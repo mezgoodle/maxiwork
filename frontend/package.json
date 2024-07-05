@@ -7,10 +7,19 @@
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "test": "vitest --run"
   },
   "dependencies": {
     "nuxt": "^3.12.2",
     "vue": "latest"
+  },
+  "devDependencies": {
+    "@nuxt/test-utils": "^3.13.1",
+    "@vitejs/plugin-vue": "^5.0.5",
+    "@vue/test-utils": "^2.4.6",
+    "happy-dom": "^14.12.3",
+    "playwright-core": "^1.45.1",
+    "vitest": "^1.6.0"
   }
 }
