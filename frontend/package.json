@@ -9,17 +9,22 @@
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "test": "vitest --run",
-    "test:coverage": "vitest --run --coverage"
+    "test:coverage": "vitest --run --coverage",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
   "dependencies": {
     "nuxt": "^3.12.2",
     "vue": "latest"
   },
   "devDependencies": {
+    "@nuxt/eslint": "^0.3.13",
+    "@nuxt/eslint-config": "^0.3.13",
     "@nuxt/test-utils": "^3.13.1",
     "@vitejs/plugin-vue": "^5.0.5",
     "@vitest/coverage-v8": "^1.6.0",
     "@vue/test-utils": "^2.4.6",
+    "eslint": "^8.57.0",
     "happy-dom": "^14.12.3",
     "playwright-core": "^1.45.1",
     "vitest": "^1.6.0"

@@ -2,33 +2,86 @@ image: node:18
 
 stages:
   - build
+  - lint
   - test
   - deploy
 
+variables:
+  BACKEND_DIR: "backend"
+  FRONTEND_DIR: "frontend"
+
 cache:
   paths:
-    - backend/node_modules/
+    - ${BACKEND_DIR}/node_modules/
+    - ${FRONTEND_DIR}/node_modules/
+    - ${FRONTEND_DIR}/.nuxt/ # Кешуємо директорію .nuxt
 
-before_script:
-  - cd backend
-
-install_dependencies-job:
-  stage: build
+.install_dependencies: &install_dependencies
   script:
-    - npm install
+    - cd $CI_PROJECT_DIR/$APP_DIR
+    - npm ci
 
-lint-job:
-  stage: test
+.lint: &lint
   script:
+    - cd $CI_PROJECT_DIR/$APP_DIR
     - npm run lint
 
-test-job:
-  stage: test
+.test: &test
   script:
+    - cd $CI_PROJECT_DIR/$APP_DIR
     - npm run test
 
-deploy-job:
+backend_build:
+  stage: build
+  variables:
+    APP_DIR: ${BACKEND_DIR}
+  <<: *install_dependencies
+
+# Збірка фронтенду
+frontend_build:
+  stage: build
+  variables:
+    APP_DIR: ${FRONTEND_DIR}
+  script:
+    - cd $CI_PROJECT_DIR/$APP_DIR
+    - npm ci
+    - npm run build # Замініть на вашу команду збірки Nuxt
+
+backend_lint:
+  stage: lint
+  variables:
+    APP_DIR: ${BACKEND_DIR}
+  <<: *lint
+
+frontend_lint:
+  stage: lint
+  variables:
+    APP_DIR: ${FRONTEND_DIR}
+  <<: *lint
+
+backend_test:
+  stage: test
+  variables:
+    APP_DIR: ${BACKEND_DIR}
+  <<: *test
+
+frontend_test:
+  stage: test
+  variables:
+    APP_DIR: ${FRONTEND_DIR}
+  needs: ["frontend_build"] # Залежність від збірки фронтенду
+  <<: *test
+
+backend_deploy:
   stage: deploy
   script:
-    - echo "Deploying application..."
-    - echo "Application successfully deployed."
+    - echo "Deploying backend application..."
+    # Додайте команди для деплою бекенду
+    - echo "Backend application successfully deployed."
+
+frontend_deploy:
+  stage: deploy
+  script:
+    - echo "Deploying frontend application..."
+    # Додайте команди для деплою фронтенду
+    - echo "Frontend application successfully deployed."
