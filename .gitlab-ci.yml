@@ -78,10 +78,3 @@ backend_deploy:
     - echo "Deploying backend application..."
     # Додайте команди для деплою бекенду
     - echo "Backend application successfully deployed."
-
-frontend_deploy:
-  stage: deploy
-  script:
-    - echo "Deploying frontend application..."
-    # Додайте команди для деплою фронтенду
-    - echo "Frontend application successfully deployed."
