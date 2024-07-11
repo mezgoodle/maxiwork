@@ -12,7 +12,6 @@ phases:
   build:
     commands:
       - ls -a
-      - cd ./backend
       - npm run build # Або іншу команду для збирання вашого NestJS застосунку
   post_build:
     commands:
