@@ -16,7 +16,6 @@ phases:
   post_build:
     commands:
       - ls -a
-      - cd backend
       - mv dist ../ # Перемістіть збірку бекенду в корінь для розгортання на Beanstalk
 
 artifacts:
