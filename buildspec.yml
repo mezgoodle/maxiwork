@@ -5,6 +5,7 @@ phases:
     runtime-versions:
       nodejs: 16 # Замініть на потрібну версію Node.js
     commands:
+      - ls -a
       - cd backend
       - npm install
   build:
