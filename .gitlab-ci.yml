@@ -4,7 +4,6 @@ stages:
   - build
   - lint
   - test
-  - deploy
 
 variables:
   BACKEND_DIR: "backend"
@@ -71,10 +70,3 @@ frontend_test:
     APP_DIR: ${FRONTEND_DIR}
   needs: ["frontend_build"] # Залежність від збірки фронтенду
   <<: *test
-
-backend_deploy:
-  stage: deploy
-  script:
-    - echo "Deploying backend application..."
-    # Додайте команди для деплою бекенду
-    - echo "Backend application successfully deployed."
