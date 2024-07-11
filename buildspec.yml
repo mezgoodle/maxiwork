@@ -11,10 +11,12 @@ phases:
       - npm install
   build:
     commands:
+      - ls -a
       - cd ./backend
       - npm run build # Або іншу команду для збирання вашого NestJS застосунку
   post_build:
     commands:
+      - ls -a
       - cd backend
       - mv dist ../ # Перемістіть збірку бекенду в корінь для розгортання на Beanstalk
 
