@@ -10,15 +10,17 @@ variables:
   FRONTEND_DIR: "frontend"
 
 cache:
+  key: ${CI_COMMIT_REF_SLUG}
   paths:
     - ${BACKEND_DIR}/node_modules/
     - ${FRONTEND_DIR}/node_modules/
     - ${FRONTEND_DIR}/.nuxt/ # Кешуємо директорію .nuxt
 
-.install_dependencies: &install_dependencies
+.build: &build
   script:
     - cd $CI_PROJECT_DIR/$APP_DIR
-    - npm ci
+    - npm install
+    - npm run build
 
 .lint: &lint
   script:
@@ -34,17 +36,13 @@ backend_build:
   stage: build
   variables:
     APP_DIR: ${BACKEND_DIR}
-  <<: *install_dependencies
+  <<: *build
 
-# Збірка фронтенду
 frontend_build:
   stage: build
   variables:
     APP_DIR: ${FRONTEND_DIR}
-  script:
-    - cd $CI_PROJECT_DIR/$APP_DIR
-    - npm ci
-    - npm run build # Замініть на вашу команду збірки Nuxt
+  <<: *build
 
 backend_lint:
   stage: lint

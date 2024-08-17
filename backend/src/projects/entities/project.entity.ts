@@ -8,7 +8,7 @@ import {
 } from 'typeorm';
 
 @Entity()
-export class Task {
+export class Project {
   @ObjectIdColumn()
   id: ObjectId;
 
@@ -19,13 +19,10 @@ export class Task {
   description: string;
 
   @Column()
-  status: string;
+  members: string[];
 
   @Column()
-  userId: string;
-
-  @Column({ default: false })
-  isFinished: boolean;
+  tasks: string[];
 
   @CreateDateColumn()
   createdAt: Date;

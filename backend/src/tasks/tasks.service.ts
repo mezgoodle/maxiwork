@@ -2,13 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
-import { Repository } from 'typeorm';
+import { MongoRepository } from 'typeorm';
+import { ObjectId } from 'mongodb';
 import { Task } from './entities/task.entity';
 
 @Injectable()
 export class TasksService {
   constructor(
-    @InjectRepository(Task) private taskRepository: Repository<Task>,
+    @InjectRepository(Task) private taskRepository: MongoRepository<Task>,
   ) {}
   async create(createTaskDto: CreateTaskDto) {
     return this.taskRepository.save(createTaskDto);
@@ -18,15 +19,16 @@ export class TasksService {
     return this.taskRepository.find();
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} task`;
+  async findOne(id: string) {
+    const objectId = new ObjectId(id);
+    return await this.taskRepository.findOneBy({ _id: objectId });
   }
 
-  update(id: number, updateTaskDto: UpdateTaskDto) {
-    return `This action updates a #${id} task`;
+  async update(id: string, updateTaskDto: UpdateTaskDto) {
+    return await this.taskRepository.update(id, updateTaskDto);
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} task`;
+  async remove(id: string) {
+    return await this.taskRepository.delete(id);
   }
 }
