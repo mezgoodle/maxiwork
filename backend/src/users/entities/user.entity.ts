@@ -1,31 +1,25 @@
 import {
   Entity,
   Column,
-  ObjectId,
   ObjectIdColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  ObjectId,
 } from 'typeorm';
 
 @Entity()
-export class Task {
+export class User {
   @ObjectIdColumn()
   id: ObjectId;
 
-  @Column()
-  title: string;
+  @Column({ unique: true })
+  email: string;
+
+  @Column({ unique: true })
+  username: string;
 
   @Column()
-  description: string;
-
-  @Column()
-  status: string;
-
-  @Column()
-  userId: string;
-
-  @Column({ default: false })
-  isFinished: boolean;
+  password: string;
 
   @CreateDateColumn()
   createdAt: Date;
