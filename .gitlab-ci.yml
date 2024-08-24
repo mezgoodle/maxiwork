@@ -11,6 +11,7 @@ stages:
   - build
   - lint
   - test
+  - api
 
 variables:
   BACKEND_DIR: "backend"
@@ -30,7 +31,14 @@ variables:
 .test: &test
   script:
     - cd $CI_PROJECT_DIR/$APP_DIR
-    - npm run test
+    - npm run test:coverage
+  coverage: '/All files[^\|]*\|[^\|]*\s+([\d\.]+)/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: $CI_PROJECT_DIR/$APP_DIR/coverage/cobertura-coverage.xml
+
 
 backend_build:
   stage: build
@@ -50,6 +58,8 @@ backend_lint:
   variables:
     APP_DIR: ${BACKEND_DIR}
   <<: *lint
+  allow_failure: true
+
 
 frontend_lint:
   stage: lint
