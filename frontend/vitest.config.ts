@@ -8,7 +8,6 @@ export default defineConfig({
     environment: "happy-dom",
     coverage: {
       provider: "v8",
-      reporter: ["cobertura"],
     },
   },
   resolve: {

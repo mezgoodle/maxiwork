@@ -33,11 +33,11 @@ variables:
     - cd $CI_PROJECT_DIR/$APP_DIR
     - npm run test:coverage
   coverage: '/All files[^\|]*\|[^\|]*\s+([\d\.]+)/'
-  artifacts:
-    reports:
-      coverage_report:
-        coverage_format: cobertura
-        path: $CI_PROJECT_DIR/$APP_DIR/coverage/cobertura-coverage.xml
+  # artifacts:
+  #   reports:
+  #     coverage_report:
+  #       coverage_format: cobertura
+  #       path: $CI_PROJECT_DIR/$APP_DIR/coverage/cobertura-coverage.xml
 
 
 backend_build:
