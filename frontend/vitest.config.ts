@@ -6,6 +6,10 @@ export default defineConfig({
   plugins: [vue()],
   test: {
     environment: "happy-dom",
+    coverage: {
+      provider: "v8",
+      reporter: ["cobertura"],
+    },
   },
   resolve: {
     alias: {
