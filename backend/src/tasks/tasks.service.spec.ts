@@ -43,6 +43,22 @@ describe('TasksService', () => {
       expect(await service.create(createTaskDto)).toEqual(createTaskDto);
       expect(repository.save).toHaveBeenCalledWith(createTaskDto);
     });
+
+    it('should handle save errors', async () => {
+      const createTaskDto: CreateTaskDto = {
+        title: 'Test Task',
+        description: 'Test Description',
+        status: 'OPEN',
+        userId: '60b5f8c8e11b1a3d2c20d2b6',
+      };
+      jest
+        .spyOn(repository, 'save')
+        .mockRejectedValue(new Error('Save failed'));
+
+      await expect(service.create(createTaskDto)).rejects.toThrow(
+        'Save failed',
+      );
+    });
   });
 
   describe('findAll', () => {
@@ -85,6 +101,21 @@ describe('TasksService', () => {
       expect(await service.update(id, updateTaskDto)).toEqual(result);
       expect(repository.update).toHaveBeenCalledWith(id, updateTaskDto);
     });
+
+    it('should handle update errors', async () => {
+      const id = '1';
+      const updateTaskDto: UpdateTaskDto = {
+        title: 'Updated Task',
+        description: 'Updated Description',
+      };
+      jest
+        .spyOn(repository, 'update')
+        .mockRejectedValue(new Error('Update failed'));
+
+      await expect(service.update(id, updateTaskDto)).rejects.toThrow(
+        'Update failed',
+      );
+    });
   });
 
   describe('remove', () => {
@@ -95,6 +126,15 @@ describe('TasksService', () => {
 
       expect(await service.remove(id)).toEqual(result);
       expect(repository.delete).toHaveBeenCalledWith(id);
+    });
+
+    it('should handle remove errors', async () => {
+      const id = '1';
+      jest
+        .spyOn(repository, 'delete')
+        .mockRejectedValue(new Error('Remove failed'));
+
+      await expect(service.remove(id)).rejects.toThrow('Remove failed');
     });
   });
 });
