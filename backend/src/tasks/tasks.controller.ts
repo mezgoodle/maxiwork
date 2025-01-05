@@ -11,6 +11,7 @@ import {
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
+import { plainToClass } from 'class-transformer';
 
 @Controller('tasks')
 export class TasksController {
@@ -18,7 +19,9 @@ export class TasksController {
 
   @Post()
   create(@Body() createTaskDto: CreateTaskDto) {
-    return this.tasksService.create(createTaskDto);
+    const task = plainToClass(CreateTaskDto, createTaskDto);
+    console.log(task); // Повинно містити isFinished: false, якщо поле не передане
+    return this.tasksService.create(task);
   }
 
   @Get()

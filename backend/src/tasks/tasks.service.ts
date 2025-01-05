@@ -5,6 +5,7 @@ import { UpdateTaskDto } from './dto/update-task.dto';
 import { MongoRepository } from 'typeorm';
 import { ObjectId } from 'mongodb';
 import { Task } from './entities/task.entity';
+import { IdValidator } from 'src/validators';
 
 @Injectable()
 export class TasksService {
