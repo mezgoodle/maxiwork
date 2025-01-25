@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import { Task } from '@/tasks/schemas/task.schema';
 import { User } from '@/users/schemas/user.schema';
 
-@Schema()
+@Schema({ timestamps: true })
 export class Project {
   @Prop({ unique: true, required: true })
   title: string;
