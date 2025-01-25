@@ -7,21 +7,22 @@ import {
   Param,
   Delete,
   NotFoundException,
+  HttpException,
 } from '@nestjs/common';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
-import { plainToClass } from 'class-transformer';
+import mongoose from 'mongoose';
+import { ApiTags } from '@nestjs/swagger';
 
+@ApiTags('tasks')
 @Controller('tasks')
 export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
   @Post()
   create(@Body() createTaskDto: CreateTaskDto) {
-    const task = plainToClass(CreateTaskDto, createTaskDto);
-    console.log(task); // Повинно містити isFinished: false, якщо поле не передане
-    return this.tasksService.create(task);
+    return this.tasksService.create(createTaskDto);
   }
 
   @Get()
@@ -31,6 +32,10 @@ export class TasksController {
 
   @Get(':id')
   async findOne(@Param('id') id: string) {
+    const isValidObjectId = mongoose.Types.ObjectId.isValid(id);
+    if (!isValidObjectId) {
+      throw new HttpException('Invalid ID', 400);
+    }
     const task = await this.tasksService.findOne(id);
     if (!task) {
       throw new NotFoundException();
@@ -40,11 +45,23 @@ export class TasksController {
 
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateTaskDto: UpdateTaskDto) {
+    const isValidObjectId = mongoose.Types.ObjectId.isValid(id);
+    if (!isValidObjectId) {
+      throw new HttpException('Invalid ID', 400);
+    }
     return this.tasksService.update(id, updateTaskDto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.tasksService.remove(id);
+  async remove(@Param('id') id: string) {
+    const isValidObjectId = mongoose.Types.ObjectId.isValid(id);
+    if (!isValidObjectId) {
+      throw new HttpException('Invalid ID', 400);
+    }
+    const task = await this.tasksService.remove(id);
+    if (!task) {
+      throw new HttpException('Task not found', 404);
+    }
+    return;
   }
 }

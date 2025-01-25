@@ -1,13 +1,6 @@
-import {
-  IsString,
-  IsNotEmpty,
-  IsEnum,
-  IsBoolean,
-  IsOptional,
-} from 'class-validator';
-import { Transform } from 'class-transformer';
+import { IsString, IsNotEmpty, IsEnum, MaxLength } from 'class-validator';
 
-enum TaskStatus {
+export enum TaskStatus {
   OPEN = 'OPEN',
   IN_PROGRESS = 'IN_PROGRESS',
   DONE = 'DONE',
@@ -20,6 +13,7 @@ export class CreateTaskDto {
 
   @IsString()
   @IsNotEmpty()
+  @MaxLength(500)
   description: string;
 
   @IsEnum(TaskStatus)
@@ -30,7 +24,7 @@ export class CreateTaskDto {
   @IsNotEmpty()
   userId: string;
 
-  @IsBoolean()
-  @Transform(({ value }) => (value !== undefined ? value : false))
-  isFinished: boolean;
+  @IsString()
+  @IsNotEmpty()
+  projectId: string;
 }
