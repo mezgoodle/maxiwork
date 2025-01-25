@@ -1,35 +1,51 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { HttpException, Injectable } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
-import { MongoRepository } from 'typeorm';
-import { ObjectId } from 'mongodb';
-import { Project } from './entities/project.entity';
+import { Model } from 'mongoose';
+import { Project } from './schemas/project.schema';
+import { User } from '@/users/schemas/user.schema';
 
 @Injectable()
 export class ProjectsService {
   constructor(
-    @InjectRepository(Project)
-    private projectRepository: MongoRepository<Project>,
+    @InjectModel(Project.name) private projectModel: Model<Project>,
+    @InjectModel(User.name) private userModel: Model<User>,
   ) {}
-  async create(createProjectDto: CreateProjectDto) {
-    return this.projectRepository.save(createProjectDto);
+  async create({ userId, ...createProjectDto }: CreateProjectDto) {
+    const user = await this.userModel.findById(userId);
+    if (!user) throw new HttpException('User Not Found', 404);
+    const newProject = new this.projectModel({
+      user: userId,
+      ...createProjectDto,
+    });
+    const savedProject = await newProject.save();
+    await user.updateOne({ $push: { projects: savedProject._id } });
+    return savedProject;
   }
 
   async findAll() {
-    return this.projectRepository.find();
+    return this.projectModel.find();
   }
 
   async findOne(id: string) {
-    const objectId = new ObjectId(id);
-    return await this.projectRepository.findOneBy({ _id: objectId });
+    return await this.projectModel.findById(id);
   }
 
   async update(id: string, updateProjectDto: UpdateProjectDto) {
-    return await this.projectRepository.update(id, updateProjectDto);
+    return await this.projectModel.findByIdAndUpdate(id, updateProjectDto, {
+      new: true,
+    });
   }
 
   async remove(id: string) {
-    return await this.projectRepository.delete(id);
+    const project = await this.projectModel.findById(id);
+    if (!project) throw new HttpException('Project Not Found', 404);
+
+    const { user, _id } = project;
+
+    await this.userModel.updateOne({ _id: user }, { $pull: { projects: _id } });
+
+    return await this.projectModel.findByIdAndDelete(id);
   }
 }
