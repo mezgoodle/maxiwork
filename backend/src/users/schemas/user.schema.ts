@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import { Project } from '@/projects/schemas/project.schema';
 import { Task } from '@/tasks/schemas/task.schema';
 
-@Schema()
+@Schema({ timestamps: true })
 export class User {
   @Prop({ unique: true })
   email: string;
