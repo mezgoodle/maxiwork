@@ -7,13 +7,15 @@ import {
   Param,
   Delete,
   HttpException,
+  NotFoundException,
+  UsePipes,
 } from '@nestjs/common';
 import { ProjectsService } from './projects.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { ProjectDto } from './dto/project.dto';
-import mongoose from 'mongoose';
 import { ApiTags } from '@nestjs/swagger';
+import { ObjectIdPipe } from '@/pipes/objectId.pipe';
 
 @ApiTags('projects')
 @Controller('projects')
@@ -33,11 +35,8 @@ export class ProjectsController {
   }
 
   @Get(':id')
+  @UsePipes(ObjectIdPipe)
   async findOne(@Param('id') id: string): Promise<ProjectDto> {
-    const isValidObjectId = mongoose.Types.ObjectId.isValid(id);
-    if (!isValidObjectId) {
-      throw new HttpException('Invalid ID', 400);
-    }
     const project = await this.projectsService.findOne(id);
     if (!project) {
       throw new HttpException('Project not found', 404);
@@ -46,14 +45,11 @@ export class ProjectsController {
   }
 
   @Patch(':id')
+  @UsePipes(ObjectIdPipe)
   async update(
     @Param('id') id: string,
     @Body() updateProjectDto: UpdateProjectDto,
   ): Promise<ProjectDto> {
-    const isValidObjectId = mongoose.Types.ObjectId.isValid(id);
-    if (!isValidObjectId) {
-      throw new HttpException('Invalid ID', 400);
-    }
     const project = await this.projectsService.update(id, updateProjectDto);
     if (!project) {
       throw new HttpException('Project not found', 404);
@@ -62,14 +58,11 @@ export class ProjectsController {
   }
 
   @Delete(':id')
+  @UsePipes(ObjectIdPipe)
   remove(@Param('id') id: string) {
-    const isValidObjectId = mongoose.Types.ObjectId.isValid(id);
-    if (!isValidObjectId) {
-      throw new HttpException('Invalid ID', 400);
-    }
     const project = this.projectsService.remove(id);
     if (!project) {
-      throw new HttpException('Project not found', 404);
+      throw new NotFoundException('Project not found');
     }
     return;
   }

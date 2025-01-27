@@ -8,12 +8,13 @@ import {
   Delete,
   NotFoundException,
   HttpException,
+  UsePipes,
 } from '@nestjs/common';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
-import mongoose from 'mongoose';
 import { ApiTags } from '@nestjs/swagger';
+import { ObjectIdPipe } from '@/pipes/objectId.pipe';
 
 @ApiTags('tasks')
 @Controller('tasks')
@@ -31,11 +32,8 @@ export class TasksController {
   }
 
   @Get(':id')
+  @UsePipes(ObjectIdPipe)
   async findOne(@Param('id') id: string) {
-    const isValidObjectId = mongoose.Types.ObjectId.isValid(id);
-    if (!isValidObjectId) {
-      throw new HttpException('Invalid ID', 400);
-    }
     const task = await this.tasksService.findOne(id);
     if (!task) {
       throw new NotFoundException();
@@ -44,20 +42,14 @@ export class TasksController {
   }
 
   @Patch(':id')
+  @UsePipes(ObjectIdPipe)
   update(@Param('id') id: string, @Body() updateTaskDto: UpdateTaskDto) {
-    const isValidObjectId = mongoose.Types.ObjectId.isValid(id);
-    if (!isValidObjectId) {
-      throw new HttpException('Invalid ID', 400);
-    }
     return this.tasksService.update(id, updateTaskDto);
   }
 
   @Delete(':id')
+  @UsePipes(ObjectIdPipe)
   async remove(@Param('id') id: string) {
-    const isValidObjectId = mongoose.Types.ObjectId.isValid(id);
-    if (!isValidObjectId) {
-      throw new HttpException('Invalid ID', 400);
-    }
     const task = await this.tasksService.remove(id);
     if (!task) {
       throw new HttpException('Task not found', 404);
