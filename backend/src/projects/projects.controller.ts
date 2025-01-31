@@ -8,7 +8,6 @@ import {
   Delete,
   HttpException,
   NotFoundException,
-  UsePipes,
 } from '@nestjs/common';
 import { ProjectsService } from './projects.service';
 import { CreateProjectDto } from './dto/create-project.dto';
@@ -26,7 +25,11 @@ export class ProjectsController {
   async create(
     @Body() createProjectDto: CreateProjectDto,
   ): Promise<ProjectDto> {
-    return await this.projectsService.create(createProjectDto);
+    const response = await this.projectsService.create(createProjectDto);
+    if (response.error) {
+      throw new HttpException(response.error.message, response.error.status);
+    }
+    return response.data;
   }
 
   @Get()
@@ -35,34 +38,34 @@ export class ProjectsController {
   }
 
   @Get(':id')
-  @UsePipes(ObjectIdPipe)
-  async findOne(@Param('id') id: string): Promise<ProjectDto> {
+  async findOne(@Param('id', ObjectIdPipe) id: string): Promise<ProjectDto> {
     const project = await this.projectsService.findOne(id);
     if (!project) {
-      throw new HttpException('Project not found', 404);
+      throw new NotFoundException('Project not found');
     }
     return project;
   }
 
   @Patch(':id')
-  @UsePipes(ObjectIdPipe)
   async update(
-    @Param('id') id: string,
+    @Param('id', ObjectIdPipe) id: string,
     @Body() updateProjectDto: UpdateProjectDto,
   ): Promise<ProjectDto> {
-    const project = await this.projectsService.update(id, updateProjectDto);
-    if (!project) {
-      throw new HttpException('Project not found', 404);
+    const updatedProject = await this.projectsService.update(
+      id,
+      updateProjectDto,
+    );
+    if (!updatedProject) {
+      throw new NotFoundException('Project not found');
     }
-    return project;
+    return updatedProject;
   }
 
   @Delete(':id')
-  @UsePipes(ObjectIdPipe)
-  remove(@Param('id') id: string) {
-    const project = this.projectsService.remove(id);
-    if (!project) {
-      throw new NotFoundException('Project not found');
+  async remove(@Param('id', ObjectIdPipe) id: string) {
+    const response = await this.projectsService.remove(id);
+    if (response.error) {
+      throw new HttpException(response.error.message, response.error.status);
     }
     return;
   }

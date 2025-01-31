@@ -8,7 +8,6 @@ import {
   Delete,
   NotFoundException,
   HttpException,
-  UsePipes,
 } from '@nestjs/common';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
@@ -22,8 +21,12 @@ export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
   @Post()
-  create(@Body() createTaskDto: CreateTaskDto) {
-    return this.tasksService.create(createTaskDto);
+  async create(@Body() createTaskDto: CreateTaskDto) {
+    const response = await this.tasksService.create(createTaskDto);
+    if (response.error) {
+      throw new HttpException(response.error.message, response.error.status);
+    }
+    return response.data;
   }
 
   @Get()
@@ -32,27 +35,31 @@ export class TasksController {
   }
 
   @Get(':id')
-  @UsePipes(ObjectIdPipe)
-  async findOne(@Param('id') id: string) {
+  async findOne(@Param('id', ObjectIdPipe) id: string) {
     const task = await this.tasksService.findOne(id);
     if (!task) {
-      throw new NotFoundException();
+      throw new NotFoundException('Task not found');
     }
     return task;
   }
 
   @Patch(':id')
-  @UsePipes(ObjectIdPipe)
-  update(@Param('id') id: string, @Body() updateTaskDto: UpdateTaskDto) {
-    return this.tasksService.update(id, updateTaskDto);
+  async update(
+    @Param('id', ObjectIdPipe) id: string,
+    @Body() updateTaskDto: UpdateTaskDto,
+  ) {
+    const updatedTask = await this.tasksService.update(id, updateTaskDto);
+    if (!updatedTask) {
+      throw new NotFoundException('Task not found');
+    }
+    return updatedTask;
   }
 
   @Delete(':id')
-  @UsePipes(ObjectIdPipe)
-  async remove(@Param('id') id: string) {
-    const task = await this.tasksService.remove(id);
-    if (!task) {
-      throw new HttpException('Task not found', 404);
+  async remove(@Param('id', ObjectIdPipe) id: string) {
+    const response = await this.tasksService.remove(id);
+    if (response.error) {
+      throw new HttpException(response.error.message, response.error.status);
     }
     return;
   }

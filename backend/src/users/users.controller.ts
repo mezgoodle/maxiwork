@@ -7,7 +7,7 @@ import {
   Param,
   Delete,
   HttpException,
-  UsePipes,
+  NotFoundException,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -21,8 +21,12 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
-  create(@Body() createUserDto: CreateUserDto) {
-    return this.usersService.create(createUserDto);
+  async create(@Body() createUserDto: CreateUserDto) {
+    const response = await this.usersService.create(createUserDto);
+    if (response.error) {
+      throw new HttpException(response.error.message, response.error.status);
+    }
+    return response.data;
   }
 
   @Get()
@@ -31,31 +35,31 @@ export class UsersController {
   }
 
   @Get(':id')
-  @UsePipes(ObjectIdPipe)
-  async findOne(@Param('id') id: string) {
+  async findOne(@Param('id', ObjectIdPipe) id: string) {
     const user = await this.usersService.findOne(id);
     if (!user) {
-      throw new HttpException('User not found', 404);
+      throw new NotFoundException('User not found');
     }
     return user;
   }
 
   @Patch(':id')
-  @UsePipes(ObjectIdPipe)
-  async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    const user = await this.usersService.update(id, updateUserDto);
-    if (!user) {
-      throw new HttpException('User not found', 404);
+  async update(
+    @Param('id', ObjectIdPipe) id: string,
+    @Body() updateUserDto: UpdateUserDto,
+  ) {
+    const updatedUser = await this.usersService.update(id, updateUserDto);
+    if (!updatedUser) {
+      throw new NotFoundException('User not found');
     }
-    return user;
+    return updatedUser;
   }
 
   @Delete(':id')
-  @UsePipes(ObjectIdPipe)
-  async remove(@Param('id') id: string) {
+  async remove(@Param('id', ObjectIdPipe) id: string) {
     const user = await this.usersService.remove(id);
     if (!user) {
-      throw new HttpException('User not found', 404);
+      throw new NotFoundException('User not found');
     }
     return;
   }
