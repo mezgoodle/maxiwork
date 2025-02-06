@@ -17,7 +17,7 @@ export class ProjectsService {
   async create({
     userId,
     ...createProjectDto
-  }: CreateProjectDto): Promise<Response<Project>> {
+  }: CreateProjectDto): Promise<Response> {
     const user = await this.userModel.findById(userId);
     if (!user)
       return {
@@ -50,7 +50,7 @@ export class ProjectsService {
     });
   }
 
-  async remove(id: string): Promise<Response<Project>> {
+  async remove(id: string): Promise<Response> {
     const project = await this.projectModel.findById(id);
     if (!project)
       return {

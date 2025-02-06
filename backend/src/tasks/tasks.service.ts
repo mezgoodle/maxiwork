@@ -21,7 +21,7 @@ export class TasksService {
     userId,
     projectId,
     ...createTaskDto
-  }: CreateTaskDto): Promise<Response<Task>> {
+  }: CreateTaskDto): Promise<Response> {
     const user = await this.userModel.findById(userId);
     const project = await this.projectModel.findById(projectId);
     if (!user) return { data: null, error: new ApiError('User Not Found') };
@@ -55,7 +55,7 @@ export class TasksService {
     });
   }
 
-  async remove(id: string): Promise<Response<Task>> {
+  async remove(id: string): Promise<Response> {
     const task = await this.taskModel.findById(id);
     if (!task)
       return {

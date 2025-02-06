@@ -19,12 +19,6 @@ export class Task {
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Project' })
   project: Project;
-
-  // @Prop({ default: new Date() })
-  // createdAt: Date;
-
-  // @Prop({ default: new Date() })
-  // updatedAt: Date;
 }
 
 export const TaskSchema = SchemaFactory.createForClass(Task);

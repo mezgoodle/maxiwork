@@ -10,7 +10,7 @@ import { Response } from '@/utils/interfaces/response.interface';
 export class UsersService {
   constructor(@InjectModel(User.name) private userModel: Model<User>) {}
 
-  async create(createUserDto: CreateUserDto): Promise<Response<User>> {
+  async create(createUserDto: CreateUserDto): Promise<Response> {
     const newUser = new this.userModel(createUserDto);
     const savedUser = await newUser.save();
     return {

@@ -1,6 +1,7 @@
+import { Document } from 'mongoose';
 import { ApiError } from '../errors';
 
-export interface Response<T> {
-  data: T | null;
+export interface Response {
+  data: Document | null;
   error: ApiError | null;
 }
