@@ -15,6 +15,7 @@ import { UpdateProjectDto } from './dto/update-project.dto';
 import { ProjectDto } from './dto/project.dto';
 import { ApiTags } from '@nestjs/swagger';
 import { ObjectIdPipe } from '@/pipes/objectId.pipe';
+import { plainToInstance } from 'class-transformer';
 
 @ApiTags('projects')
 @Controller('projects')
@@ -29,12 +30,16 @@ export class ProjectsController {
     if (response.error) {
       throw new HttpException(response.error.message, response.error.status);
     }
-    return response.data;
+    const project = response.data.toObject();
+    return plainToInstance(ProjectDto, project);
   }
 
   @Get()
-  findAll(): Promise<ProjectDto[]> {
-    return this.projectsService.findAll();
+  async findAll(): Promise<ProjectDto[]> {
+    const projects = await this.projectsService.findAll();
+    return projects.map((project) =>
+      plainToInstance(ProjectDto, project.toObject()),
+    );
   }
 
   @Get(':id')
@@ -43,7 +48,8 @@ export class ProjectsController {
     if (!project) {
       throw new NotFoundException('Project not found');
     }
-    return project;
+    const projectObject = project.toObject();
+    return plainToInstance(ProjectDto, projectObject);
   }
 
   @Patch(':id')
@@ -58,7 +64,8 @@ export class ProjectsController {
     if (!updatedProject) {
       throw new NotFoundException('Project not found');
     }
-    return updatedProject;
+    const projectObject = updatedProject.toObject();
+    return plainToInstance(ProjectDto, projectObject);
   }
 
   @Delete(':id')

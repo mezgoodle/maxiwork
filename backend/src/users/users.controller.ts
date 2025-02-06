@@ -14,6 +14,8 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ApiTags } from '@nestjs/swagger';
 import { ObjectIdPipe } from '@/pipes/objectId.pipe';
+import { UserDto } from './dto/user.dto';
+import { plainToInstance } from 'class-transformer';
 
 @ApiTags('users')
 @Controller('users')
@@ -21,38 +23,42 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
-  async create(@Body() createUserDto: CreateUserDto) {
+  async create(@Body() createUserDto: CreateUserDto): Promise<UserDto> {
     const response = await this.usersService.create(createUserDto);
     if (response.error) {
       throw new HttpException(response.error.message, response.error.status);
     }
-    return response.data;
+    const user = response.data.toObject();
+    return plainToInstance(UserDto, user);
   }
 
   @Get()
-  findAll() {
-    return this.usersService.findAll();
+  async findAll(): Promise<UserDto[]> {
+    const users = await this.usersService.findAll();
+    return users.map((user) => plainToInstance(UserDto, user.toObject()));
   }
 
   @Get(':id')
-  async findOne(@Param('id', ObjectIdPipe) id: string) {
+  async findOne(@Param('id', ObjectIdPipe) id: string): Promise<UserDto> {
     const user = await this.usersService.findOne(id);
     if (!user) {
       throw new NotFoundException('User not found');
     }
-    return user;
+    const userObject = user.toObject();
+    return plainToInstance(UserDto, userObject);
   }
 
   @Patch(':id')
   async update(
     @Param('id', ObjectIdPipe) id: string,
     @Body() updateUserDto: UpdateUserDto,
-  ) {
+  ): Promise<UserDto> {
     const updatedUser = await this.usersService.update(id, updateUserDto);
     if (!updatedUser) {
       throw new NotFoundException('User not found');
     }
-    return updatedUser;
+    const userObject = updatedUser.toObject();
+    return plainToInstance(UserDto, userObject);
   }
 
   @Delete(':id')
