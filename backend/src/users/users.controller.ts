@@ -9,11 +9,18 @@ import {
   HttpStatus,
   HttpException,
   NotFoundException,
+  Query,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ObjectIdPipe } from '@/pipes/objectId.pipe';
 import { UserDto } from './dto/user.dto';
 import { plainToInstance } from 'class-transformer';
@@ -56,8 +63,30 @@ export class UsersController {
     description: 'Get an array of users',
     type: [UserDto],
   })
-  async findAll(): Promise<UserDto[]> {
-    const users = await this.usersService.findAll();
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Number of items per page',
+    example: 10,
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Search email for users',
+    example: 'test@example.com',
+  })
+  async findAll(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Query('search') search: string = '',
+  ): Promise<UserDto[]> {
+    const users = await this.usersService.findAll(page, limit, search);
     return users.map((user) => plainToInstance(UserDto, user.toObject()));
   }
 

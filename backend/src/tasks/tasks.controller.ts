@@ -9,11 +9,18 @@ import {
   NotFoundException,
   HttpException,
   HttpStatus,
+  Query,
 } from '@nestjs/common';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ObjectIdPipe } from '@/pipes/objectId.pipe';
 import { plainToInstance } from 'class-transformer';
 import { TaskDto } from './dto/task.dto';
@@ -52,8 +59,30 @@ export class TasksController {
     description: 'Returns an array of tasks',
     type: [TaskDto],
   })
-  async findAll(): Promise<TaskDto[]> {
-    const tasks = await this.tasksService.findAll();
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Number of items per page',
+    example: 10,
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Search title for task',
+    example: 'title',
+  })
+  async findAll(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Query('search') search: string = '',
+  ): Promise<TaskDto[]> {
+    const tasks = await this.tasksService.findAll(page, limit, search);
     return tasks.map((task) => plainToInstance(TaskDto, task.toObject()));
   }
 

@@ -41,8 +41,10 @@ export class TasksService {
     };
   }
 
-  async findAll() {
-    return this.taskModel.find();
+  async findAll(page: number = 1, limit: number = 10, search: string = '') {
+    const skip = (page - 1) * limit;
+    const query = search ? { title: { $regex: search, $options: 'i' } } : {};
+    return await this.taskModel.find(query).limit(limit).skip(skip);
   }
 
   async findOne(id: string) {
