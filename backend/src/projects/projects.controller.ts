@@ -9,12 +9,19 @@ import {
   HttpException,
   NotFoundException,
   HttpStatus,
+  Query,
 } from '@nestjs/common';
 import { ProjectsService } from './projects.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { ProjectDto } from './dto/project.dto';
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ObjectIdPipe } from '@/pipes/objectId.pipe';
 import { plainToInstance } from 'class-transformer';
 
@@ -58,8 +65,30 @@ export class ProjectsController {
     description: 'Returns an array of projects',
     type: [ProjectDto],
   })
-  async findAll(): Promise<ProjectDto[]> {
-    const projects = await this.projectsService.findAll();
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Number of items per page',
+    example: 10,
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Search title for projects',
+    example: 'title',
+  })
+  async findAll(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Query('search') search: string = '',
+  ): Promise<ProjectDto[]> {
+    const projects = await this.projectsService.findAll(page, limit, search);
     return projects.map((project) =>
       plainToInstance(ProjectDto, project.toObject()),
     );
