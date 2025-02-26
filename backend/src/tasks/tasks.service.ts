@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 
 import { Task } from './schemas/task.schema';
 import { InjectModel } from '@nestjs/mongoose';
@@ -55,6 +55,51 @@ export class TasksService {
     return await this.taskModel.findByIdAndUpdate(id, updateTaskDto, {
       new: true,
     });
+  }
+
+  async reassign(id: string, userId: string): Promise<Response> {
+    const task = await this.taskModel.findById(id);
+    if (!task) {
+      return {
+        data: null,
+        error: new ApiError('Task not found'),
+      };
+    }
+
+    const oldUserId = task.user.toString();
+    if (oldUserId === userId) {
+      return {
+        data: null,
+        error: new ApiError(
+          'User already assigned to task',
+          HttpStatus.BAD_REQUEST,
+        ),
+      };
+    }
+
+    const oldUser = await this.userModel.findById(oldUserId);
+    const newUser = await this.userModel.findById(userId);
+
+    if (!newUser) {
+      return {
+        data: null,
+        error: new ApiError('User not found'),
+      };
+    }
+
+    await oldUser.updateOne({ $pull: { tasks: id } });
+    await newUser.updateOne({ $push: { tasks: id } });
+
+    const updatedTask = await this.taskModel.findByIdAndUpdate(
+      id,
+      { user: userId },
+      { new: true },
+    );
+
+    return {
+      data: updatedTask,
+      error: null,
+    };
   }
 
   async remove(id: string): Promise<Response> {

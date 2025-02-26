@@ -4,12 +4,14 @@ import { ProjectsService } from './projects.service';
 import { ProjectsController } from './projects.controller';
 import { Project, ProjectSchema } from './schemas/project.schema';
 import { User, UserSchema } from '@/users/schemas/user.schema';
+import { Task, TaskSchema } from '@/tasks/schemas/task.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: Project.name, schema: ProjectSchema },
       { name: User.name, schema: UserSchema },
+      { name: Task.name, schema: TaskSchema },
     ]),
   ],
   controllers: [ProjectsController],
