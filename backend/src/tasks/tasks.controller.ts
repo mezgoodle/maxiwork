@@ -146,6 +146,40 @@ export class TasksController {
     return plainToInstance(TaskDto, taskObject);
   }
 
+  @Patch(':id/reassign')
+  @ApiOperation({ summary: 'Reassign a task to a new user' })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    required: true,
+    description: 'The id of the task',
+  })
+  @ApiQuery({
+    name: 'newUserId',
+    type: String,
+    required: true,
+    description: 'The id of the new user to reassign the task to',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'The task has been successfully updated',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Task not found',
+  })
+  async reassign(
+    @Param('id', ObjectIdPipe) id: string,
+    @Query('newUserId', ObjectIdPipe) newUserId: string,
+  ): Promise<TaskDto> {
+    const response = await this.tasksService.reassign(id, newUserId);
+    if (response.error) {
+      throw new HttpException(response.error.message, response.error.status);
+    }
+    const taskObject = response.data.toObject();
+    return plainToInstance(TaskDto, taskObject);
+  }
+
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a task by id' })
   @ApiParam({
