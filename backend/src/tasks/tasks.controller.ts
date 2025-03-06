@@ -10,6 +10,7 @@ import {
   HttpException,
   HttpStatus,
   Query,
+  HttpCode,
 } from '@nestjs/common';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
@@ -189,13 +190,14 @@ export class TasksController {
     description: 'The id of the task',
   })
   @ApiResponse({
-    status: HttpStatus.OK,
+    status: HttpStatus.NO_CONTENT,
     description: 'The task has been successfully deleted',
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
     description: 'Task not found',
   })
+  @HttpCode(HttpStatus.NO_CONTENT)
   async remove(@Param('id', ObjectIdPipe) id: string) {
     const response = await this.tasksService.remove(id);
     if (response.error) {

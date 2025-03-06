@@ -10,6 +10,7 @@ import {
   HttpException,
   NotFoundException,
   Query,
+  HttpCode,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -167,6 +168,7 @@ export class UsersController {
     status: HttpStatus.NOT_FOUND,
     description: 'User was not found',
   })
+  @HttpCode(HttpStatus.NO_CONTENT)
   async remove(@Param('id', ObjectIdPipe) id: string) {
     const user = await this.usersService.remove(id);
     if (!user) {

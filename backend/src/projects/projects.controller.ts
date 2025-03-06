@@ -10,6 +10,7 @@ import {
   NotFoundException,
   HttpStatus,
   Query,
+  HttpCode,
 } from '@nestjs/common';
 import { ProjectsService } from './projects.service';
 import { CreateProjectDto } from './dto/create-project.dto';
@@ -258,6 +259,7 @@ export class ProjectsController {
     status: HttpStatus.NOT_FOUND,
     description: 'The project was not found',
   })
+  @HttpCode(HttpStatus.NO_CONTENT)
   async remove(@Param('id', ObjectIdPipe) id: string) {
     const response = await this.projectsService.remove(id);
     if (response.error) {
