@@ -8,8 +8,9 @@ import * as mongoose from 'mongoose';
 
 @Injectable()
 export class ObjectIdPipe implements PipeTransform {
-  transform(value: any, _metadata: ArgumentMetadata): string {
+  transform(value: any, metadata: ArgumentMetadata): string {
     if (!mongoose.Types.ObjectId.isValid(value)) {
+      console.info(metadata);
       throw new BadRequestException('Invalid ID');
     }
     return value;
