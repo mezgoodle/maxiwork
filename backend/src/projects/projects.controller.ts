@@ -251,6 +251,13 @@ export class ProjectsController {
     required: true,
     description: 'The id of the project to delete',
   })
+  @ApiParam({
+    name: 'deleteChilds',
+    type: Boolean,
+    required: false,
+    example: true,
+    description: 'Delete all tasks of the project',
+  })
   @ApiResponse({
     status: HttpStatus.NO_CONTENT,
     description: 'The project has been successfully deleted',
@@ -260,8 +267,11 @@ export class ProjectsController {
     description: 'The project was not found',
   })
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id', ObjectIdPipe) id: string) {
-    const response = await this.projectsService.remove(id);
+  async remove(
+    @Param('id', ObjectIdPipe) id: string,
+    @Param('deleteChilds') deleteChilds: boolean = true,
+  ) {
+    const response = await this.projectsService.remove(id, deleteChilds);
     if (response.error) {
       throw new HttpException(response.error.message, response.error.status);
     }

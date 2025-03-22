@@ -2,12 +2,13 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Project } from '@/projects/schemas/project.schema';
 import { User } from '@/users/schemas/user.schema';
 import { Response } from '@/utils/interfaces/response.interface';
 import { ApiError } from '@/utils/errors';
 import { Task } from '@/tasks/schemas/task.schema';
+import { TasksService } from '../tasks/tasks.service';
 
 @Injectable()
 export class ProjectsService {
@@ -15,6 +16,7 @@ export class ProjectsService {
     @InjectModel(Project.name) private projectModel: Model<Project>,
     @InjectModel(User.name) private userModel: Model<User>,
     @InjectModel(Task.name) private taskModel: Model<Project>,
+    private readonly tasksService: TasksService,
   ) {}
   async create({
     userId,
@@ -128,7 +130,7 @@ export class ProjectsService {
     };
   }
 
-  async remove(id: string): Promise<Response> {
+  async remove(id: string, deleteChilds: boolean): Promise<Response> {
     const project = await this.projectModel.findById(id);
     if (!project)
       return {
@@ -140,6 +142,18 @@ export class ProjectsService {
 
     await this.userModel.updateOne({ _id: user }, { $pull: { projects: _id } });
 
+    if (deleteChilds) {
+      await this.tasksService.removeByProject(project._id);
+    }
+
     return await this.projectModel.findByIdAndDelete(id);
+  }
+
+  async removeByUser(userId: Types.ObjectId): Promise<void> {
+    const projects = await this.projectModel.find({ user: userId }).exec();
+    for (const project of projects) {
+      await this.projectModel.findByIdAndDelete(project._id);
+      await this.tasksService.removeByProject(project._id);
+    }
   }
 }

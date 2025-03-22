@@ -2,7 +2,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 
 import { Task } from './schemas/task.schema';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { User } from '@/users/schemas/user.schema';
@@ -118,5 +118,23 @@ export class TasksService {
     );
 
     return await this.taskModel.findByIdAndDelete(id);
+  }
+
+  async removeByProject(projectId: Types.ObjectId): Promise<void> {
+    const documents = await this.taskModel
+      .find({ project: projectId })
+      .select('_id')
+      .exec();
+    const idsToRemove = documents.map((doc) => doc._id);
+    // remove from user these ids
+    await this.userModel.updateMany(
+      { tasks: { $in: idsToRemove } },
+      { $pull: { tasks: { $in: idsToRemove } } },
+    );
+    await this.taskModel.deleteMany({ project: projectId }).exec();
+  }
+
+  async removeByUser(userId: Types.ObjectId): Promise<void> {
+    await this.taskModel.deleteMany({ user: userId }).exec();
   }
 }
