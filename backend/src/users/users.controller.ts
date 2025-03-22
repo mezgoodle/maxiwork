@@ -160,6 +160,13 @@ export class UsersController {
     required: true,
     description: 'User id',
   })
+  @ApiParam({
+    name: 'deleteChilds',
+    type: Boolean,
+    required: false,
+    example: true,
+    description: 'Delete all tasks and projects of the user',
+  })
   @ApiResponse({
     status: HttpStatus.NO_CONTENT,
     description: 'User was deleted successfully',
@@ -169,8 +176,11 @@ export class UsersController {
     description: 'User was not found',
   })
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id', ObjectIdPipe) id: string) {
-    const user = await this.usersService.remove(id);
+  async remove(
+    @Param('id', ObjectIdPipe) id: string,
+    @Param('deleteChilds') deleteChilds: boolean = true,
+  ) {
+    const user = await this.usersService.remove(id, deleteChilds);
     if (!user) {
       throw new NotFoundException('User not found');
     }

@@ -5,10 +5,17 @@ import { InjectModel } from '@nestjs/mongoose';
 import { User } from './schemas/user.schema';
 import { Model } from 'mongoose';
 import { Response } from '@/utils/interfaces/response.interface';
+import { ProjectsService } from '@/projects/projects.service';
+import { TasksService } from '@/tasks/tasks.service';
+import { ApiError } from '@/utils/errors';
 
 @Injectable()
 export class UsersService {
-  constructor(@InjectModel(User.name) private userModel: Model<User>) {}
+  constructor(
+    @InjectModel(User.name) private userModel: Model<User>,
+    private readonly projectsService: ProjectsService,
+    private readonly tasksService: TasksService,
+  ) {}
 
   async create(createUserDto: CreateUserDto): Promise<Response> {
     const newUser = new this.userModel(createUserDto);
@@ -35,7 +42,17 @@ export class UsersService {
     });
   }
 
-  async remove(id: string) {
+  async remove(id: string, deleteChilds: boolean) {
+    const user = await this.userModel.findById(id);
+    if (!user)
+      return {
+        data: null,
+        error: new ApiError('Project not found'),
+      };
+    if (deleteChilds) {
+      await this.projectsService.removeByUser(user._id);
+      await this.tasksService.removeByUser(user._id);
+    }
     return await this.userModel.findByIdAndDelete(id);
   }
 }
