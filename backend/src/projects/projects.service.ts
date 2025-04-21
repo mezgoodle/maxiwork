@@ -9,13 +9,14 @@ import { Response } from '@/utils/interfaces/response.interface';
 import { ApiError } from '@/utils/errors';
 import { Task } from '@/tasks/schemas/task.schema';
 import { TasksService } from '../tasks/tasks.service';
+import { TaskStatus } from '@/tasks/dto/create-task.dto';
 
 @Injectable()
 export class ProjectsService {
   constructor(
     @InjectModel(Project.name) private projectModel: Model<Project>,
     @InjectModel(User.name) private userModel: Model<User>,
-    @InjectModel(Task.name) private taskModel: Model<Project>,
+    @InjectModel(Task.name) private taskModel: Model<Task>,
     private readonly tasksService: TasksService,
   ) {}
   async create({
@@ -73,13 +74,17 @@ export class ProjectsService {
 
     const tasks = await this.taskModel.find({ project: id });
     const totalTasks = tasks.length;
-    // const completedTasks = tasks.filter((task) => task.status === 'completed').length; // Замініть 'completed'
-    // const completionPercentage = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+    const completedTasks = tasks.filter(
+      (task) => task.status === TaskStatus.DONE,
+    ).length;
+    const completionPercentage = Math.round(
+      totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0,
+    );
 
     return {
       data: {
         totalTasks,
-        // completionPercentage,
+        completionPercentage,
       },
       error: null,
     };
