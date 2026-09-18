@@ -22,7 +22,7 @@ description: Review github pull request
 
 
 ### Step 4: Resolving Review Threads & Verification
-- **Mandatory Verification:** Run `npm run lint` in `backend` and `frontend` to verify zero linting errors.
+- **Mandatory Verification:** Run `npm run lint:check` in `backend` and `npm run lint` in `frontend` to verify zero linting errors.
 - If checks pass:
   - Commit all applied changes and push to the remote branch.
   - Resolve the corresponding review threads on GitHub via `gh api graphql`:
