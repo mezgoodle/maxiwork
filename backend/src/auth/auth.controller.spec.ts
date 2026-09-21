@@ -33,13 +33,15 @@ describe('AuthController', () => {
 
   it('register should call authService.register', async () => {
     const dto = {
-      name: 'John',
+      firstName: 'John',
+      lastName: 'Doe',
       email: 'john@example.com',
       password: 'password123',
     };
     mockAuthService.register.mockResolvedValue({
       _id: '1',
-      name: 'John',
+      firstName: 'John',
+      lastName: 'Doe',
       email: 'john@example.com',
     });
 
