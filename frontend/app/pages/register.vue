@@ -100,6 +100,25 @@
           <p v-if="errors.password" class="mt-1 text-xs text-rose-400">
             {{ errors.password }}
           </p>
+
+          <!-- Dynamic Password Criteria Indicators -->
+          <div
+            v-if="form.password"
+            class="mt-2.5 p-2.5 bg-slate-900/60 border border-slate-700/50 rounded-xl grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs"
+          >
+            <div
+              v-for="criterion in passwordCriteria"
+              :key="criterion.label"
+              class="flex items-center gap-2 transition-colors duration-150"
+              :class="criterion.valid ? 'text-emerald-400' : 'text-rose-400'"
+            >
+              <span
+                class="w-2 h-2 rounded-full shrink-0 transition-colors duration-150"
+                :class="criterion.valid ? 'bg-emerald-400 shadow-xs shadow-emerald-400/50' : 'bg-rose-500 shadow-xs shadow-rose-500/50'"
+              />
+              <span>{{ criterion.label }}</span>
+            </div>
+          </div>
         </div>
 
         <!-- Confirm Password -->
@@ -120,6 +139,19 @@
           <p v-if="errors.confirmPassword" class="mt-1 text-xs text-rose-400">
             {{ errors.confirmPassword }}
           </p>
+
+          <!-- Dynamic Password Match Indicator -->
+          <div
+            v-if="form.confirmPassword"
+            class="mt-2 flex items-center gap-2 text-xs transition-colors duration-150"
+            :class="isPasswordMatch ? 'text-emerald-400' : 'text-rose-400'"
+          >
+            <span
+              class="w-2 h-2 rounded-full shrink-0 transition-colors duration-150"
+              :class="isPasswordMatch ? 'bg-emerald-400 shadow-xs shadow-emerald-400/50' : 'bg-rose-500 shadow-xs shadow-rose-500/50'"
+            />
+            <span>{{ isPasswordMatch ? 'Passwords match' : 'Passwords do not match' }}</span>
+          </div>
         </div>
 
         <!-- Submit Button -->
@@ -150,7 +182,7 @@
 </template>
 
 <script lang="ts" setup>
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import { useAuthStore } from '../stores/auth';
 
 definePageMeta({
@@ -177,6 +209,15 @@ const errors = reactive({
 
 const errorMessage = ref('');
 const loading = ref(false);
+
+const passwordCriteria = computed(() => [
+  { label: 'At least 8 characters', valid: form.password.length >= 8 },
+  { label: 'Lowercase letter (a-z)', valid: /[a-z]/.test(form.password) },
+  { label: 'Uppercase letter (A-Z)', valid: /[A-Z]/.test(form.password) },
+  { label: 'Number (0-9)', valid: /\d/.test(form.password) },
+]);
+
+const isPasswordMatch = computed(() => !!form.confirmPassword && form.password === form.confirmPassword);
 
 function validate(): boolean {
   let isValid = true;
