@@ -92,7 +92,7 @@
             v-model="form.password"
             type="password"
             autocomplete="new-password"
-            placeholder="At least 6 characters"
+            placeholder="At least 8 chars (a-z, A-Z, 0-9)"
             :disabled="loading"
             class="w-full px-4 py-2.5 bg-slate-900/90 border rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition text-sm"
             :class="errors.password ? 'border-rose-500 focus:ring-rose-500' : 'border-slate-700'"
@@ -209,12 +209,24 @@ function validate(): boolean {
   if (!form.password) {
     errors.password = 'Please enter your password';
     isValid = false;
-  } else if (form.password.length < 6) {
-    errors.password = 'Password must be at least 6 characters';
+  } else if (form.password.length < 8) {
+    errors.password = 'Password must be at least 8 characters long';
+    isValid = false;
+  } else if (!/[a-z]/.test(form.password)) {
+    errors.password = 'Password must contain at least one lowercase letter';
+    isValid = false;
+  } else if (!/[A-Z]/.test(form.password)) {
+    errors.password = 'Password must contain at least one uppercase letter';
+    isValid = false;
+  } else if (!/\d/.test(form.password)) {
+    errors.password = 'Password must contain at least one number';
     isValid = false;
   }
 
-  if (form.password !== form.confirmPassword) {
+  if (!form.confirmPassword) {
+    errors.confirmPassword = 'Please confirm your password';
+    isValid = false;
+  } else if (form.password !== form.confirmPassword) {
     errors.confirmPassword = 'Passwords do not match';
     isValid = false;
   }
