@@ -46,6 +46,12 @@ describe('AuthService', () => {
     mockRefreshTokenModel = {
       create: jest.fn(),
       findOne: jest.fn(),
+      deleteOne: jest
+        .fn()
+        .mockReturnValue({ exec: jest.fn().mockResolvedValue({}) }),
+      deleteMany: jest
+        .fn()
+        .mockReturnValue({ exec: jest.fn().mockResolvedValue({}) }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -175,8 +181,7 @@ describe('AuthService', () => {
 
       const result = await service.refreshTokens('old-refresh-token');
 
-      expect(tokenDoc.isRevoked).toBe(true);
-      expect(tokenDoc.save).toHaveBeenCalled();
+      expect(mockRefreshTokenModel.deleteOne).toHaveBeenCalled();
       expect(result).toEqual({
         access_token: 'new-access-token',
         refresh_token: 'new-refresh-token',
@@ -211,21 +216,12 @@ describe('AuthService', () => {
   });
 
   describe('logout', () => {
-    it('should mark token as revoked', async () => {
-      const tokenDoc = {
-        token: 'active-token',
-        isRevoked: false,
-        save: jest.fn().mockResolvedValue({}),
-      };
-
-      mockRefreshTokenModel.findOne.mockReturnValue({
-        exec: jest.fn().mockResolvedValue(tokenDoc),
-      });
-
+    it('should delete token from database', async () => {
       const result = await service.logout('active-token');
 
-      expect(tokenDoc.isRevoked).toBe(true);
-      expect(tokenDoc.save).toHaveBeenCalled();
+      expect(mockRefreshTokenModel.deleteOne).toHaveBeenCalledWith({
+        token: 'active-token',
+      });
       expect(result).toEqual({ message: 'Successfully logged out' });
     });
   });

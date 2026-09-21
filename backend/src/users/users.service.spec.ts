@@ -20,7 +20,8 @@ describe('UsersService', () => {
       save: jest.fn().mockResolvedValue({
         toObject: () => ({
           _id: 'mock-user-id',
-          name: dto.name,
+          firstName: dto.firstName,
+          lastName: dto.lastName,
           email: dto.email,
           password: dto.password,
         }),
@@ -52,7 +53,8 @@ describe('UsersService', () => {
       mockUserModel.findOne.mockResolvedValue(null);
 
       const result = await service.create({
-        name: 'Test User',
+        firstName: 'Test',
+        lastName: 'User',
         email: 'test@example.com',
         password: 'password123',
       });
@@ -62,7 +64,8 @@ describe('UsersService', () => {
       });
       expect(bcrypt.hash).toHaveBeenCalledWith('password123', 10);
       expect(result).toHaveProperty('_id', 'mock-user-id');
-      expect(result).toHaveProperty('name', 'Test User');
+      expect(result).toHaveProperty('firstName', 'Test');
+      expect(result).toHaveProperty('lastName', 'User');
       expect(result).toHaveProperty('email', 'test@example.com');
       expect((result as any).password).toBeUndefined();
     });
@@ -74,7 +77,8 @@ describe('UsersService', () => {
 
       await expect(
         service.create({
-          name: 'Test User',
+          firstName: 'Test',
+          lastName: 'User',
           email: 'test@example.com',
           password: 'password123',
         }),

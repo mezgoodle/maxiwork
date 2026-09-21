@@ -56,6 +56,9 @@ export class AuthService {
     const accessToken = await this.generateAccessToken(payload);
     const refreshToken = await this.generateRefreshToken(payload);
 
+    await this.refreshTokenModel
+      .deleteMany({ userId: new Types.ObjectId(userId) })
+      .exec();
     await this.storeRefreshToken(refreshToken, new Types.ObjectId(userId));
 
     return {
@@ -85,9 +88,8 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token is invalid or expired');
     }
 
-    // Token rotation: revoke old token
-    storedToken.isRevoked = true;
-    await storedToken.save();
+    // Token rotation: delete old token to prevent token accumulation
+    await this.refreshTokenModel.deleteOne({ _id: storedToken._id }).exec();
 
     const user = await this.usersService.findById(payload.sub);
     const newPayload: JwtPayload = {
@@ -110,11 +112,7 @@ export class AuthService {
   }
 
   async logout(token: string): Promise<{ message: string }> {
-    const storedToken = await this.refreshTokenModel.findOne({ token }).exec();
-    if (storedToken) {
-      storedToken.isRevoked = true;
-      await storedToken.save();
-    }
+    await this.refreshTokenModel.deleteOne({ token }).exec();
     return { message: 'Successfully logged out' };
   }
 
