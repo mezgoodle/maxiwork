@@ -2,11 +2,11 @@
   <div class="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
     <div class="w-full max-w-md bg-slate-800/80 border border-slate-700/80 rounded-2xl p-6 sm:p-8 shadow-2xl backdrop-blur">
       <div class="text-center mb-8">
-        <h1 class="text-2xl font-bold text-white tracking-tight">Створення акаунту</h1>
+        <h1 class="text-2xl font-bold text-white tracking-tight">Create an Account</h1>
         <p class="text-sm text-slate-400 mt-2">
-          Вже маєте акаунт?
+          Already have an account?
           <NuxtLink to="/login" class="text-emerald-400 hover:text-emerald-300 font-medium transition">
-            Увійти
+            Sign in
           </NuxtLink>
         </p>
       </div>
@@ -24,14 +24,14 @@
         <!-- Name -->
         <div>
           <label for="name" class="block text-sm font-medium text-slate-300 mb-1.5">
-            Ваше ім'я
+            Full Name
           </label>
           <input
             id="name"
             v-model="form.name"
             type="text"
             autocomplete="name"
-            placeholder="Тарас Шевченко"
+            placeholder="John Doe"
             :disabled="loading"
             class="w-full px-4 py-2.5 bg-slate-900/90 border rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition text-sm"
             :class="errors.name ? 'border-rose-500 focus:ring-rose-500' : 'border-slate-700'"
@@ -44,7 +44,7 @@
         <!-- Email -->
         <div>
           <label for="email" class="block text-sm font-medium text-slate-300 mb-1.5">
-            Електронна пошта
+            Email address
           </label>
           <input
             id="email"
@@ -64,14 +64,14 @@
         <!-- Password -->
         <div>
           <label for="password" class="block text-sm font-medium text-slate-300 mb-1.5">
-            Пароль
+            Password
           </label>
           <input
             id="password"
             v-model="form.password"
             type="password"
             autocomplete="new-password"
-            placeholder="Мінімум 6 символів"
+            placeholder="At least 6 characters"
             :disabled="loading"
             class="w-full px-4 py-2.5 bg-slate-900/90 border rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition text-sm"
             :class="errors.password ? 'border-rose-500 focus:ring-rose-500' : 'border-slate-700'"
@@ -84,14 +84,14 @@
         <!-- Confirm Password -->
         <div>
           <label for="confirmPassword" class="block text-sm font-medium text-slate-300 mb-1.5">
-            Підтвердження пароля
+            Confirm Password
           </label>
           <input
             id="confirmPassword"
             v-model="form.confirmPassword"
             type="password"
             autocomplete="new-password"
-            placeholder="Повторіть пароль"
+            placeholder="Re-enter your password"
             :disabled="loading"
             class="w-full px-4 py-2.5 bg-slate-900/90 border rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition text-sm"
             :class="errors.confirmPassword ? 'border-rose-500 focus:ring-rose-500' : 'border-slate-700'"
@@ -114,14 +114,14 @@
             fill="none"
             viewBox="0 0 24 24"
           >
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
             <path
               class="opacity-75"
               fill="currentColor"
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
             />
           </svg>
-          <span>{{ loading ? 'Реєстрація...' : 'Зареєструватися' }}</span>
+          <span>{{ loading ? 'Creating account...' : 'Create Account' }}</span>
         </button>
       </form>
     </div>
@@ -164,29 +164,29 @@ function validate(): boolean {
   errorMessage.value = '';
 
   if (!form.name.trim()) {
-    errors.name = "Введіть ваше ім'я";
+    errors.name = 'Please enter your name';
     isValid = false;
   }
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!form.email.trim()) {
-    errors.email = 'Введіть електронну пошту';
+    errors.email = 'Please enter your email';
     isValid = false;
   } else if (!emailRegex.test(form.email.trim())) {
-    errors.email = 'Некоректний формат email';
+    errors.email = 'Invalid email format';
     isValid = false;
   }
 
   if (!form.password) {
-    errors.password = 'Введіть пароль';
+    errors.password = 'Please enter your password';
     isValid = false;
   } else if (form.password.length < 6) {
-    errors.password = 'Пароль має містити щонайменше 6 символів';
+    errors.password = 'Password must be at least 6 characters';
     isValid = false;
   }
 
   if (form.password !== form.confirmPassword) {
-    errors.confirmPassword = 'Паролі не співпадають';
+    errors.confirmPassword = 'Passwords do not match';
     isValid = false;
   }
 
@@ -224,13 +224,13 @@ async function handleSubmit() {
     const apiError = err as ApiError;
     if (apiError?.response?.status === 409 || apiError?.statusCode === 409) {
       errorMessage.value =
-        'Користувач із такою електронною поштою вже зареєстрований';
+        'An account with this email already exists';
     } else if (apiError?.data?.message) {
       errorMessage.value = Array.isArray(apiError.data.message)
         ? apiError.data.message.join(', ')
         : apiError.data.message;
     } else {
-      errorMessage.value = 'Помилка під час реєстрації. Спробуйте пізніше';
+      errorMessage.value = 'Registration failed. Please try again later.';
     }
   } finally {
     loading.value = false;

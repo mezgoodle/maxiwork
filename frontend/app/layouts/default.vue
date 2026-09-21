@@ -16,13 +16,13 @@
               to="/dashboard"
               class="px-3 py-1.5 text-sm font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-white transition"
             >
-              Панель
+              Dashboard
             </NuxtLink>
             <button
               class="px-3 py-1.5 text-sm font-medium rounded-lg bg-rose-600/20 text-rose-300 hover:bg-rose-600/30 transition cursor-pointer"
               @click="handleLogout"
             >
-              Вийти
+              Logout
             </button>
           </template>
 
@@ -31,13 +31,13 @@
               to="/login"
               class="px-3 py-1.5 text-sm font-medium text-slate-300 hover:text-white transition"
             >
-              Увійти
+              Login
             </NuxtLink>
             <NuxtLink
               to="/register"
               class="px-3.5 py-1.5 text-sm font-medium rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm transition"
             >
-              Реєстрація
+              Register
             </NuxtLink>
           </template>
         </nav>
@@ -51,7 +51,7 @@
 
     <!-- Footer -->
     <footer class="border-t border-slate-800 py-6 text-center text-xs text-slate-500">
-      &copy; {{ new Date().getFullYear() }} MaxiWork. Всі права захищено.
+      &copy; {{ new Date().getFullYear() }} MaxiWork. All rights reserved.
     </footer>
   </div>
 </template>

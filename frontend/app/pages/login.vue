@@ -2,11 +2,11 @@
   <div class="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
     <div class="w-full max-w-md bg-slate-800/80 border border-slate-700/80 rounded-2xl p-6 sm:p-8 shadow-2xl backdrop-blur">
       <div class="text-center mb-8">
-        <h1 class="text-2xl font-bold text-white tracking-tight">Вхід в MaxiWork</h1>
+        <h1 class="text-2xl font-bold text-white tracking-tight">Sign in to MaxiWork</h1>
         <p class="text-sm text-slate-400 mt-2">
-          Ще не маєте акаунту?
+          Don't have an account yet?
           <NuxtLink to="/register" class="text-emerald-400 hover:text-emerald-300 font-medium transition">
-            Зареєструватися
+            Sign up
           </NuxtLink>
         </p>
       </div>
@@ -24,7 +24,7 @@
         <!-- Email -->
         <div>
           <label for="email" class="block text-sm font-medium text-slate-300 mb-1.5">
-            Електронна пошта
+            Email address
           </label>
           <input
             id="email"
@@ -45,7 +45,7 @@
         <div>
           <div class="flex items-center justify-between mb-1.5">
             <label for="password" class="block text-sm font-medium text-slate-300">
-              Пароль
+              Password
             </label>
           </div>
           <input
@@ -76,14 +76,14 @@
             fill="none"
             viewBox="0 0 24 24"
           >
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
             <path
               class="opacity-75"
               fill="currentColor"
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
             />
           </svg>
-          <span>{{ loading ? 'Вхід...' : 'Увійти' }}</span>
+          <span>{{ loading ? 'Signing in...' : 'Sign In' }}</span>
         </button>
       </form>
     </div>
@@ -122,15 +122,15 @@ function validate(): boolean {
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!form.email.trim()) {
-    errors.email = 'Введіть електронну пошту';
+    errors.email = 'Please enter your email';
     isValid = false;
   } else if (!emailRegex.test(form.email.trim())) {
-    errors.email = 'Некоректний формат email';
+    errors.email = 'Invalid email format';
     isValid = false;
   }
 
   if (!form.password) {
-    errors.password = 'Введіть пароль';
+    errors.password = 'Please enter your password';
     isValid = false;
   }
 
@@ -160,13 +160,13 @@ async function handleSubmit() {
   } catch (err: unknown) {
     const apiError = err as ApiError;
     if (apiError?.response?.status === 401 || apiError?.statusCode === 401) {
-      errorMessage.value = 'Невірний email або пароль';
+      errorMessage.value = 'Invalid email or password';
     } else if (apiError?.data?.message) {
       errorMessage.value = Array.isArray(apiError.data.message)
         ? apiError.data.message.join(', ')
         : apiError.data.message;
     } else {
-      errorMessage.value = "Помилка з'єднання із сервером. Спробуйте пізніше";
+      errorMessage.value = 'Server connection error. Please try again later.';
     }
   } finally {
     loading.value = false;
