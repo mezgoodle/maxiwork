@@ -30,8 +30,12 @@
 
           <dl class="space-y-3 text-sm">
             <div class="flex justify-between py-2 border-b border-slate-800">
-              <dt class="text-slate-400">Name:</dt>
-              <dd class="text-white font-medium">{{ authStore.user?.name || 'Loading...' }}</dd>
+              <dt class="text-slate-400">First Name:</dt>
+              <dd class="text-white font-medium">{{ authStore.user?.firstName || 'Loading...' }}</dd>
+            </div>
+            <div class="flex justify-between py-2 border-b border-slate-800">
+              <dt class="text-slate-400">Last Name:</dt>
+              <dd class="text-white font-medium">{{ authStore.user?.lastName || 'Loading...' }}</dd>
             </div>
             <div class="flex justify-between py-2 border-b border-slate-800">
               <dt class="text-slate-400">Email:</dt>

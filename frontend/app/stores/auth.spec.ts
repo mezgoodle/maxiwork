@@ -37,7 +37,8 @@ describe('useAuthStore', () => {
     });
     store.user = {
       _id: '1',
-      name: 'John',
+      firstName: 'John',
+      lastName: 'Doe',
       email: 'john@example.com',
     };
 
@@ -58,7 +59,8 @@ describe('useAuthStore', () => {
     };
     const mockUser = {
       _id: 'user-1',
-      name: 'Test',
+      firstName: 'Test',
+      lastName: 'User',
       email: 'test@example.com',
     };
 
@@ -84,14 +86,16 @@ describe('useAuthStore', () => {
     const store = useAuthStore();
     const mockCreatedUser = {
       _id: 'user-2',
-      name: 'Jane',
+      firstName: 'Jane',
+      lastName: 'Doe',
       email: 'jane@example.com',
     };
 
     global.$fetch = vi.fn().mockResolvedValue(mockCreatedUser);
 
     const result = await store.register({
-      name: 'Jane',
+      firstName: 'Jane',
+      lastName: 'Doe',
       email: 'jane@example.com',
       password: 'password123',
     });

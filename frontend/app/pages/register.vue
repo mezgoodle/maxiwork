@@ -21,24 +21,45 @@
       </div>
 
       <form class="space-y-4" novalidate @submit.prevent="handleSubmit">
-        <!-- Name -->
-        <div>
-          <label for="name" class="block text-sm font-medium text-slate-300 mb-1.5">
-            Full Name
-          </label>
-          <input
-            id="name"
-            v-model="form.name"
-            type="text"
-            autocomplete="name"
-            placeholder="John Doe"
-            :disabled="loading"
-            class="w-full px-4 py-2.5 bg-slate-900/90 border rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition text-sm"
-            :class="errors.name ? 'border-rose-500 focus:ring-rose-500' : 'border-slate-700'"
-          >
-          <p v-if="errors.name" class="mt-1 text-xs text-rose-400">
-            {{ errors.name }}
-          </p>
+        <!-- Name fields (First Name & Last Name) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label for="firstName" class="block text-sm font-medium text-slate-300 mb-1.5">
+              First Name
+            </label>
+            <input
+              id="firstName"
+              v-model="form.firstName"
+              type="text"
+              autocomplete="given-name"
+              placeholder="John"
+              :disabled="loading"
+              class="w-full px-4 py-2.5 bg-slate-900/90 border rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition text-sm"
+              :class="errors.firstName ? 'border-rose-500 focus:ring-rose-500' : 'border-slate-700'"
+            >
+            <p v-if="errors.firstName" class="mt-1 text-xs text-rose-400">
+              {{ errors.firstName }}
+            </p>
+          </div>
+
+          <div>
+            <label for="lastName" class="block text-sm font-medium text-slate-300 mb-1.5">
+              Last Name
+            </label>
+            <input
+              id="lastName"
+              v-model="form.lastName"
+              type="text"
+              autocomplete="family-name"
+              placeholder="Doe"
+              :disabled="loading"
+              class="w-full px-4 py-2.5 bg-slate-900/90 border rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition text-sm"
+              :class="errors.lastName ? 'border-rose-500 focus:ring-rose-500' : 'border-slate-700'"
+            >
+            <p v-if="errors.lastName" class="mt-1 text-xs text-rose-400">
+              {{ errors.lastName }}
+            </p>
+          </div>
         </div>
 
         <!-- Email -->
@@ -139,14 +160,16 @@ definePageMeta({
 const authStore = useAuthStore();
 
 const form = reactive({
-  name: '',
+  firstName: '',
+  lastName: '',
   email: '',
   password: '',
   confirmPassword: '',
 });
 
 const errors = reactive({
-  name: '',
+  firstName: '',
+  lastName: '',
   email: '',
   password: '',
   confirmPassword: '',
@@ -157,14 +180,20 @@ const loading = ref(false);
 
 function validate(): boolean {
   let isValid = true;
-  errors.name = '';
+  errors.firstName = '';
+  errors.lastName = '';
   errors.email = '';
   errors.password = '';
   errors.confirmPassword = '';
   errorMessage.value = '';
 
-  if (!form.name.trim()) {
-    errors.name = 'Please enter your name';
+  if (!form.firstName.trim()) {
+    errors.firstName = 'Please enter your first name';
+    isValid = false;
+  }
+
+  if (!form.lastName.trim()) {
+    errors.lastName = 'Please enter your last name';
     isValid = false;
   }
 
@@ -208,7 +237,8 @@ async function handleSubmit() {
   try {
     // 1. Register user
     await authStore.register({
-      name: form.name.trim(),
+      firstName: form.firstName.trim(),
+      lastName: form.lastName.trim(),
       email: form.email.trim(),
       password: form.password,
     });

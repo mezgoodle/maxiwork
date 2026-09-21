@@ -1,6 +1,7 @@
 export interface User {
   _id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   createdAt?: string;
   updatedAt?: string;
@@ -17,7 +18,9 @@ export interface LoginPayload {
 }
 
 export interface RegisterPayload {
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   password: string;
 }
+

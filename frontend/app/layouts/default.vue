@@ -10,7 +10,7 @@
         <nav class="flex items-center gap-4">
           <template v-if="authStore.isAuthenticated">
             <span class="text-sm text-slate-400 hidden sm:inline">
-              {{ authStore.user?.name || authStore.user?.email }}
+              {{ authStore.user ? ([authStore.user.firstName, authStore.user.lastName].filter(Boolean).join(' ') || authStore.user.email) : '' }}
             </span>
             <NuxtLink
               to="/dashboard"
