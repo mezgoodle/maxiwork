@@ -63,10 +63,9 @@ maxiwork/
 
 ## 🌿 3. Git & Workflow Guidelines
 
-### Branch Naming Conventions
-- Feature branches: `feat/<TICKET-KEY>-<short-description>` (e.g. `feat/MAX-62-backend-auth`)
-- Bugfix branches: `fix/<TICKET-KEY>-<short-description>`
-- Chained PRs: When a frontend PR depends on an unmerged backend PR, branch from the backend feature branch and set the PR's base branch accordingly.
+### Branch Naming
+- Always use the branch names suggested directly by Jira (e.g. `MAX-62-implement-user-registration`).
+- Chained PRs: When a frontend PR depends on an unmerged backend PR, branch from the backend branch and set the PR's base branch accordingly.
 
 ### Commit Messages
 - Every commit message MUST start with the Jira ticket key:
