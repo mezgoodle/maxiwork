@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
+import * as crypto from 'crypto';
 import type { StringValue } from 'ms';
 import { UsersService } from '../users/users.service';
 import { CreateUserDto } from '../users/dto/create-user.dto';
@@ -22,6 +23,18 @@ export class AuthService {
     @InjectModel(RefreshToken.name)
     private readonly refreshTokenModel: Model<RefreshTokenDocument>,
   ) {}
+
+  private hashToken(token: string): string {
+    return crypto.createHash('sha256').update(token).digest('hex');
+  }
+
+  private getRequiredConfig(key: string): string {
+    const value = this.configService.get<string>(key);
+    if (!value) {
+      throw new Error(`${key} environment variable is required`);
+    }
+    return value;
+  }
 
   async validateUser(
     email: string,
@@ -71,25 +84,11 @@ export class AuthService {
     let payload: JwtPayload;
     try {
       payload = await this.jwtService.verifyAsync<JwtPayload>(token, {
-        secret:
-          this.configService.get<string>('JWT_REFRESH_SECRET') ||
-          'default_refresh_secret',
+        secret: this.getRequiredConfig('JWT_REFRESH_SECRET'),
       });
     } catch {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
-
-    const storedToken = await this.refreshTokenModel.findOne({ token }).exec();
-    if (
-      !storedToken ||
-      storedToken.isRevoked ||
-      storedToken.expiresAt < new Date()
-    ) {
-      throw new UnauthorizedException('Refresh token is invalid or expired');
-    }
-
-    // Token rotation: delete old token to prevent token accumulation
-    await this.refreshTokenModel.deleteOne({ _id: storedToken._id }).exec();
 
     const user = await this.usersService.findById(payload.sub);
     const newPayload: JwtPayload = {
@@ -99,6 +98,19 @@ export class AuthService {
 
     const accessToken = await this.generateAccessToken(newPayload);
     const newRefreshToken = await this.generateRefreshToken(newPayload);
+
+    // Atomic consumption: conditionally find and delete the unexpired matching token hash
+    const hashedToken = this.hashToken(token);
+    const consumedToken = await this.refreshTokenModel
+      .findOneAndDelete({
+        token: hashedToken,
+        expiresAt: { $gt: new Date() },
+      })
+      .exec();
+
+    if (!consumedToken) {
+      throw new UnauthorizedException('Refresh token is invalid or expired');
+    }
 
     await this.storeRefreshToken(
       newRefreshToken,
@@ -112,16 +124,15 @@ export class AuthService {
   }
 
   async logout(token: string): Promise<{ message: string }> {
-    await this.refreshTokenModel.deleteOne({ token }).exec();
+    const hashedToken = this.hashToken(token);
+    await this.refreshTokenModel.deleteOne({ token: hashedToken }).exec();
     return { message: 'Successfully logged out' };
   }
 
   private async generateAccessToken(payload: JwtPayload): Promise<string> {
     const expiration =
       this.configService.get<string>('JWT_ACCESS_EXPIRATION') || '15m';
-    const secret =
-      this.configService.get<string>('JWT_ACCESS_SECRET') ||
-      'default_access_secret';
+    const secret = this.getRequiredConfig('JWT_ACCESS_SECRET');
     return this.jwtService.signAsync(payload, {
       secret,
       expiresIn: expiration as StringValue,
@@ -131,9 +142,7 @@ export class AuthService {
   private async generateRefreshToken(payload: JwtPayload): Promise<string> {
     const expiration =
       this.configService.get<string>('JWT_REFRESH_EXPIRATION') || '7d';
-    const secret =
-      this.configService.get<string>('JWT_REFRESH_SECRET') ||
-      'default_refresh_secret';
+    const secret = this.getRequiredConfig('JWT_REFRESH_SECRET');
     return this.jwtService.signAsync(payload, {
       secret,
       expiresIn: expiration as StringValue,
@@ -144,9 +153,13 @@ export class AuthService {
     token: string,
     userId: Types.ObjectId,
   ): Promise<void> {
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const decoded = this.jwtService.decode<{ exp?: number }>(token);
+    const expiresAt = decoded?.exp
+      ? new Date(decoded.exp * 1000)
+      : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
     await this.refreshTokenModel.create({
-      token,
+      token: this.hashToken(token),
       userId,
       expiresAt,
       isRevoked: false,

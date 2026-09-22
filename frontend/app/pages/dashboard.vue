@@ -118,7 +118,12 @@ async function refreshTokensManual() {
       await navigateTo('/login');
     }
   } catch {
-    refreshMessage.value = 'Failed to refresh tokens. Please try again.';
+    if (!authStore.isAuthenticated) {
+      refreshMessage.value = 'Session expired. Please log in again.';
+      await navigateTo('/login');
+    } else {
+      refreshMessage.value = 'Failed to refresh tokens. Please try again.';
+    }
   } finally {
     isRefreshing.value = false;
   }

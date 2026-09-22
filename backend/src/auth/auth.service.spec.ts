@@ -31,6 +31,9 @@ describe('AuthService', () => {
     mockJwtService = {
       signAsync: jest.fn(),
       verifyAsync: jest.fn(),
+      decode: jest
+        .fn()
+        .mockReturnValue({ exp: Math.floor(Date.now() / 1000) + 7 * 86400 }),
     };
 
     mockConfigService = {
@@ -46,6 +49,9 @@ describe('AuthService', () => {
     mockRefreshTokenModel = {
       create: jest.fn(),
       findOne: jest.fn(),
+      findOneAndDelete: jest
+        .fn()
+        .mockReturnValue({ exec: jest.fn().mockResolvedValue({}) }),
       deleteOne: jest
         .fn()
         .mockReturnValue({ exec: jest.fn().mockResolvedValue({}) }),
@@ -143,7 +149,6 @@ describe('AuthService', () => {
       });
       expect(mockRefreshTokenModel.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          token: 'refresh-token-xyz',
           userId,
           isRevoked: false,
         }),
@@ -155,19 +160,14 @@ describe('AuthService', () => {
     it('should rotate refresh token and return new tokens', async () => {
       const userId = new Types.ObjectId();
       const tokenDoc = {
-        token: 'old-refresh-token',
+        token: 'hashed-token',
         userId,
         expiresAt: new Date(Date.now() + 100000),
-        isRevoked: false,
-        save: jest.fn().mockResolvedValue({}),
       };
 
       mockJwtService.verifyAsync.mockResolvedValue({
         sub: userId.toString(),
         email: 'test@example.com',
-      });
-      mockRefreshTokenModel.findOne.mockReturnValue({
-        exec: jest.fn().mockResolvedValue(tokenDoc),
       });
       mockUsersService.findById.mockResolvedValue({
         _id: userId,
@@ -177,11 +177,14 @@ describe('AuthService', () => {
       mockJwtService.signAsync
         .mockResolvedValueOnce('new-access-token')
         .mockResolvedValueOnce('new-refresh-token');
+      mockRefreshTokenModel.findOneAndDelete.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(tokenDoc),
+      });
       mockRefreshTokenModel.create.mockResolvedValue({});
 
       const result = await service.refreshTokens('old-refresh-token');
 
-      expect(mockRefreshTokenModel.deleteOne).toHaveBeenCalled();
+      expect(mockRefreshTokenModel.findOneAndDelete).toHaveBeenCalled();
       expect(result).toEqual({
         access_token: 'new-access-token',
         refresh_token: 'new-refresh-token',
@@ -196,17 +199,21 @@ describe('AuthService', () => {
       );
     });
 
-    it('should throw UnauthorizedException when token is revoked in DB', async () => {
+    it('should throw UnauthorizedException when token is revoked or expired in DB', async () => {
       const userId = new Types.ObjectId();
       mockJwtService.verifyAsync.mockResolvedValue({
         sub: userId.toString(),
         email: 'test@example.com',
       });
-      mockRefreshTokenModel.findOne.mockReturnValue({
-        exec: jest.fn().mockResolvedValue({
-          isRevoked: true,
-          expiresAt: new Date(Date.now() + 10000),
-        }),
+      mockUsersService.findById.mockResolvedValue({
+        _id: userId,
+        email: 'test@example.com',
+      });
+      mockJwtService.signAsync
+        .mockResolvedValueOnce('new-access-token')
+        .mockResolvedValueOnce('new-refresh-token');
+      mockRefreshTokenModel.findOneAndDelete.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(null),
       });
 
       await expect(service.refreshTokens('revoked-token')).rejects.toThrow(
@@ -219,9 +226,7 @@ describe('AuthService', () => {
     it('should delete token from database', async () => {
       const result = await service.logout('active-token');
 
-      expect(mockRefreshTokenModel.deleteOne).toHaveBeenCalledWith({
-        token: 'active-token',
-      });
+      expect(mockRefreshTokenModel.deleteOne).toHaveBeenCalled();
       expect(result).toEqual({ message: 'Successfully logged out' });
     });
   });

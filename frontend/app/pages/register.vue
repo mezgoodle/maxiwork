@@ -286,6 +286,7 @@ async function handleSubmit() {
 
   loading.value = true;
   errorMessage.value = '';
+  let registrationCompleted = false;
 
   try {
     // 1. Register user
@@ -295,6 +296,7 @@ async function handleSubmit() {
       email: form.email.trim(),
       password: form.password,
     });
+    registrationCompleted = true;
 
     // 2. Automatically log in after registration
     await authStore.login({
@@ -304,6 +306,14 @@ async function handleSubmit() {
 
     await navigateTo('/dashboard');
   } catch (err: unknown) {
+    if (registrationCompleted) {
+      await navigateTo({
+        path: '/login',
+        query: { registered: 'true' },
+      });
+      return;
+    }
+
     const apiError = err as ApiError;
     if (apiError?.response?.status === 409 || apiError?.statusCode === 409) {
       errorMessage.value =

@@ -57,7 +57,10 @@ export const useAuthStore = defineStore('auth', () => {
     refreshTokenCookie.value = tokens.refresh_token;
   }
 
+  let authGeneration = 0;
+
   function clearAuth() {
+    authGeneration += 1;
     user.value = null;
     accessToken.value = null;
     refreshToken.value = null;
@@ -131,6 +134,7 @@ export const useAuthStore = defineStore('auth', () => {
       return refreshPromise;
     }
 
+    const currentGeneration = authGeneration;
     refreshPromise = (async () => {
       try {
         const apiBase = getApiBase();
@@ -138,6 +142,9 @@ export const useAuthStore = defineStore('auth', () => {
           method: 'POST',
           body: { refresh_token: currentRefreshToken },
         });
+        if (currentGeneration !== authGeneration) {
+          return null;
+        }
         setTokens(tokens);
         return tokens;
       } catch (err: unknown) {

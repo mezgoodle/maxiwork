@@ -40,13 +40,26 @@ export class UsersService {
       password: hashedPassword,
     });
 
-    const savedUser = await createdUser.save();
+    let savedUser: UserDocument;
+    try {
+      savedUser = await createdUser.save();
+    } catch (err: unknown) {
+      const mongoError = err as { code?: number };
+      if (mongoError?.code === 11000) {
+        throw new ConflictException('Email already in use');
+      }
+      throw err;
+    }
+
     const userObj = savedUser.toObject();
     delete (userObj as { password?: string }).password;
     return userObj;
   }
 
   async findByEmail(email: string): Promise<UserDocument | null> {
+    if (typeof email !== 'string') {
+      return null;
+    }
     return this.userModel.findOne({ email: email.toLowerCase() }).exec();
   }
 

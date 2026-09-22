@@ -84,6 +84,23 @@ describe('UsersService', () => {
         }),
       ).rejects.toThrow(ConflictException);
     });
+
+    it('should throw ConflictException if save() throws duplicate key error 11000', async () => {
+      mockUserModel.findOne.mockResolvedValue(null);
+      mockUserModel.mockImplementationOnce((dto) => ({
+        ...dto,
+        save: jest.fn().mockRejectedValue({ code: 11000 }),
+      }));
+
+      await expect(
+        service.create({
+          firstName: 'Test',
+          lastName: 'User',
+          email: 'test@example.com',
+          password: 'password123',
+        }),
+      ).rejects.toThrow(ConflictException);
+    });
   });
 
   describe('findByEmail', () => {
@@ -95,6 +112,11 @@ describe('UsersService', () => {
 
       const result = await service.findByEmail('test@example.com');
       expect(result).toEqual(mockUser);
+    });
+
+    it('should return null if email is not a string', async () => {
+      const result = await service.findByEmail(123 as unknown as string);
+      expect(result).toBeNull();
     });
   });
 
