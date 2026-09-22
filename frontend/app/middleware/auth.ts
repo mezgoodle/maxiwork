@@ -1,14 +1,11 @@
 import { useAuthStore } from '../stores/auth';
 
-export default defineNuxtRouteMiddleware((to) => {
+export default defineNuxtRouteMiddleware(async (to) => {
   const authStore = useAuthStore();
-  const tokenCookie = useCookie('access_token');
-  const refreshTokenCookie = useCookie('refresh_token');
 
-  const hasAuth =
-    authStore.isAuthenticated || !!tokenCookie.value || !!refreshTokenCookie.value;
+  const isRestored = await authStore.restoreSession();
 
-  if (!hasAuth) {
+  if (!isRestored || !authStore.isAuthenticated) {
     return navigateTo({
       path: '/login',
       query: to.fullPath !== '/' ? { redirect: to.fullPath } : undefined,

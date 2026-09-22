@@ -138,4 +138,111 @@ describe('useAuthStore', () => {
     expect(store.refreshToken).toBeNull();
     expect(store.isAuthenticated).toBe(false);
   });
+
+  it('refreshTokens deduplicates concurrent calls into a single request', async () => {
+    const store = useAuthStore();
+    store.setTokens({
+      access_token: 'old-acc',
+      refresh_token: 'old-ref',
+    });
+
+    const rotatedTokens = {
+      access_token: 'fresh-acc',
+      refresh_token: 'fresh-ref',
+    };
+    global.$fetch = vi.fn().mockResolvedValue(rotatedTokens);
+
+    const [res1, res2] = await Promise.all([
+      store.refreshTokens(),
+      store.refreshTokens(),
+    ]);
+
+    expect(global.$fetch).toHaveBeenCalledTimes(1);
+    expect(res1).toEqual(rotatedTokens);
+    expect(res2).toEqual(rotatedTokens);
+  });
+
+  it('refreshTokens does not clear auth on temporary server error (500)', async () => {
+    const store = useAuthStore();
+    store.setTokens({
+      access_token: 'old-acc',
+      refresh_token: 'old-ref',
+    });
+
+    global.$fetch = vi
+      .fn()
+      .mockRejectedValue({ statusCode: 500, message: 'Server error' });
+
+    await expect(store.refreshTokens()).rejects.toBeDefined();
+    expect(store.accessToken).toBe('old-acc');
+    expect(store.refreshToken).toBe('old-ref');
+  });
+
+  it('refreshTokens clears auth when server rejects refresh token (401)', async () => {
+    const store = useAuthStore();
+    store.setTokens({
+      access_token: 'old-acc',
+      refresh_token: 'old-ref',
+    });
+
+    global.$fetch = vi
+      .fn()
+      .mockRejectedValue({ statusCode: 401, message: 'Unauthorized' });
+
+    await expect(store.refreshTokens()).rejects.toBeDefined();
+    expect(store.accessToken).toBeNull();
+    expect(store.refreshToken).toBeNull();
+  });
+
+  it('restoreSession restores user with valid access token', async () => {
+    const store = useAuthStore();
+    store.setTokens({
+      access_token: 'valid-acc',
+      refresh_token: 'valid-ref',
+    });
+
+    const mockUser = {
+      _id: 'user-1',
+      firstName: 'Alex',
+      lastName: 'Smith',
+      email: 'alex@example.com',
+    };
+    global.$fetch = vi.fn().mockResolvedValue(mockUser);
+
+    const success = await store.restoreSession();
+
+    expect(success).toBe(true);
+    expect(store.user).toEqual(mockUser);
+  });
+
+  it('restoreSession refreshes tokens if access token expired and recovers session', async () => {
+    const store = useAuthStore();
+    store.setTokens({
+      access_token: 'expired-acc',
+      refresh_token: 'valid-ref',
+    });
+
+    const mockRotated = {
+      access_token: 'fresh-acc',
+      refresh_token: 'fresh-ref',
+    };
+    const mockUser = {
+      _id: 'user-1',
+      firstName: 'Alex',
+      lastName: 'Smith',
+      email: 'alex@example.com',
+    };
+
+    global.$fetch = vi
+      .fn()
+      .mockRejectedValueOnce({ statusCode: 401, message: 'Expired' })
+      .mockResolvedValueOnce(mockRotated)
+      .mockResolvedValueOnce(mockUser);
+
+    const success = await store.restoreSession();
+
+    expect(success).toBe(true);
+    expect(store.accessToken).toBe('fresh-acc');
+    expect(store.user).toEqual(mockUser);
+  });
 });

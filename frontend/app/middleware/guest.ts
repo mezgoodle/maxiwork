@@ -1,14 +1,14 @@
 import { useAuthStore } from '../stores/auth';
 
-export default defineNuxtRouteMiddleware(() => {
+export default defineNuxtRouteMiddleware(async () => {
   const authStore = useAuthStore();
   const tokenCookie = useCookie('access_token');
   const refreshTokenCookie = useCookie('refresh_token');
 
-  const hasAuth =
-    authStore.isAuthenticated || !!tokenCookie.value || !!refreshTokenCookie.value;
-
-  if (hasAuth) {
-    return navigateTo('/dashboard');
+  if (authStore.isAuthenticated || tokenCookie.value || refreshTokenCookie.value) {
+    const isRestored = await authStore.restoreSession();
+    if (isRestored && authStore.isAuthenticated) {
+      return navigateTo('/dashboard');
+    }
   }
 });

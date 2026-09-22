@@ -107,13 +107,18 @@ async function refreshTokensManual() {
   isRefreshing.value = true;
   refreshMessage.value = '';
   try {
-    await authStore.refreshTokens();
-    refreshMessage.value = 'Tokens successfully refreshed!';
-    setTimeout(() => {
-      refreshMessage.value = '';
-    }, 3000);
+    const tokens = await authStore.refreshTokens();
+    if (tokens?.access_token) {
+      refreshMessage.value = 'Tokens successfully refreshed!';
+      setTimeout(() => {
+        refreshMessage.value = '';
+      }, 3000);
+    } else {
+      refreshMessage.value = 'Session expired. Please log in again.';
+      await navigateTo('/login');
+    }
   } catch {
-    refreshMessage.value = 'Failed to refresh tokens.';
+    refreshMessage.value = 'Failed to refresh tokens. Please try again.';
   } finally {
     isRefreshing.value = false;
   }

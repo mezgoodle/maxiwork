@@ -9,10 +9,8 @@ import { useAuthStore } from './stores/auth';
 
 const authStore = useAuthStore();
 
-// On app initialization, fetch user profile if token is present
+// On app initialization, restore session if tokens exist
 onMounted(async () => {
-  if (authStore.isAuthenticated && !authStore.user) {
-    await authStore.fetchUser();
-  }
+  await authStore.restoreSession();
 });
 </script>

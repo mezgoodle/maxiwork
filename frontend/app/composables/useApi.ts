@@ -16,9 +16,13 @@ export const useApi = () => {
       }
     },
     async onResponseError({ response, options }) {
-      if (response.status === 401 && authStore.refreshToken) {
+      const hasRefreshToken =
+        authStore.refreshToken ||
+        (typeof useCookie === 'function' && !!useCookie('refresh_token').value);
+
+      if (response.status === 401 && hasRefreshToken) {
         try {
-          // Attempt token refresh
+          // Attempt token refresh (in-flight deduplication handled in authStore)
           const newTokens = await authStore.refreshTokens();
           if (newTokens?.access_token) {
             options.headers = new Headers(options.headers);
@@ -26,16 +30,24 @@ export const useApi = () => {
               'Authorization',
               `Bearer ${newTokens.access_token}`,
             );
-            // Retry the request
+            // Retry the request with the new access token
             return await $fetch(
               response.url,
               options as NitroFetchOptions<NitroFetchRequest>,
             );
           }
-        } catch {
-          await authStore.logout();
-          if (typeof navigateTo === 'function') {
-            await navigateTo('/login');
+        } catch (err: unknown) {
+          const status =
+            (err as { response?: { status?: number }; statusCode?: number; status?: number })?.response?.status ||
+            (err as { statusCode?: number })?.statusCode ||
+            (err as { status?: number })?.status;
+
+          // Only redirect to login when credentials were confirmed invalid
+          if (status === 400 || status === 401 || status === 403) {
+            await authStore.logout();
+            if (typeof navigateTo === 'function') {
+              await navigateTo('/login');
+            }
           }
         }
       }

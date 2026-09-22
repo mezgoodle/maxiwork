@@ -118,6 +118,8 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  let refreshPromise: Promise<AuthTokens | null> | null = null;
+
   async function refreshTokens(): Promise<AuthTokens | null> {
     const currentRefreshToken = refreshToken.value || refreshTokenCookie.value;
     if (!currentRefreshToken) {
@@ -125,18 +127,89 @@ export const useAuthStore = defineStore('auth', () => {
       return null;
     }
 
-    try {
-      const apiBase = getApiBase();
-      const tokens = await $fetch<AuthTokens>(`${apiBase}/auth/refresh`, {
-        method: 'POST',
-        body: { refresh_token: currentRefreshToken },
-      });
-      setTokens(tokens);
-      return tokens;
-    } catch (err) {
-      clearAuth();
-      throw err;
+    if (refreshPromise) {
+      return refreshPromise;
     }
+
+    refreshPromise = (async () => {
+      try {
+        const apiBase = getApiBase();
+        const tokens = await $fetch<AuthTokens>(`${apiBase}/auth/refresh`, {
+          method: 'POST',
+          body: { refresh_token: currentRefreshToken },
+        });
+        setTokens(tokens);
+        return tokens;
+      } catch (err: unknown) {
+        const status =
+          (err as { response?: { status?: number }; statusCode?: number; status?: number })?.response?.status ||
+          (err as { statusCode?: number })?.statusCode ||
+          (err as { status?: number })?.status;
+
+        // Only clear credentials if the server explicitly rejected the refresh token
+        if (status === 400 || status === 401 || status === 403) {
+          clearAuth();
+        }
+        throw err;
+      } finally {
+        refreshPromise = null;
+      }
+    })();
+
+    return refreshPromise;
+  }
+
+  let sessionPromise: Promise<boolean> | null = null;
+
+  async function restoreSession(): Promise<boolean> {
+    if (sessionPromise) {
+      return sessionPromise;
+    }
+
+    sessionPromise = (async () => {
+      // Synchronize reactive state with cookies if present
+      if (!accessToken.value && accessTokenCookie.value) {
+        accessToken.value = accessTokenCookie.value;
+      }
+      if (!refreshToken.value && refreshTokenCookie.value) {
+        refreshToken.value = refreshTokenCookie.value;
+      }
+
+      // If user profile is already loaded and access token is valid
+      if (accessToken.value && user.value) {
+        return true;
+      }
+
+      // If access token is present, validate it by fetching user profile
+      if (accessToken.value) {
+        const profile = await fetchUser();
+        if (profile) {
+          return true;
+        }
+      }
+
+      // If access token was missing or expired, attempt refresh
+      const currentRefreshToken = refreshToken.value || refreshTokenCookie.value;
+      if (currentRefreshToken) {
+        try {
+          const tokens = await refreshTokens();
+          if (tokens?.access_token) {
+            const profile = await fetchUser();
+            if (profile) {
+              return true;
+            }
+          }
+        } catch {
+          // Token refresh failed or was rejected
+        }
+      }
+
+      return false;
+    })().finally(() => {
+      sessionPromise = null;
+    });
+
+    return sessionPromise;
   }
 
   async function logout(): Promise<void> {
@@ -167,6 +240,7 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     fetchUser,
     refreshTokens,
+    restoreSession,
     logout,
   };
 });
