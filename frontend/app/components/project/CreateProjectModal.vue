@@ -40,7 +40,7 @@
                 Project Name <span class="text-rose-400">*</span>
               </label>
               <input
-                v-model.trim="form.name"
+                v-model="form.name"
                 type="text"
                 required
                 maxlength="100"
@@ -144,6 +144,21 @@ const form = reactive({
 
 const loading = ref(false);
 const errorMessage = ref('');
+const isPrefixManuallyEdited = ref(false);
+
+function generatePrefix(name: string): string {
+  const clean = name.trim().replace(/[^a-zA-Z0-9\s]/g, '');
+  if (!clean) return '';
+  const words = clean.split(/\s+/).filter(Boolean);
+  if (words.length === 1) {
+    return words[0].slice(0, 3).toUpperCase();
+  }
+  return words
+    .map((w) => w[0])
+    .join('')
+    .slice(0, 5)
+    .toUpperCase();
+}
 
 watch(
   () => props.isOpen,
@@ -153,6 +168,16 @@ watch(
       form.prefix = '';
       form.description = '';
       errorMessage.value = '';
+      isPrefixManuallyEdited.value = false;
+    }
+  },
+);
+
+watch(
+  () => form.name,
+  (newName) => {
+    if (!isPrefixManuallyEdited.value) {
+      form.prefix = generatePrefix(newName);
     }
   },
 );
@@ -160,6 +185,7 @@ watch(
 function handlePrefixInput(event: Event) {
   const target = event.target as HTMLInputElement;
   form.prefix = target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  isPrefixManuallyEdited.value = form.prefix.length > 0;
 }
 
 const nameError = computed(() => {
@@ -199,7 +225,7 @@ async function handleSubmit() {
 
   try {
     const created = await projectsStore.createProject({
-      name: form.name,
+      name: form.name.trim(),
       prefix: form.prefix,
       description: form.description || undefined,
     });
