@@ -67,7 +67,10 @@ export class AuthService {
     const payload: JwtPayload = { sub: userId, email: user.email };
 
     const accessToken = await this.generateAccessToken(payload);
-    const refreshToken = await this.generateRefreshToken(payload);
+    const refreshToken = await this.generateRefreshToken({
+      ...payload,
+      jti: crypto.randomUUID(),
+    });
 
     await this.refreshTokenModel
       .deleteMany({ userId: new Types.ObjectId(userId) })
@@ -97,7 +100,10 @@ export class AuthService {
     };
 
     const accessToken = await this.generateAccessToken(newPayload);
-    const newRefreshToken = await this.generateRefreshToken(newPayload);
+    const newRefreshToken = await this.generateRefreshToken({
+      ...newPayload,
+      jti: crypto.randomUUID(),
+    });
 
     // Atomic consumption: conditionally find and delete the unexpired matching token hash
     const hashedToken = this.hashToken(token);
