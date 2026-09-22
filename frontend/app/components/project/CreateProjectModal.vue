@@ -226,8 +226,8 @@ async function handleSubmit() {
   try {
     const created = await projectsStore.createProject({
       name: form.name.trim(),
-      prefix: form.prefix,
-      description: form.description || undefined,
+      prefix: form.prefix.trim(),
+      description: form.description ? form.description.trim() : undefined,
     });
     toast.success(`Project "${created.name}" created successfully!`);
     emit('created', created);

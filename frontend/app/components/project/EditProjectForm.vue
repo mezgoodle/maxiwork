@@ -153,9 +153,9 @@ async function handleSubmit() {
 
   try {
     const updated = await projectsStore.updateProject(props.project._id, {
-      name: form.name,
-      prefix: form.prefix,
-      description: form.description,
+      name: form.name.trim(),
+      prefix: form.prefix.trim(),
+      description: form.description ? form.description.trim() : undefined,
     });
     toast.success('Project settings updated successfully!');
     emit('saved', updated);
