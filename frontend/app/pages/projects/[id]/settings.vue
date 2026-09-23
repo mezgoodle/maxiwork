@@ -109,7 +109,7 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
 import { useProjectsStore } from '../../../stores/projects';
 import { useAuthStore } from '../../../stores/auth';
 import { useToast } from '../../../composables/useToast';
@@ -122,8 +122,6 @@ definePageMeta({
 });
 
 const route = useRoute();
-const projectId = route.params.id as string;
-
 const projectsStore = useProjectsStore();
 const authStore = useAuthStore();
 const toast = useToast();
@@ -132,57 +130,65 @@ const isConfirmOpen = ref(false);
 const isDeleting = ref(false);
 const errorState = ref('');
 
-const project = computed(() => projectsStore.currentProject);
+const { data: project, status } = await useAsyncData(
+  () => `project-${String(route.params.id || '')}`,
+  async () => {
+    const id = String(route.params.id || '');
+    if (!id) return null;
 
-const { status } = await useAsyncData(`project-${projectId}`, async () => {
-  try {
-    errorState.value = '';
-    const proj = await projectsStore.fetchProject(projectId);
+    try {
+      errorState.value = '';
+      const proj = await projectsStore.fetchProject(id);
 
-    // Verify owner authorization
-    const currentUserId = String(authStore.user?._id || '');
-    const ownerId =
-      typeof proj.owner === 'object'
-        ? String(proj.owner?._id || '')
-        : String(proj.owner || '');
+      // Verify owner authorization
+      const currentUserId = String(authStore.user?._id || '');
+      const ownerId =
+        typeof proj.owner === 'object'
+          ? String(proj.owner?._id || '')
+          : String(proj.owner || '');
 
-    if (currentUserId && ownerId && currentUserId !== ownerId) {
-      toast.error('Only the project owner can manage project settings.');
-      await navigateTo('/projects');
+      if (currentUserId && ownerId && currentUserId !== ownerId) {
+        toast.error('Only the project owner can manage project settings.');
+        await navigateTo('/projects');
+        return null;
+      }
+
+      return proj;
+    } catch (err: unknown) {
+      const fetchErr = err as {
+        statusCode?: number;
+        data?: { message?: string };
+        message?: string;
+      };
+      if (fetchErr?.statusCode === 404) {
+        errorState.value = 'Project not found';
+      } else if (fetchErr?.statusCode === 403) {
+        errorState.value = 'You do not have access to this project';
+      } else {
+        errorState.value =
+          fetchErr?.data?.message ||
+          fetchErr?.message ||
+          'Failed to load project details';
+      }
       return null;
     }
-
-    return proj;
-  } catch (err: unknown) {
-    const fetchErr = err as {
-      statusCode?: number;
-      data?: { message?: string };
-      message?: string;
-    };
-    if (fetchErr?.statusCode === 404) {
-      errorState.value = 'Project not found';
-    } else if (fetchErr?.statusCode === 403) {
-      errorState.value = 'You do not have access to this project';
-    } else {
-      errorState.value =
-        fetchErr?.data?.message ||
-        fetchErr?.message ||
-        'Failed to load project details';
-    }
-    return null;
-  }
-});
+  },
+  {
+    watch: [() => route.params.id],
+  },
+);
 
 function handleProjectSaved(updated: Project) {
-  void updated;
+  project.value = updated;
 }
 
 async function handleDeleteProject() {
-  if (!project.value) return;
+  const targetId = project.value?._id;
+  if (!targetId) return;
 
   isDeleting.value = true;
   try {
-    await projectsStore.deleteProject(projectId);
+    await projectsStore.deleteProject(targetId);
     toast.success('Project was successfully deleted.');
     isConfirmOpen.value = false;
     await navigateTo('/projects');

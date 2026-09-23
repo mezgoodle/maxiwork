@@ -7,9 +7,16 @@ export interface Toast {
   duration?: number;
 }
 
-const toasts = ref<Toast[]>([]);
-
 export const useToast = () => {
+  const toasts =
+    typeof useState === 'function'
+      ? useState<Toast[]>('maxiwork-toasts', () => [])
+      : ref<Toast[]>([]);
+
+  const remove = (id: string) => {
+    toasts.value = toasts.value.filter((t) => t.id !== id);
+  };
+
   const add = (
     message: string,
     type: 'success' | 'error' | 'info' = 'info',
@@ -19,7 +26,7 @@ export const useToast = () => {
     const toast: Toast = { id, message, type, duration };
     toasts.value.push(toast);
 
-    if (duration > 0) {
+    if (duration > 0 && (import.meta as { client?: boolean }).client) {
       setTimeout(() => {
         remove(id);
       }, duration);
@@ -32,10 +39,6 @@ export const useToast = () => {
     add(message, 'error', duration);
   const info = (message: string, duration = 4000) =>
     add(message, 'info', duration);
-
-  const remove = (id: string) => {
-    toasts.value = toasts.value.filter((t) => t.id !== id);
-  };
 
   return {
     toasts,
