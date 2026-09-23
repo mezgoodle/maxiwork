@@ -1,0 +1,65 @@
+{
+  "spaceKey": "M",
+  "spaceId": "6094850",
+  "cloudId": "ed716bdb-1672-4e65-b830-561e3e58b47f",
+  "pages": {
+    "domainModel": {
+      "pageId": "6193153",
+      "title": "Domain Model & Entity Hierarchy (ClickUp Model)",
+      "watchPaths": [
+        "backend/src/**/*.schema.ts",
+        "backend/src/**/schemas/**/*.ts",
+        "backend/src/**/dto/**/*.ts",
+        "backend/src/**/interfaces/**/*.ts"
+      ],
+      "description": "ClickUp 5-level hierarchy, Mongoose schemas, status workflows, and custom fields."
+    },
+    "mcpServer": {
+      "pageId": "6258689",
+      "title": "Embedded MCP Server Engine Specification",
+      "watchPaths": [
+        "backend/src/mcp/**/*",
+        "backend/src/**/*.tool.ts",
+        "backend/src/auth/api-key/**/*"
+      ],
+      "description": "Embedded MCP endpoint (/api/mcp), SSE transport, user API keys, registered MCP tools, client configs."
+    },
+    "aiAssistant": {
+      "pageId": "6291457",
+      "title": "In-App Gemini AI Assistant Specification",
+      "watchPaths": [
+        "backend/src/ai/**/*",
+        "backend/src/**/gemini/**/*.ts",
+        "frontend/app/components/ai/**/*"
+      ],
+      "description": "Google Gemini orchestrator, native function calling loop, chat sessions, floating drawer UI."
+    },
+    "multiViews": {
+      "pageId": "6225921",
+      "title": "Multi-View System Specification (List, Board & Calendar)",
+      "watchPaths": [
+        "frontend/app/components/views/**/*",
+        "frontend/app/pages/**/*",
+        "frontend/app/components/task/**/*"
+      ],
+      "description": "Persistent View Toolbar, Table/List View, Kanban Board with DnD, Due-Date Calendar View."
+    },
+    "projectOverview": {
+      "pageId": "6160385",
+      "title": "MaxiWork — Project Overview & Architecture",
+      "watchPaths": [
+        "backend/package.json",
+        "frontend/package.json",
+        "README.md",
+        "docker-compose.yml"
+      ],
+      "description": "High-level architecture, technology stack, system component topology."
+    },
+    "traceabilityMatrix": {
+      "pageId": "6324225",
+      "title": "Jira Roadmap & Backlog Traceability Matrix",
+      "watchPaths": [],
+      "description": "Mapping of specifications to Jira Epics, Stories, and Tasks."
+    }
+  }
+}

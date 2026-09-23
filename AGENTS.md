@@ -103,3 +103,7 @@ Before submitting code, pushing branches, or opening PRs, agents MUST verify:
    - Maintain `.env.example` with template environment variables.
    - Always hash passwords using `bcryptjs` before persisting to database.
    - Sanitize user objects so password hashes are never returned in API responses.
+6. **Documentation Synchronization (Confluence)**:
+   - When modifying database schemas (`*.schema.ts`), DTOs, API endpoints, MCP tools (`mcp/`), AI services, or major UI views, activate the `confluence-docs-sync` skill to update the respective Confluence specification pages before completing the task or opening a PR.
+   - When completing Jira stories or tasks, ensure the corresponding entries in the Jira Roadmap & Backlog Traceability Matrix page (`6324225`) reflect the updated state.
+
