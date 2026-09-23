@@ -110,7 +110,7 @@ definePageMeta({
 
 const projectsStore = useProjectsStore();
 const isCreateModalOpen = ref(false);
-const fetchError = ref('');
+const fetchError = useState('projects-list-error', () => '');
 
 const projects = computed(() => projectsStore.projects);
 

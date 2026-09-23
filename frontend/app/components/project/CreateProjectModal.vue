@@ -189,25 +189,29 @@ function handlePrefixInput(event: Event) {
 }
 
 const nameError = computed(() => {
+  const name = form.name.trim();
   if (!form.name) return '';
-  if (form.name.length < 2) return 'Project name must be at least 2 characters';
+  if (name.length < 2) return 'Project name must be at least 2 characters';
   return '';
 });
 
 const prefixError = computed(() => {
+  const prefix = form.prefix.trim();
   if (!form.prefix) return '';
-  if (form.prefix.length < 2) return 'Prefix must be at least 2 characters';
-  if (form.prefix.length > 5) return 'Prefix cannot exceed 5 characters';
+  if (prefix.length < 2) return 'Prefix must be at least 2 characters';
+  if (prefix.length > 5) return 'Prefix cannot exceed 5 characters';
   return '';
 });
 
 const isFormInvalid = computed(() => {
+  const name = form.name.trim();
+  const prefix = form.prefix.trim();
   return (
-    !form.name ||
-    form.name.length < 2 ||
-    !form.prefix ||
-    form.prefix.length < 2 ||
-    form.prefix.length > 5
+    !name ||
+    name.length < 2 ||
+    !prefix ||
+    prefix.length < 2 ||
+    prefix.length > 5
   );
 });
 

@@ -1,8 +1,8 @@
-import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsString, MaxLength, MinLength, ValidateIf } from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class UpdateProjectDto {
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @IsString()
   @MinLength(2)
   @MaxLength(100)
@@ -11,7 +11,7 @@ export class UpdateProjectDto {
   )
   name?: string;
 
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @IsString()
   @MinLength(2)
   @MaxLength(5)
@@ -20,7 +20,7 @@ export class UpdateProjectDto {
   )
   prefix?: string;
 
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @IsString()
   @MaxLength(1000)
   @Transform(({ value }: { value: unknown }) =>

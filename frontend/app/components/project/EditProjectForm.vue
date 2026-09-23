@@ -129,15 +129,17 @@ const isDirty = computed(() => {
 });
 
 const nameError = computed(() => {
-  if (!form.name) return 'Project name is required';
-  if (form.name.length < 2) return 'Project name must be at least 2 characters';
+  const name = form.name.trim();
+  if (!name) return 'Project name is required';
+  if (name.length < 2) return 'Project name must be at least 2 characters';
   return '';
 });
 
 const prefixError = computed(() => {
-  if (!form.prefix) return 'Prefix is required';
-  if (form.prefix.length < 2) return 'Prefix must be at least 2 characters';
-  if (form.prefix.length > 5) return 'Prefix cannot exceed 5 characters';
+  const prefix = form.prefix.trim();
+  if (!prefix) return 'Prefix is required';
+  if (prefix.length < 2) return 'Prefix must be at least 2 characters';
+  if (prefix.length > 5) return 'Prefix cannot exceed 5 characters';
   return '';
 });
 
@@ -155,7 +157,7 @@ async function handleSubmit() {
     const updated = await projectsStore.updateProject(props.project._id, {
       name: form.name.trim(),
       prefix: form.prefix.trim(),
-      description: form.description ? form.description.trim() : undefined,
+      description: form.description.trim(),
     });
     toast.success('Project settings updated successfully!');
     emit('saved', updated);

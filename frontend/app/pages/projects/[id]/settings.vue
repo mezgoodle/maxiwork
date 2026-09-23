@@ -128,7 +128,10 @@ const toast = useToast();
 
 const isConfirmOpen = ref(false);
 const isDeleting = ref(false);
-const errorState = ref('');
+const errorState = useState(
+  () => `project-settings-error-${String(route.params.id || '')}`,
+  () => '',
+);
 
 const { data: project, status } = await useAsyncData(
   () => `project-${String(route.params.id || '')}`,

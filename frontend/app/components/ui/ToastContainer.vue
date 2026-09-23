@@ -1,6 +1,8 @@
 <template>
   <div
     class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"
+    role="status"
+    aria-live="polite"
   >
     <TransitionGroup
       enter-active-class="transform ease-out duration-300 transition"
@@ -31,6 +33,7 @@
         </div>
         <button
           type="button"
+          aria-label="Dismiss notification"
           class="text-slate-400 hover:text-white transition p-1 cursor-pointer"
           @click="remove(toast.id)"
         >
