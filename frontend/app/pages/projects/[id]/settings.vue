@@ -1,9 +1,16 @@
 <template>
   <div class="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 lg:p-8">
-    <!-- Breadcrumbs / Back navigation -->
-    <div class="mb-6 flex items-center gap-2 text-sm text-slate-400">
+    <!-- Breadcrumbs / Navigation -->
+    <div class="mb-6 flex items-center justify-between text-sm text-slate-400">
       <NuxtLink to="/projects" class="hover:text-white transition">
         &larr; Back to Projects
+      </NuxtLink>
+      <NuxtLink
+        v-if="project"
+        :to="`/projects/${project._id}/board`"
+        class="text-emerald-400 hover:text-emerald-300 font-medium transition cursor-pointer"
+      >
+        Open Board &rarr;
       </NuxtLink>
     </div>
 

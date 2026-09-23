@@ -10,11 +10,12 @@
           >
             {{ project.prefix }}
           </span>
-          <h3
-            class="text-lg font-bold text-white group-hover:text-emerald-300 transition line-clamp-1"
+          <NuxtLink
+            :to="`/projects/${project._id}/board`"
+            class="text-lg font-bold text-white group-hover:text-emerald-300 transition line-clamp-1 cursor-pointer"
           >
             {{ project.name }}
-          </h3>
+          </NuxtLink>
         </div>
 
         <NuxtLink
@@ -41,12 +42,14 @@
         </span>
       </div>
 
-      <NuxtLink
-        :to="`/projects/${project._id}/settings`"
-        class="text-emerald-400 hover:text-emerald-300 font-medium transition cursor-pointer"
-      >
-        Settings &rarr;
-      </NuxtLink>
+      <div class="flex items-center gap-3">
+        <NuxtLink
+          :to="`/projects/${project._id}/board`"
+          class="text-emerald-400 hover:text-emerald-300 font-medium transition cursor-pointer"
+        >
+          Board &rarr;
+        </NuxtLink>
+      </div>
     </div>
   </div>
 </template>
