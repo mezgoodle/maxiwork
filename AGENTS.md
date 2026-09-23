@@ -9,6 +9,7 @@ Welcome to the **MaxiWork** project repository. This document serves as the sing
 > [!IMPORTANT]
 > **All project artifacts MUST be written exclusively in English.**
 > This includes, but is not limited to:
+>
 > - User Interface (UI) text: labels, buttons, headings, placeholders, descriptions, alerts, and toasts.
 > - Source code: variable names, function names, class names, types, and comments.
 > - API error messages, HTTP exception descriptions, and validation messages.
@@ -31,6 +32,7 @@ maxiwork/
 ```
 
 ### 🔧 Backend (`/backend`)
+
 - **Framework**: NestJS 11 with TypeScript
 - **Database**: MongoDB using `@nestjs/mongoose` and Mongoose schemas
 - **Authentication**: Passport Local (`passport-local`) and Passport JWT (`passport-jwt`), short-lived access tokens (15m) + secure rotating refresh tokens (7d)
@@ -45,6 +47,7 @@ maxiwork/
   - `npm test` — Run Jest unit test suites
 
 ### 🎨 Frontend (`/frontend`)
+
 - **Framework**: Nuxt 4 (Vue 3, Composition API with `<script setup>`)
 - **Rendering Mode**: Server-Side Rendering (`ssr: true`)
 - **State Management**: Pinia (`@pinia/nuxt`)
@@ -64,20 +67,23 @@ maxiwork/
 ## 🌿 3. Git & Workflow Guidelines
 
 ### Branch Naming
+
 - Always use the branch names suggested directly by Jira (e.g. `MAX-62-implement-user-registration`).
 - Chained PRs: When a frontend PR depends on an unmerged backend PR, branch from the backend branch and set the PR's base branch accordingly.
 
 ### Commit Messages
+
 - Every commit message MUST start with the Jira ticket key:
   ```
   <TICKET-KEY>: <imperative action description>
   ```
-  *Examples:*
+  _Examples:_
   - `MAX-62: implement user registration with User schema and validation`
   - `MAX-67: implement Pinia auth store, token management, and useApi interceptor`
 - Keep commits atomic, well-scoped, and cleanly separated by feature or ticket.
 
 ### Pull Requests
+
 - **Title**: `<type>(<scope>): <summary> (<TICKET-KEYS>)` (e.g. `feat(frontend): implement auth UI, store, and middleware (MAX-66, MAX-67, MAX-68)`).
 - **Description**: Include a concise summary of changes, linked Jira issue keys, and test/build verification results.
 
@@ -107,3 +113,28 @@ Before submitting code, pushing branches, or opening PRs, agents MUST verify:
    - When modifying database schemas (`*.schema.ts`), DTOs, API endpoints, MCP tools (`mcp/`), AI services, or major UI views, activate the `confluence-docs-sync` skill to update the respective Confluence specification pages before completing the task or opening a PR.
    - When completing Jira stories or tasks, ensure the corresponding entries in the Jira Roadmap & Backlog Traceability Matrix page (`6324225`) reflect the updated state.
 
+## 🛑 5. Agent Behavioral Guardrails (STRICT)
+
+- **Scope Control**: Touch ONLY files directly related to the active Jira ticket. Do NOT reformat untouched files or modify shared configs unless explicitly instructed.
+- **Dependency Freeze**: NEVER run `npm install <package>` without prior approval. Always leverage already installed packages (`lodash`, `date-fns`, existing utils, etc.).
+- **Self-Correction Rule**: If any lint, build, or test step fails during verification, inspect the error output, fix the root cause, and re-run the verification commands automatically. Do not ask for user intervention on errors introduced by your changes.
+- **No Cheat Directives**:
+  - NEVER use `@ts-ignore`, `@ts-nocheck`, or `as any`.
+  - NEVER comment out failing tests to make suites pass.
+  - Fix the underlying type or logic discrepancy.
+
+---
+
+## 🏛️ 6. Architecture & Implementation Patterns
+
+### Backend (NestJS 11 + Mongoose)
+
+- **Controller/Service Separation**: Controllers must ONLY handle routing, DTO validation, and HTTP responses. Zero business logic inside controllers.
+- **DTOs & Typing**: Every incoming request must have a dedicated class decorated with `class-validator`. Never type `req.body` as a raw interface or record.
+- **Mongoose Sanitization**: Do not return raw Mongoose documents. Use `.lean()`, transform `_id` to string `id`, and exclude `__v` and password hashes via DTO mapping or schema transforms.
+
+### Frontend (Nuxt 4 SSR)
+
+- **SSR Safety**: Never access browser-only globals (`window`, `localStorage`, `document`) outside `onMounted()` or client-only lifecycle guards.
+- **Data Fetching**: Use the provided `useApi` composable for all internal backend calls. Avoid raw `fetch()` or third-party axios instances.
+- **Component Consistency**: Follow Vue 3 `<script setup lang="ts">` strictly. Define explicit `defineProps<{ ... }>()` and `defineEmits<{ ... }>()` with TypeScript types.
