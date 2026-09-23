@@ -13,6 +13,12 @@
               {{ authStore.user ? ([authStore.user.firstName, authStore.user.lastName].filter(Boolean).join(' ') || authStore.user.email) : '' }}
             </span>
             <NuxtLink
+              to="/projects"
+              class="px-3 py-1.5 text-sm font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-white transition"
+            >
+              Projects
+            </NuxtLink>
+            <NuxtLink
               to="/dashboard"
               class="px-3 py-1.5 text-sm font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-white transition"
             >
@@ -53,11 +59,15 @@
     <footer class="border-t border-slate-800 py-6 text-center text-xs text-slate-500">
       &copy; {{ new Date().getFullYear() }} MaxiWork. All rights reserved.
     </footer>
+
+    <!-- Global Toast Notifications -->
+    <ToastContainer />
   </div>
 </template>
 
 <script lang="ts" setup>
 import { useAuthStore } from '../stores/auth';
+import ToastContainer from '../components/ui/ToastContainer.vue';
 
 const authStore = useAuthStore();
 
