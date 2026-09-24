@@ -10,6 +10,7 @@ import type {
   TasksPaginationMeta,
 } from '../types/task';
 import { useApi } from '../composables/useApi';
+import { extractApiErrorMessage } from '../utils/error';
 
 export const useTasksStore = defineStore('tasks', () => {
   const tasks = ref<Task[]>([]);
@@ -70,9 +71,7 @@ export const useTasksStore = defineStore('tasks', () => {
       meta.value = res.meta;
       return res;
     } catch (err: unknown) {
-      const fetchErr = err as { data?: { message?: string }; message?: string };
-      error.value =
-        fetchErr?.data?.message || fetchErr?.message || 'Failed to fetch tasks';
+      error.value = extractApiErrorMessage(err, 'Failed to fetch tasks');
       throw err;
     } finally {
       loading.value = false;
@@ -93,9 +92,7 @@ export const useTasksStore = defineStore('tasks', () => {
       currentTask.value = res;
       return res;
     } catch (err: unknown) {
-      const fetchErr = err as { data?: { message?: string }; message?: string };
-      error.value =
-        fetchErr?.data?.message || fetchErr?.message || 'Failed to fetch task';
+      error.value = extractApiErrorMessage(err, 'Failed to fetch task');
       throw err;
     } finally {
       loading.value = false;
@@ -120,9 +117,7 @@ export const useTasksStore = defineStore('tasks', () => {
       tasks.value.unshift(created);
       return created;
     } catch (err: unknown) {
-      const fetchErr = err as { data?: { message?: string }; message?: string };
-      error.value =
-        fetchErr?.data?.message || fetchErr?.message || 'Failed to create task';
+      error.value = extractApiErrorMessage(err, 'Failed to create task');
       throw err;
     } finally {
       loading.value = false;
@@ -154,9 +149,7 @@ export const useTasksStore = defineStore('tasks', () => {
       }
       return updated;
     } catch (err: unknown) {
-      const fetchErr = err as { data?: { message?: string }; message?: string };
-      error.value =
-        fetchErr?.data?.message || fetchErr?.message || 'Failed to update task';
+      error.value = extractApiErrorMessage(err, 'Failed to update task');
       throw err;
     } finally {
       loading.value = false;
@@ -204,11 +197,7 @@ export const useTasksStore = defineStore('tasks', () => {
       if (currentTask.value?._id === taskId && previousStatus) {
         currentTask.value.status = previousStatus;
       }
-      const fetchErr = err as { data?: { message?: string }; message?: string };
-      error.value =
-        fetchErr?.data?.message ||
-        fetchErr?.message ||
-        'Failed to update task status';
+      error.value = extractApiErrorMessage(err, 'Failed to update task status');
       throw err;
     }
   }
@@ -226,9 +215,7 @@ export const useTasksStore = defineStore('tasks', () => {
         currentTask.value = null;
       }
     } catch (err: unknown) {
-      const fetchErr = err as { data?: { message?: string }; message?: string };
-      error.value =
-        fetchErr?.data?.message || fetchErr?.message || 'Failed to delete task';
+      error.value = extractApiErrorMessage(err, 'Failed to delete task');
       throw err;
     } finally {
       loading.value = false;

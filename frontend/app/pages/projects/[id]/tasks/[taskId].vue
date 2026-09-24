@@ -227,7 +227,7 @@
               Created
             </span>
             <span class="text-xs text-slate-400 py-1 inline-block">
-              {{ formatDate(task.createdAt) || 'Unknown' }}
+              {{ formatTaskDate(task.createdAt) || 'Unknown' }}
             </span>
           </div>
         </div>
@@ -365,56 +365,16 @@ const assignableUsers = computed(() => {
 
 const priorityBadgeClass = computed(() => {
   if (!task.value) return '';
-  const map: Record<TaskPriority, string> = {
-    low: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    medium: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-    high: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
-    critical: 'bg-rose-500/10 text-rose-400 border-rose-500/20 font-bold',
-  };
-  return map[task.value.priority] || map.medium;
+  return getPriorityBadgeClass(task.value.priority);
 });
 
-const reporterName = computed(() => {
-  if (!task.value?.reporter) return 'Unknown';
-  if (typeof task.value.reporter === 'object') {
-    const { firstName, lastName, email } = task.value.reporter;
-    return (
-      [firstName, lastName].filter(Boolean).join(' ') || email || 'Reporter'
-    );
-  }
-  return 'Reporter';
-});
+const reporterName = computed(() =>
+  getUserDisplayName(task.value?.reporter, 'Reporter'),
+);
 
-const reporterInitials = computed(() => {
-  if (!task.value?.reporter) return '?';
-  if (typeof task.value.reporter === 'object') {
-    const { firstName, lastName, email } = task.value.reporter;
-    if (firstName && lastName) {
-      return `${firstName[0]}${lastName[0]}`.toUpperCase();
-    }
-    if (firstName) return firstName.slice(0, 2).toUpperCase();
-    if (email) return email.slice(0, 2).toUpperCase();
-  }
-  return 'R';
-});
-
-function formatDate(dateStr?: string): string {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return '';
-  return d.toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-}
-
-function formatDateForInput(dateStr?: string): string {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return '';
-  return d.toISOString().split('T')[0];
-}
+const reporterInitials = computed(() =>
+  getUserInitials(task.value?.reporter, 'R'),
+);
 
 async function updateTaskField(payload: UpdateTaskPayload, successMessage?: string) {
   if (!task.value) return;
@@ -424,11 +384,7 @@ async function updateTaskField(payload: UpdateTaskPayload, successMessage?: stri
       showToast(successMessage, 'success');
     }
   } catch (err: unknown) {
-    const errorMsg =
-      (err as { data?: { message?: string }; message?: string })?.data
-        ?.message ||
-      (err as { message?: string })?.message ||
-      'Failed to update task';
+    const errorMsg = extractApiErrorMessage(err, 'Failed to update task');
     showToast(errorMsg, 'error');
   }
 }
@@ -487,11 +443,7 @@ async function handleStatusChange(newStatus: TaskStatus) {
     await tasksStore.updateTaskStatus(projectId.value, taskId.value, newStatus);
     showToast(`Status updated to ${newStatus.replace('_', ' ')}`, 'success');
   } catch (err: unknown) {
-    const errorMsg =
-      (err as { data?: { message?: string }; message?: string })?.data
-        ?.message ||
-      (err as { message?: string })?.message ||
-      'Failed to update status';
+    const errorMsg = extractApiErrorMessage(err, 'Failed to update status');
     showToast(errorMsg, 'error');
   }
 }
@@ -502,7 +454,6 @@ async function toggleComplete() {
   await handleStatusChange(newStatus);
 }
 
-
 async function handleDeleteTask() {
   isDeleting.value = true;
   try {
@@ -511,11 +462,7 @@ async function handleDeleteTask() {
     isDeleteDialogOpen.value = false;
     router.push(`/projects/${projectId.value}/board`);
   } catch (err: unknown) {
-    const errorMsg =
-      (err as { data?: { message?: string }; message?: string })?.data
-        ?.message ||
-      (err as { message?: string })?.message ||
-      'Failed to delete task';
+    const errorMsg = extractApiErrorMessage(err, 'Failed to delete task');
     showToast(errorMsg, 'error');
   } finally {
     isDeleting.value = false;

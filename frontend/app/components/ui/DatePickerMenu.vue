@@ -140,17 +140,6 @@ const emit = defineEmits<Emits>();
 const containerRef = ref<HTMLElement | null>(null);
 const isOpen = ref(false);
 
-function padZero(n: number): string {
-  return n < 10 ? `0${n}` : `${n}`;
-}
-
-function toDateString(d: Date): string {
-  const year = d.getFullYear();
-  const month = padZero(d.getMonth() + 1);
-  const day = padZero(d.getDate());
-  return `${year}-${month}-${day}`;
-}
-
 const todayStr = computed(() => toDateString(new Date()));
 
 const tomorrowStr = computed(() => {

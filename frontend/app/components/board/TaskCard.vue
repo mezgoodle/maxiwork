@@ -66,7 +66,7 @@
 
 <script lang="ts" setup>
 import { computed, ref } from 'vue';
-import type { Task, TaskPriority } from '../../types/task';
+import type { Task } from '../../types/task';
 
 interface Props {
   task: Task;
@@ -83,39 +83,13 @@ const emit = defineEmits<Emits>();
 
 const isDragging = ref(false);
 
-const priorityBadgeClass = computed(() => {
-  const map: Record<TaskPriority, string> = {
-    low: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    medium: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-    high: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
-    critical: 'bg-rose-500/10 text-rose-400 border-rose-500/20 font-bold',
-  };
-  return map[props.task.priority] || map.medium;
-});
+const priorityBadgeClass = computed(() =>
+  getPriorityBadgeClass(props.task.priority),
+);
 
-const assigneeName = computed(() => {
-  if (!props.task.assignee) return 'Unassigned';
-  if (typeof props.task.assignee === 'object') {
-    const { firstName, lastName, email } = props.task.assignee;
-    return (
-      [firstName, lastName].filter(Boolean).join(' ') || email || 'Assignee'
-    );
-  }
-  return 'Assignee';
-});
+const assigneeName = computed(() => getUserDisplayName(props.task.assignee));
 
-const assigneeInitials = computed(() => {
-  if (!props.task.assignee) return '?';
-  if (typeof props.task.assignee === 'object') {
-    const { firstName, lastName, email } = props.task.assignee;
-    if (firstName && lastName) {
-      return `${firstName[0]}${lastName[0]}`.toUpperCase();
-    }
-    if (firstName) return firstName.slice(0, 2).toUpperCase();
-    if (email) return email.slice(0, 2).toUpperCase();
-  }
-  return 'U';
-});
+const assigneeInitials = computed(() => getUserInitials(props.task.assignee));
 
 const formattedDueDate = computed(() => {
   if (!props.task.dueDate) return '';

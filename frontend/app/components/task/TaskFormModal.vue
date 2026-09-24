@@ -372,11 +372,7 @@ async function handleSubmit() {
     emit('saved', result);
     handleClose();
   } catch (err: unknown) {
-    errorMessage.value =
-      (err as { data?: { message?: string }; message?: string })?.data
-        ?.message ||
-      (err as { message?: string })?.message ||
-      'Failed to save task';
+    errorMessage.value = extractApiErrorMessage(err, 'Failed to save task');
   } finally {
     loading.value = false;
   }
