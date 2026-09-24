@@ -26,7 +26,7 @@
         type="button"
         class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer text-sm font-semibold"
         title="Add task in this column"
-        @click="$emit('create-task', status)"
+        @click="emit('create-task', props.status)"
       >
         +
       </button>

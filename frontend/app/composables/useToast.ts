@@ -43,6 +43,7 @@ export const useToast = () => {
   return {
     toasts,
     add,
+    showToast: add,
     success,
     error,
     info,

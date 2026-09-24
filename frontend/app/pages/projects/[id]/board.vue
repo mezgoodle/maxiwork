@@ -93,7 +93,7 @@
     <div class="flex-1">
       <KanbanBoard
         :project-id="projectId"
-        @create-task="openCreateModal"
+        @create-task="(status) => openCreateModal(status)"
         @edit-task="openEditModal"
       />
     </div>

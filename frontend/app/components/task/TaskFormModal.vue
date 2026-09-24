@@ -224,27 +224,27 @@ function formatDateForInput(dateStr?: string): string {
 }
 
 watch(
-  () => props.isOpen,
-  (open) => {
+  [() => props.isOpen, () => props.defaultStatus, () => props.task],
+  ([open, defaultStatus, task]) => {
     if (open) {
       errorMessage.value = '';
       titleError.value = '';
 
-      if (props.task) {
-        form.title = props.task.title;
-        form.description = props.task.description || '';
-        form.status = props.task.status;
-        form.priority = props.task.priority;
+      if (task) {
+        form.title = task.title;
+        form.description = task.description || '';
+        form.status = task.status;
+        form.priority = task.priority;
         form.assignee =
-          typeof props.task.assignee === 'object' && props.task.assignee
-            ? props.task.assignee._id
-            : (props.task.assignee as string) || '';
-        form.startDate = formatDateForInput(props.task.startDate);
-        form.dueDate = formatDateForInput(props.task.dueDate);
+          typeof task.assignee === 'object' && task.assignee
+            ? task.assignee._id
+            : (task.assignee as string) || '';
+        form.startDate = formatDateForInput(task.startDate);
+        form.dueDate = formatDateForInput(task.dueDate);
       } else {
         form.title = '';
         form.description = '';
-        form.status = props.defaultStatus || 'todo';
+        form.status = defaultStatus || 'todo';
         form.priority = 'medium';
         form.assignee = '';
         form.startDate = '';

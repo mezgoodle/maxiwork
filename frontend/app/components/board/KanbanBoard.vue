@@ -26,8 +26,8 @@
         :tasks="tasksStore.tasksByStatus.todo"
         :project-id="projectId"
         @task-drop="handleTaskDrop"
-        @create-task="(status) => $emit('create-task', status)"
-        @edit-task="(task) => $emit('edit-task', task)"
+        @create-task="(status) => emit('create-task', status)"
+        @edit-task="(task) => emit('edit-task', task)"
       />
 
       <KanbanColumn
@@ -36,8 +36,8 @@
         :tasks="tasksStore.tasksByStatus.in_progress"
         :project-id="projectId"
         @task-drop="handleTaskDrop"
-        @create-task="(status) => $emit('create-task', status)"
-        @edit-task="(task) => $emit('edit-task', task)"
+        @create-task="(status) => emit('create-task', status)"
+        @edit-task="(task) => emit('edit-task', task)"
       />
 
       <KanbanColumn
@@ -46,8 +46,8 @@
         :tasks="tasksStore.tasksByStatus.in_review"
         :project-id="projectId"
         @task-drop="handleTaskDrop"
-        @create-task="(status) => $emit('create-task', status)"
-        @edit-task="(task) => $emit('edit-task', task)"
+        @create-task="(status) => emit('create-task', status)"
+        @edit-task="(task) => emit('edit-task', task)"
       />
 
       <KanbanColumn
@@ -56,8 +56,8 @@
         :tasks="tasksStore.tasksByStatus.done"
         :project-id="projectId"
         @task-drop="handleTaskDrop"
-        @create-task="(status) => $emit('create-task', status)"
-        @edit-task="(task) => $emit('edit-task', task)"
+        @create-task="(status) => emit('create-task', status)"
+        @edit-task="(task) => emit('edit-task', task)"
       />
     </div>
   </div>
@@ -79,7 +79,7 @@ interface Emits {
 }
 
 const props = defineProps<Props>();
-defineEmits<Emits>();
+const emit = defineEmits<Emits>();
 
 const tasksStore = useTasksStore();
 const { showToast } = useToast();

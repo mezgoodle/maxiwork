@@ -135,13 +135,10 @@ const toast = useToast();
 
 const isConfirmOpen = ref(false);
 const isDeleting = ref(false);
-const errorState = useState(
-  () => `project-settings-error-${String(route.params.id || '')}`,
-  () => '',
-);
+const errorState = ref('');
 
 const { data: project, status } = await useAsyncData(
-  () => `project-${String(route.params.id || '')}`,
+  `project-settings-${String(route.params.id || '')}`,
   async () => {
     const id = String(route.params.id || '');
     if (!id) return null;
@@ -158,8 +155,7 @@ const { data: project, status } = await useAsyncData(
           : String(proj.owner || '');
 
       if (currentUserId && ownerId && currentUserId !== ownerId) {
-        toast.error('Only the project owner can manage project settings.');
-        await navigateTo('/projects');
+        errorState.value = 'Only the project owner can manage project settings.';
         return null;
       }
 
