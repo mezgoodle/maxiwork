@@ -142,5 +142,14 @@ describe('Tasks DTOs', () => {
       const errors = await validate(dto);
       expect(errors.length).toBe(2);
     });
+
+    it('should reject search longer than 100 characters', async () => {
+      const dto = plainToInstance(GetTasksQueryDto, {
+        search: 'a'.repeat(101),
+      });
+      const errors = await validate(dto);
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors[0].property).toBe('search');
+    });
   });
 });

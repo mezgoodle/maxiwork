@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Types } from 'mongoose';
 import { TasksService } from './tasks.service';
 import { Task } from './schemas/task.schema';
@@ -26,6 +30,8 @@ interface MockTaskModelConstructor {
 
 interface MockProjectModel {
   findById: jest.Mock;
+  findByIdAndUpdate: jest.Mock;
+  updateOne: jest.Mock;
 }
 
 describe('TasksService', () => {
@@ -79,6 +85,15 @@ describe('TasksService', () => {
     mockProjectModel = {
       findById: jest.fn().mockReturnValue({
         exec: jest.fn().mockResolvedValue(mockProject),
+      }),
+      findByIdAndUpdate: jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue({
+          prefix: mockProject.prefix,
+          taskCounter: 1,
+        }),
+      }),
+      updateOne: jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
       }),
     };
 
@@ -183,6 +198,13 @@ describe('TasksService', () => {
         }),
       });
 
+      mockProjectModel.findByIdAndUpdate.mockReturnValue({
+        exec: jest.fn().mockResolvedValue({
+          prefix: 'TEST',
+          taskCounter: 5,
+        }),
+      });
+
       const dto: CreateTaskDto = {
         title: 'Next Task',
       };
@@ -193,6 +215,17 @@ describe('TasksService', () => {
           taskKey: 'TEST-5',
         }),
       );
+    });
+
+    it('should throw BadRequestException if assignee is not a member of the project', async () => {
+      const dto: CreateTaskDto = {
+        title: 'Task with external assignee',
+        assignee: mockOtherUserId,
+      };
+
+      await expect(
+        service.create(mockProjectId, dto, mockOwnerId),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('should handle optional dates and assignee conversion', async () => {
@@ -206,7 +239,7 @@ describe('TasksService', () => {
 
       const dto: CreateTaskDto = {
         title: 'Dated Task',
-        assignee: '507f1f77bcf86cd799439022',
+        assignee: mockMemberId,
         startDate: '2026-09-24T00:00:00.000Z',
         dueDate: '2026-09-30T00:00:00.000Z',
       };
@@ -263,6 +296,36 @@ describe('TasksService', () => {
           $or: [
             { title: { $regex: 'bug', $options: 'i' } },
             { description: { $regex: 'bug', $options: 'i' } },
+          ],
+        }),
+      );
+    });
+
+    it('should escape regex special characters in search query', async () => {
+      const mockQueryExec = {
+        sort: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        populate: jest.fn().mockReturnThis(),
+        exec: jest.fn().mockResolvedValue([]),
+      };
+
+      mockTaskModel.find.mockReturnValue(mockQueryExec);
+      mockTaskModel.countDocuments.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(0),
+      });
+
+      const query: GetTasksQueryDto = {
+        search: 'bug.*fix(1)',
+      };
+
+      await service.findAll(mockProjectId, query, mockOwnerId);
+
+      expect(mockTaskModel.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          $or: [
+            { title: { $regex: 'bug\\.\\*fix\\(1\\)', $options: 'i' } },
+            { description: { $regex: 'bug\\.\\*fix\\(1\\)', $options: 'i' } },
           ],
         }),
       );
@@ -333,6 +396,26 @@ describe('TasksService', () => {
       );
       expect(mockExisting.title).toBe('New Title');
       expect(result).toBeDefined();
+    });
+
+    it('should throw BadRequestException when updating assignee to non-member', async () => {
+      const mockExisting = {
+        _id: mockTaskId,
+        title: 'Task',
+        save: jest.fn(),
+      };
+
+      mockTaskModel.findOne.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockExisting),
+      });
+
+      const updateDto: UpdateTaskDto = {
+        assignee: mockOtherUserId,
+      };
+
+      await expect(
+        service.update(mockProjectId, mockTaskId, updateDto, mockOwnerId),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw NotFoundException if task to update does not exist', async () => {

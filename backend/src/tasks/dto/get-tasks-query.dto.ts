@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsString,
   Max,
+  MaxLength,
   Min,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
@@ -39,6 +40,7 @@ export class GetTasksQueryDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim() : value,
   )

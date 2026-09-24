@@ -37,6 +37,9 @@ export class Project {
   })
   members: (Types.ObjectId | User)[];
 
+  @Prop({ type: Number, default: 0 })
+  taskCounter?: number;
+
   createdAt?: Date;
   updatedAt?: Date;
 }

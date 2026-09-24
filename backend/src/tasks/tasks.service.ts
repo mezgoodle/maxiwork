@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -44,6 +45,18 @@ export class TasksService {
     return typeof ref === 'string' ? ref : '';
   }
 
+  private assertAssigneeInProject(
+    project: ProjectDocument,
+    assigneeId: string,
+  ): void {
+    const ids = [project.owner, ...(project.members || [])].map((r) =>
+      this.extractId(r),
+    );
+    if (!ids.includes(assigneeId.toString())) {
+      throw new BadRequestException('Assignee must be a member of the project');
+    }
+  }
+
   async checkProjectAccess(
     projectId: string,
     userId: string,
@@ -72,25 +85,50 @@ export class TasksService {
   ): Promise<TaskDocument> {
     const project = await this.checkProjectAccess(projectId, userId);
 
-    const existingTasks = await this.taskModel
-      .find({ project: projectId })
-      .select('taskKey')
-      .lean()
-      .exec();
-
-    const prefixPattern = new RegExp(`^${project.prefix}-(\\d+)$`);
-    let maxNum = 0;
-    for (const t of existingTasks) {
-      const match = t.taskKey.match(prefixPattern);
-      if (match) {
-        const num = parseInt(match[1], 10);
-        if (!isNaN(num) && num > maxNum) {
-          maxNum = num;
-        }
-      }
+    if (createTaskDto.assignee) {
+      this.assertAssigneeInProject(project, createTaskDto.assignee);
     }
 
-    const taskKey = `${project.prefix}-${maxNum + 1}`;
+    if (typeof project.taskCounter !== 'number') {
+      const existingTasks = await this.taskModel
+        .find({ project: projectId })
+        .select('taskKey')
+        .lean()
+        .exec();
+
+      const escapedPrefix = project.prefix.replace(
+        /[.*+?^${}()|[\]\\]/g,
+        '\\$&',
+      );
+      const prefixPattern = new RegExp(`^${escapedPrefix}-(\\d+)$`);
+      let maxNum = 0;
+      for (const t of existingTasks) {
+        const match = t.taskKey.match(prefixPattern);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (!isNaN(num) && num > maxNum) {
+            maxNum = num;
+          }
+        }
+      }
+      await this.projectModel
+        .updateOne({ _id: projectId }, { $set: { taskCounter: maxNum } })
+        .exec();
+    }
+
+    const counter = await this.projectModel
+      .findByIdAndUpdate(
+        projectId,
+        { $inc: { taskCounter: 1 } },
+        { new: true, projection: { prefix: 1, taskCounter: 1 } },
+      )
+      .exec();
+
+    if (!counter) {
+      throw new NotFoundException('Project not found');
+    }
+
+    const taskKey = `${counter.prefix}-${counter.taskCounter}`;
 
     const createdTask = new this.taskModel({
       ...createTaskDto,
@@ -137,7 +175,8 @@ export class TasksService {
     }
 
     if (query.search) {
-      const searchRegex = { $regex: query.search, $options: 'i' };
+      const escaped = query.search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const searchRegex = { $regex: escaped, $options: 'i' };
       filter.$or = [{ title: searchRegex }, { description: searchRegex }];
     }
 
@@ -194,7 +233,7 @@ export class TasksService {
     updateTaskDto: UpdateTaskDto,
     userId: string,
   ): Promise<TaskDocument> {
-    await this.checkProjectAccess(projectId, userId);
+    const project = await this.checkProjectAccess(projectId, userId);
 
     const task = await this.taskModel
       .findOne({ _id: taskId, project: projectId })
@@ -221,6 +260,9 @@ export class TasksService {
     }
 
     if (updateTaskDto.assignee !== undefined) {
+      if (updateTaskDto.assignee) {
+        this.assertAssigneeInProject(project, updateTaskDto.assignee);
+      }
       task.assignee = updateTaskDto.assignee
         ? new Types.ObjectId(updateTaskDto.assignee)
         : undefined;
