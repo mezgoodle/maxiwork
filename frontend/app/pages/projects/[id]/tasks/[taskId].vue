@@ -74,19 +74,47 @@
             </h1>
           </div>
 
-          <!-- Status Dropdown -->
-          <div class="flex items-center gap-3 shrink-0">
+          <!-- Status Dropdown & Close/Done Toggle Button (ClickUp style) -->
+          <div class="flex items-center gap-2.5 shrink-0">
             <label class="text-xs text-slate-400">Status:</label>
-            <select
-              :value="task.status"
-              class="px-3.5 py-2 bg-slate-900 border border-slate-700 rounded-xl text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 capitalize"
-              @change="handleStatusChange(($event.target as HTMLSelectElement).value as TaskStatus)"
-            >
-              <option value="todo">To Do</option>
-              <option value="in_progress">In Progress</option>
-              <option value="in_review">In Review</option>
-              <option value="done">Done</option>
-            </select>
+            <div class="flex items-center gap-2">
+              <select
+                :value="task.status"
+                class="px-3.5 py-2 bg-slate-900 border border-slate-700 rounded-xl text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 capitalize cursor-pointer transition"
+                @change="handleStatusChange(($event.target as HTMLSelectElement).value as TaskStatus)"
+              >
+                <option value="todo">To Do</option>
+                <option value="in_progress">In Progress</option>
+                <option value="in_review">In Review</option>
+                <option value="done">Done</option>
+              </select>
+
+              <!-- Quick Close / Done Button -->
+              <button
+                type="button"
+                class="w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer text-sm"
+                :class="
+                  task.status === 'done'
+                    ? 'bg-emerald-500 border-emerald-400 text-slate-950 hover:bg-emerald-400 shadow-md shadow-emerald-500/20'
+                    : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-emerald-400 hover:border-emerald-500 hover:bg-emerald-500/10'
+                "
+                :title="task.status === 'done' ? 'Reopen task (To Do)' : 'Close task (Mark as Done)'"
+                @click="toggleComplete"
+              >
+                <svg
+                  class="w-4 h-4 stroke-[2.5]"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -329,6 +357,12 @@ async function handleStatusChange(newStatus: TaskStatus) {
       'Failed to update status';
     showToast(errorMsg, 'error');
   }
+}
+
+async function toggleComplete() {
+  if (!task.value) return;
+  const newStatus: TaskStatus = task.value.status === 'done' ? 'todo' : 'done';
+  await handleStatusChange(newStatus);
 }
 
 function handleTaskUpdated() {
