@@ -103,12 +103,22 @@
 
             <!-- Assignee -->
             <div>
-              <label class="block text-sm font-medium text-slate-300 mb-1.5">
-                Assignee
-              </label>
+              <div class="flex items-center justify-between mb-1.5">
+                <label class="block text-sm font-medium text-slate-300">
+                  Assignee
+                </label>
+                <button
+                  v-if="currentUserId"
+                  type="button"
+                  class="text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition cursor-pointer flex items-center gap-1 hover:underline"
+                  @click="assignToMe"
+                >
+                  <span>⚡ Assign to me</span>
+                </button>
+              </div>
               <select
                 v-model="form.assignee"
-                class="w-full px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500"
+                class="w-full px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition"
               >
                 <option value="">Unassigned</option>
                 <option
@@ -127,22 +137,21 @@
                 <label class="block text-sm font-medium text-slate-300 mb-1.5">
                   Start Date
                 </label>
-                <input
+                <DatePickerMenu
                   v-model="form.startDate"
-                  type="date"
-                  class="w-full px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500"
-                >
+                  placeholder="Select start date"
+                />
               </div>
 
               <div>
                 <label class="block text-sm font-medium text-slate-300 mb-1.5">
                   Due Date
                 </label>
-                <input
+                <DatePickerMenu
                   v-model="form.dueDate"
-                  type="date"
-                  class="w-full px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500"
-                >
+                  placeholder="Select due date"
+                  :min-date="form.startDate"
+                />
               </div>
             </div>
           </div>
@@ -179,7 +188,9 @@ import { computed, reactive, ref, watch } from 'vue';
 import type { Task, TaskPriority, TaskStatus } from '../../types/task';
 import { useTasksStore } from '../../stores/tasks';
 import { useProjectsStore } from '../../stores/projects';
+import { useAuthStore } from '../../stores/auth';
 import { useToast } from '../../composables/useToast';
+import DatePickerMenu from '../ui/DatePickerMenu.vue';
 
 interface Props {
   isOpen: boolean;
@@ -198,7 +209,16 @@ const emit = defineEmits<Emits>();
 
 const tasksStore = useTasksStore();
 const projectsStore = useProjectsStore();
+const authStore = useAuthStore();
 const { showToast } = useToast();
+
+const currentUserId = computed(() => authStore.user?._id || '');
+
+function assignToMe() {
+  if (currentUserId.value) {
+    form.assignee = currentUserId.value;
+  }
+}
 
 const loading = ref(false);
 const errorMessage = ref('');
@@ -285,6 +305,18 @@ const assignableUsers = computed(() => {
         });
       }
     }
+  }
+
+  if (authStore.user && !users.some((u) => u._id === authStore.user?._id)) {
+    const name =
+      [authStore.user.firstName, authStore.user.lastName]
+        .filter(Boolean)
+        .join(' ') || authStore.user.email;
+    users.push({
+      _id: authStore.user._id,
+      name,
+      email: authStore.user.email,
+    });
   }
 
   return users;
