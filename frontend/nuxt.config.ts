@@ -3,6 +3,9 @@ export default defineNuxtConfig({
   ssr: true,
   compatibilityDate: "2025-07-15",
   devtools: { enabled: true },
+  devServer: {
+    port: 3001,
+  },
   modules: ["@pinia/nuxt", "@nuxtjs/tailwindcss", "@nuxt/eslint"],
   runtimeConfig: {
     public: {
