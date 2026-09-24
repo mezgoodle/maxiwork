@@ -1,9 +1,16 @@
 <template>
   <div class="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 lg:p-8">
-    <!-- Breadcrumbs / Back navigation -->
-    <div class="mb-6 flex items-center gap-2 text-sm text-slate-400">
+    <!-- Breadcrumbs / Navigation -->
+    <div class="mb-6 flex items-center justify-between text-sm text-slate-400">
       <NuxtLink to="/projects" class="hover:text-white transition">
         &larr; Back to Projects
+      </NuxtLink>
+      <NuxtLink
+        v-if="project"
+        :to="`/projects/${project._id}/board`"
+        class="text-emerald-400 hover:text-emerald-300 font-medium transition cursor-pointer"
+      >
+        Open Board &rarr;
       </NuxtLink>
     </div>
 
@@ -128,13 +135,10 @@ const toast = useToast();
 
 const isConfirmOpen = ref(false);
 const isDeleting = ref(false);
-const errorState = useState(
-  () => `project-settings-error-${String(route.params.id || '')}`,
-  () => '',
-);
+const errorState = ref('');
 
 const { data: project, status } = await useAsyncData(
-  () => `project-${String(route.params.id || '')}`,
+  `project-settings-${String(route.params.id || '')}`,
   async () => {
     const id = String(route.params.id || '');
     if (!id) return null;
@@ -151,8 +155,7 @@ const { data: project, status } = await useAsyncData(
           : String(proj.owner || '');
 
       if (currentUserId && ownerId && currentUserId !== ownerId) {
-        toast.error('Only the project owner can manage project settings.');
-        await navigateTo('/projects');
+        errorState.value = 'Only the project owner can manage project settings.';
         return null;
       }
 
