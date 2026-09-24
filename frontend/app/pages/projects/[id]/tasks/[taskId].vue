@@ -15,13 +15,6 @@
       <div v-if="task" class="flex items-center gap-2">
         <button
           type="button"
-          class="px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition cursor-pointer"
-          @click="isEditModalOpen = true"
-        >
-          Edit
-        </button>
-        <button
-          type="button"
           class="px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-medium bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition cursor-pointer"
           @click="isDeleteDialogOpen = true"
         >
@@ -241,14 +234,7 @@
       </div>
     </div>
 
-    <!-- Edit Modal -->
-    <TaskFormModal
-      :is-open="isEditModalOpen"
-      :project-id="projectId"
-      :task="task"
-      @close="isEditModalOpen = false"
-      @saved="handleTaskUpdated"
-    />
+
 
     <!-- Delete Confirmation Dialog -->
     <ConfirmDialog
@@ -273,7 +259,6 @@ import { useTasksStore } from '../../../../stores/tasks';
 import { useAuthStore } from '../../../../stores/auth';
 import { useToast } from '../../../../composables/useToast';
 import DatePickerMenu from '../../../../components/ui/DatePickerMenu.vue';
-import TaskFormModal from '../../../../components/task/TaskFormModal.vue';
 import ConfirmDialog from '../../../../components/ui/ConfirmDialog.vue';
 
 definePageMeta({
@@ -291,7 +276,6 @@ const tasksStore = useTasksStore();
 const authStore = useAuthStore();
 const { showToast } = useToast();
 
-const isEditModalOpen = ref(false);
 const isDeleteDialogOpen = ref(false);
 const isDeleting = ref(false);
 
@@ -518,9 +502,6 @@ async function toggleComplete() {
   await handleStatusChange(newStatus);
 }
 
-function handleTaskUpdated() {
-  tasksStore.fetchTask(projectId.value, taskId.value);
-}
 
 async function handleDeleteTask() {
   isDeleting.value = true;
