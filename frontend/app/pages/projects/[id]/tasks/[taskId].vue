@@ -63,15 +63,22 @@
       <div class="bg-slate-800/60 border border-slate-700/80 rounded-2xl p-6 sm:p-8 backdrop-blur shadow-xl">
         <!-- Key, Title & Status Selector -->
         <div class="pb-6 border-b border-slate-700/60 mb-6 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-          <div>
+          <div class="flex-1 min-w-0 pr-4">
             <span
-              class="inline-block px-2.5 py-1 text-xs font-mono font-bold tracking-wider rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-3"
+              class="inline-block px-2.5 py-1 text-xs font-mono font-bold tracking-wider rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-2"
             >
               {{ task.taskKey }}
             </span>
-            <h1 class="text-2xl font-bold text-white">
-              {{ task.title }}
-            </h1>
+            <div>
+              <input
+                v-model="titleInput"
+                type="text"
+                class="w-full text-2xl sm:text-3xl font-bold text-white bg-transparent border border-transparent hover:border-slate-700/80 focus:border-emerald-500 focus:bg-slate-900/60 rounded-xl px-2.5 py-1 -ml-2.5 transition focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                placeholder="Task title..."
+                @blur="saveTitle"
+                @keydown.enter="($event.target as HTMLElement).blur()"
+              >
+            </div>
           </div>
 
           <!-- Status Dropdown & Close/Done Toggle Button (ClickUp style) -->
@@ -118,89 +125,115 @@
           </div>
         </div>
 
-        <!-- Description -->
+        <!-- Description (Inline Editable) -->
         <div class="mb-8">
           <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
             Description
           </h3>
-          <p
-            v-if="task.description"
-            class="text-sm text-slate-300 whitespace-pre-line leading-relaxed"
-          >
-            {{ task.description }}
-          </p>
-          <p v-else class="text-sm text-slate-500 italic">
-            No description provided.
-          </p>
+          <textarea
+            v-model="descriptionInput"
+            rows="4"
+            placeholder="Add description or notes..."
+            class="w-full text-sm text-slate-200 bg-slate-900/40 hover:bg-slate-900/70 border border-slate-700/70 hover:border-slate-600 focus:border-emerald-500 focus:bg-slate-900 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 transition placeholder-slate-500 leading-relaxed resize-y"
+            @blur="saveDescription"
+          />
         </div>
 
-        <!-- Metadata Grid -->
+        <!-- Metadata Grid (Inline Editable) -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pt-6 border-t border-slate-700/60 text-sm">
-          <!-- Priority -->
+          <!-- Priority (Inline Editable) -->
           <div>
-            <span class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
               Priority
-            </span>
-            <span
-              class="inline-block px-2.5 py-1 text-xs font-semibold rounded-full border capitalize"
+            </label>
+            <select
+              :value="task.priority"
+              class="px-3 py-1.5 rounded-xl text-xs font-semibold border capitalize cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500/40 transition"
               :class="priorityBadgeClass"
+              @change="handlePriorityChange(($event.target as HTMLSelectElement).value as TaskPriority)"
             >
-              {{ task.priority }}
-            </span>
+              <option value="low" class="bg-slate-900 text-emerald-400">Low</option>
+              <option value="medium" class="bg-slate-900 text-amber-400">Medium</option>
+              <option value="high" class="bg-slate-900 text-orange-400">High</option>
+              <option value="critical" class="bg-slate-900 text-rose-400">Critical</option>
+            </select>
           </div>
 
-          <!-- Assignee -->
+          <!-- Assignee (Inline Editable) -->
           <div>
-            <span class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-              Assignee
-            </span>
-            <div class="flex items-center gap-2 text-slate-200">
-              <span class="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold border border-slate-600">
-                {{ assigneeInitials }}
-              </span>
-              <span>{{ assigneeName }}</span>
+            <div class="flex items-center justify-between mb-1.5">
+              <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                Assignee
+              </label>
+              <button
+                v-if="currentUserId && taskAssigneeId !== currentUserId"
+                type="button"
+                class="text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 transition cursor-pointer hover:underline"
+                @click="assignToMe"
+              >
+                Assign to me
+              </button>
             </div>
+            <select
+              :value="taskAssigneeId"
+              class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 hover:border-slate-600 rounded-xl text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition cursor-pointer"
+              @change="handleAssigneeChange(($event.target as HTMLSelectElement).value)"
+            >
+              <option value="">Unassigned</option>
+              <option
+                v-for="user in assignableUsers"
+                :key="user._id"
+                :value="user._id"
+              >
+                {{ user.name }} ({{ user.email }})
+              </option>
+            </select>
           </div>
 
-          <!-- Reporter -->
+          <!-- Reporter (Read-only) -->
           <div>
-            <span class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+            <span class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
               Reporter
             </span>
-            <div class="flex items-center gap-2 text-slate-200">
+            <div class="flex items-center gap-2 text-slate-200 py-1">
               <span class="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold border border-slate-600">
                 {{ reporterInitials }}
               </span>
-              <span>{{ reporterName }}</span>
+              <span class="text-xs">{{ reporterName }}</span>
             </div>
           </div>
 
-          <!-- Start Date -->
+          <!-- Start Date (Inline Editable via DatePickerMenu) -->
           <div>
-            <span class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
               Start Date
-            </span>
-            <span class="text-slate-300">
-              {{ formatDate(task.startDate) || 'Not set' }}
-            </span>
+            </label>
+            <DatePickerMenu
+              :model-value="formatDateForInput(task.startDate)"
+              placeholder="Set start date"
+              @update:model-value="handleStartDateChange"
+            />
           </div>
 
-          <!-- Due Date -->
+          <!-- Due Date (Inline Editable via DatePickerMenu) -->
           <div>
-            <span class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
               Due Date
-            </span>
-            <span :class="dueDateClass">
-              {{ formatDate(task.dueDate) || 'Not set' }}
-            </span>
+            </label>
+            <DatePickerMenu
+              :model-value="formatDateForInput(task.dueDate)"
+              :min-date="formatDateForInput(task.startDate)"
+              placeholder="Set due date"
+              @update:model-value="handleDueDateChange"
+            />
           </div>
 
-          <!-- Created At -->
+          <!-- Created At (Read-only) -->
           <div>
-            <span class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+            <span class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
               Created
             </span>
-            <span class="text-slate-400">
+            <span class="text-xs text-slate-400 py-1 inline-block">
               {{ formatDate(task.createdAt) || 'Unknown' }}
             </span>
           </div>
@@ -232,12 +265,14 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import type { TaskPriority, TaskStatus } from '../../../../types/task';
+import type { TaskPriority, TaskStatus, UpdateTaskPayload } from '../../../../types/task';
 import { useProjectsStore } from '../../../../stores/projects';
 import { useTasksStore } from '../../../../stores/tasks';
+import { useAuthStore } from '../../../../stores/auth';
 import { useToast } from '../../../../composables/useToast';
+import DatePickerMenu from '../../../../components/ui/DatePickerMenu.vue';
 import TaskFormModal from '../../../../components/task/TaskFormModal.vue';
 import ConfirmDialog from '../../../../components/ui/ConfirmDialog.vue';
 
@@ -253,6 +288,7 @@ const taskId = computed(() => route.params.taskId as string);
 
 const projectsStore = useProjectsStore();
 const tasksStore = useTasksStore();
+const authStore = useAuthStore();
 const { showToast } = useToast();
 
 const isEditModalOpen = ref(false);
@@ -260,6 +296,88 @@ const isDeleteDialogOpen = ref(false);
 const isDeleting = ref(false);
 
 const task = computed(() => tasksStore.currentTask);
+
+const titleInput = ref('');
+const descriptionInput = ref('');
+
+watch(
+  () => task.value?.title,
+  (newTitle) => {
+    if (newTitle !== undefined) {
+      titleInput.value = newTitle;
+    }
+  },
+  { immediate: true },
+);
+
+watch(
+  () => task.value?.description,
+  (newDesc) => {
+    descriptionInput.value = newDesc || '';
+  },
+  { immediate: true },
+);
+
+const currentUserId = computed(() => authStore.user?._id || '');
+
+const taskAssigneeId = computed(() => {
+  if (!task.value?.assignee) return '';
+  return typeof task.value.assignee === 'object'
+    ? task.value.assignee._id
+    : (task.value.assignee as string);
+});
+
+const assignableUsers = computed(() => {
+  const users: { _id: string; name: string; email: string }[] = [];
+  const project = projectsStore.currentProject;
+  if (!project) return users;
+
+  if (typeof project.owner === 'object' && project.owner) {
+    const name =
+      [project.owner.firstName, project.owner.lastName]
+        .filter(Boolean)
+        .join(' ') || project.owner.email;
+    users.push({
+      _id: project.owner._id,
+      name: `${name} (Owner)`,
+      email: project.owner.email,
+    });
+  }
+
+  if (Array.isArray(project.members)) {
+    for (const member of project.members) {
+      if (
+        typeof member === 'object' &&
+        member &&
+        member._id !==
+          (typeof project.owner === 'object' ? project.owner._id : project.owner)
+      ) {
+        const name =
+          [member.firstName, member.lastName].filter(Boolean).join(' ') ||
+          member.email;
+        users.push({
+          _id: member._id,
+          name,
+          email: member.email,
+        });
+      }
+    }
+  }
+
+  if (authStore.user && !users.some((u) => u._id === authStore.user?._id)) {
+    const name =
+      [authStore.user.firstName, authStore.user.lastName]
+        .filter(Boolean)
+        .join(' ') || authStore.user.email;
+    users.push({
+      _id: authStore.user._id,
+      name,
+      email: authStore.user.email,
+    });
+  }
+
+  return users;
+});
 
 const priorityBadgeClass = computed(() => {
   if (!task.value) return '';
@@ -270,30 +388,6 @@ const priorityBadgeClass = computed(() => {
     critical: 'bg-rose-500/10 text-rose-400 border-rose-500/20 font-bold',
   };
   return map[task.value.priority] || map.medium;
-});
-
-const assigneeName = computed(() => {
-  if (!task.value?.assignee) return 'Unassigned';
-  if (typeof task.value.assignee === 'object') {
-    const { firstName, lastName, email } = task.value.assignee;
-    return (
-      [firstName, lastName].filter(Boolean).join(' ') || email || 'Assignee'
-    );
-  }
-  return 'Assignee';
-});
-
-const assigneeInitials = computed(() => {
-  if (!task.value?.assignee) return '?';
-  if (typeof task.value.assignee === 'object') {
-    const { firstName, lastName, email } = task.value.assignee;
-    if (firstName && lastName) {
-      return `${firstName[0]}${lastName[0]}`.toUpperCase();
-    }
-    if (firstName) return firstName.slice(0, 2).toUpperCase();
-    if (email) return email.slice(0, 2).toUpperCase();
-  }
-  return 'U';
 });
 
 const reporterName = computed(() => {
@@ -331,18 +425,77 @@ function formatDate(dateStr?: string): string {
   });
 }
 
-const dueDateClass = computed(() => {
-  if (!task.value?.dueDate) return 'text-slate-400';
-  const due = new Date(task.value.dueDate).getTime();
-  const now = Date.now();
-  if (task.value.status === 'done') {
-    return 'text-slate-300';
+function formatDateForInput(dateStr?: string): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  return d.toISOString().split('T')[0];
+}
+
+async function updateTaskField(payload: UpdateTaskPayload, successMessage?: string) {
+  if (!task.value) return;
+  try {
+    await tasksStore.updateTask(projectId.value, taskId.value, payload);
+    if (successMessage) {
+      showToast(successMessage, 'success');
+    }
+  } catch (err: unknown) {
+    const errorMsg =
+      (err as { data?: { message?: string }; message?: string })?.data
+        ?.message ||
+      (err as { message?: string })?.message ||
+      'Failed to update task';
+    showToast(errorMsg, 'error');
   }
-  if (due < now) {
-    return 'text-rose-400 font-bold';
+}
+
+async function saveTitle() {
+  const trimmed = titleInput.value.trim();
+  if (!task.value || !trimmed || trimmed === task.value.title) {
+    if (task.value && !trimmed) {
+      titleInput.value = task.value.title;
+    }
+    return;
   }
-  return 'text-slate-300';
-});
+  await updateTaskField({ title: trimmed }, 'Title updated');
+}
+
+async function saveDescription() {
+  if (!task.value) return;
+  const trimmed = descriptionInput.value.trim();
+  const current = (task.value.description || '').trim();
+  if (trimmed === current) return;
+  await updateTaskField({ description: trimmed }, 'Description updated');
+}
+
+async function handlePriorityChange(newPriority: TaskPriority) {
+  if (!task.value || task.value.priority === newPriority) return;
+  await updateTaskField({ priority: newPriority }, 'Priority updated');
+}
+
+async function handleAssigneeChange(newAssigneeId: string) {
+  if (!task.value) return;
+  const val = newAssigneeId || null;
+  await updateTaskField({ assignee: val }, 'Assignee updated');
+}
+
+async function assignToMe() {
+  if (currentUserId.value) {
+    await updateTaskField({ assignee: currentUserId.value }, 'Assigned to you');
+  }
+}
+
+async function handleStartDateChange(newDate: string) {
+  if (!task.value) return;
+  const iso = newDate ? new Date(newDate).toISOString() : null;
+  await updateTaskField({ startDate: iso }, 'Start date updated');
+}
+
+async function handleDueDateChange(newDate: string) {
+  if (!task.value) return;
+  const iso = newDate ? new Date(newDate).toISOString() : null;
+  await updateTaskField({ dueDate: iso }, 'Due date updated');
+}
 
 async function handleStatusChange(newStatus: TaskStatus) {
   if (!task.value || task.value.status === newStatus) return;
