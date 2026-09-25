@@ -1,7 +1,7 @@
 <template>
   <div class="w-full">
     <!-- Loading skeleton -->
-    <div v-if="tasksStore.loading && tasksStore.tasks.length === 0" class="flex gap-6 overflow-x-auto pb-6">
+    <div v-if="isLoading && allTasks.length === 0" class="flex gap-6 overflow-x-auto pb-6">
       <div
         v-for="i in 4"
         :key="i"
@@ -23,59 +23,77 @@
       <KanbanColumn
         status="todo"
         title="To Do"
-        :tasks="tasksStore.tasksByStatus.todo"
+        :tasks="groupedTasks.todo"
         :project-id="projectId"
+        :list-id="listId"
         @task-drop="handleTaskDrop"
         @create-task="(status) => emit('create-task', status)"
         @edit-task="(task) => emit('edit-task', task)"
+        @task-click="(task) => emit('task-click', task)"
+        @delete-task="(taskId) => emit('delete-task', taskId)"
       />
 
       <KanbanColumn
         status="in_progress"
         title="In Progress"
-        :tasks="tasksStore.tasksByStatus.in_progress"
+        :tasks="groupedTasks.in_progress"
         :project-id="projectId"
+        :list-id="listId"
         @task-drop="handleTaskDrop"
         @create-task="(status) => emit('create-task', status)"
         @edit-task="(task) => emit('edit-task', task)"
+        @task-click="(task) => emit('task-click', task)"
+        @delete-task="(taskId) => emit('delete-task', taskId)"
       />
 
       <KanbanColumn
         status="in_review"
         title="In Review"
-        :tasks="tasksStore.tasksByStatus.in_review"
+        :tasks="groupedTasks.in_review"
         :project-id="projectId"
+        :list-id="listId"
         @task-drop="handleTaskDrop"
         @create-task="(status) => emit('create-task', status)"
         @edit-task="(task) => emit('edit-task', task)"
+        @task-click="(task) => emit('task-click', task)"
+        @delete-task="(taskId) => emit('delete-task', taskId)"
       />
 
       <KanbanColumn
         status="done"
         title="Done"
-        :tasks="tasksStore.tasksByStatus.done"
+        :tasks="groupedTasks.done"
         :project-id="projectId"
+        :list-id="listId"
         @task-drop="handleTaskDrop"
         @create-task="(status) => emit('create-task', status)"
         @edit-task="(task) => emit('edit-task', task)"
+        @task-click="(task) => emit('task-click', task)"
+        @delete-task="(taskId) => emit('delete-task', taskId)"
       />
     </div>
   </div>
 </template>
 
 <script lang="ts" setup>
+import { computed } from 'vue';
 import type { Task, TaskStatus } from '../../types/task';
 import { useTasksStore } from '../../stores/tasks';
 import { useToast } from '../../composables/useToast';
 import KanbanColumn from './KanbanColumn.vue';
 
 interface Props {
-  projectId: string;
+  tasks?: Task[];
+  projectId?: string;
+  listId?: string;
+  loading?: boolean;
 }
 
 interface Emits {
+  (e: 'task-drop', taskId: string, newStatus: TaskStatus): void;
   (e: 'create-task', status?: TaskStatus): void;
-  (e: 'edit-task', task: Task): void;
+  (e: 'edit-task' | 'task-click', task: Task): void;
+  (e: 'delete-task', taskId: string): void;
 }
 
 const props = defineProps<Props>();
@@ -84,22 +102,50 @@ const emit = defineEmits<Emits>();
 const tasksStore = useTasksStore();
 const { showToast } = useToast();
 
-async function handleTaskDrop(taskId: string, newStatus: TaskStatus) {
-  const current = tasksStore.tasks.find((t) => t._id === taskId);
-  if (!current || current.status === newStatus) {
-    return;
-  }
+const allTasks = computed<Task[]>(() => {
+  return props.tasks !== undefined ? props.tasks : tasksStore.tasks;
+});
 
-  try {
-    await tasksStore.updateTaskStatus(props.projectId, taskId, newStatus);
-    showToast(`Task status updated to ${newStatus.replace('_', ' ')}`, 'success');
-  } catch (err: unknown) {
-    const errorMsg =
-      (err as { data?: { message?: string }; message?: string })?.data
-        ?.message ||
-      (err as { message?: string })?.message ||
-      'Failed to update task status';
-    showToast(errorMsg, 'error');
+const isLoading = computed(() => {
+  return props.loading !== undefined ? props.loading : tasksStore.loading;
+});
+
+const groupedTasks = computed(() => {
+  const map: Record<TaskStatus, Task[]> = {
+    todo: [],
+    in_progress: [],
+    in_review: [],
+    done: [],
+  };
+  for (const t of allTasks.value) {
+    if (map[t.status]) {
+      map[t.status].push(t);
+    } else {
+      map.todo.push(t);
+    }
+  }
+  return map;
+});
+
+async function handleTaskDrop(taskId: string, newStatus: TaskStatus) {
+  emit('task-drop', taskId, newStatus);
+
+  // If using projectId and tasksStore, update status via store automatically
+  if (props.projectId && !props.listId) {
+    const current = tasksStore.tasks.find((t) => t._id === taskId);
+    if (!current || current.status === newStatus) return;
+
+    try {
+      await tasksStore.updateTaskStatus(props.projectId, taskId, newStatus);
+      showToast(`Task status updated to ${newStatus.replace('_', ' ')}`, 'success');
+    } catch (err: unknown) {
+      const errorMsg =
+        (err as { data?: { message?: string }; message?: string })?.data
+          ?.message ||
+        (err as { message?: string })?.message ||
+        'Failed to update task status';
+      showToast(errorMsg, 'error');
+    }
   }
 }
 </script>

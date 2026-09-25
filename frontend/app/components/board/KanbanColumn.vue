@@ -2,7 +2,7 @@
   <div
     class="flex-shrink-0 w-80 bg-slate-900/60 border border-slate-800/90 rounded-2xl flex flex-col max-h-[calc(100vh-14rem)] transition-all duration-200"
     :class="{
-      'ring-2 ring-emerald-500/60 bg-slate-800/50 border-emerald-500/40': isDragOver,
+      'ring-2 ring-indigo-500/60 bg-slate-800/50 border-indigo-500/40': isDragOver,
     }"
     @dragover.prevent="handleDragOver"
     @dragleave="handleDragLeave"
@@ -46,7 +46,10 @@
         :key="task._id"
         :task="task"
         :project-id="projectId"
-        @edit="$emit('edit-task', task)"
+        :list-id="listId"
+        @click="emit('task-click', task)"
+        @edit="emit('edit-task', task)"
+        @delete="emit('delete-task', $event)"
       />
     </div>
   </div>
@@ -61,13 +64,15 @@ interface Props {
   status: TaskStatus;
   title: string;
   tasks: Task[];
-  projectId: string;
+  projectId?: string;
+  listId?: string;
 }
 
 interface Emits {
   (e: 'task-drop', taskId: string, newStatus: TaskStatus): void;
   (e: 'create-task', status: TaskStatus): void;
-  (e: 'edit-task', task: Task): void;
+  (e: 'edit-task' | 'task-click', task: Task): void;
+  (e: 'delete-task', taskId: string): void;
 }
 
 const props = defineProps<Props>();
@@ -93,7 +98,6 @@ function handleDragOver(e: DragEvent) {
 }
 
 function handleDragLeave(e: DragEvent) {
-  // Only unset if leaving the column itself
   const currentTarget = e.currentTarget as HTMLElement;
   const relatedTarget = e.relatedTarget as HTMLElement;
   if (!currentTarget.contains(relatedTarget)) {
