@@ -37,11 +37,22 @@
 
     <!-- Due Date & Assignee row -->
     <div class="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-700/50 mt-auto">
-      <div v-if="task.dueDate" class="flex items-center gap-1 font-mono text-[11px]" :class="dueDateClass">
-        <span>📅</span>
-        <span>{{ formattedDueDate }}</span>
+      <div class="flex items-center gap-2">
+        <div v-if="task.dueDate" class="flex items-center gap-1 font-mono text-[11px]" :class="dueDateClass">
+          <span>📅</span>
+          <span>{{ formattedDueDate }}</span>
+        </div>
+
+        <div
+          v-if="task.subtasksCount && task.subtasksCount > 0"
+          class="flex items-center gap-1 text-[11px] font-mono px-1.5 py-0.5 rounded-md bg-slate-900/60 border border-slate-700/60"
+          :class="task.completedSubtasksCount === task.subtasksCount ? 'text-emerald-400 border-emerald-500/30' : 'text-slate-400'"
+          title="Subtasks completed"
+        >
+          <span>↳</span>
+          <span>{{ task.completedSubtasksCount || 0 }}/{{ task.subtasksCount }}</span>
+        </div>
       </div>
-      <div v-else />
 
       <div class="flex items-center gap-1.5">
         <span

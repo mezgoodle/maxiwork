@@ -110,6 +110,14 @@
           <div class="flex items-center gap-3">
             <span class="text-xs font-mono font-bold text-indigo-400">{{ task.taskKey || 'TASK' }}</span>
             <span class="text-sm font-medium text-slate-100">{{ task.title }}</span>
+            <span
+              v-if="task.subtasksCount && task.subtasksCount > 0"
+              class="text-xs font-mono px-2 py-0.5 rounded-md bg-slate-900/60 border border-slate-700/60"
+              :class="task.completedSubtasksCount === task.subtasksCount ? 'text-emerald-400 border-emerald-500/30' : 'text-slate-400'"
+              title="Subtasks"
+            >
+              ↳ {{ task.completedSubtasksCount || 0 }}/{{ task.subtasksCount }}
+            </span>
           </div>
           <div class="flex items-center gap-2">
             <span class="px-2 py-0.5 text-xs rounded-full bg-slate-700 text-slate-300 capitalize">
@@ -142,7 +150,16 @@ const activeView = ref<'board' | 'list'>('board');
 const loading = ref(false);
 const error = ref<string | null>(null);
 const listDetails = ref<List | null>(null);
-const tasks = ref<Array<{ _id: string; title: string; taskKey?: string; status: string }>>([]);
+const tasks = ref<
+  Array<{
+    _id: string;
+    title: string;
+    taskKey?: string;
+    status: string;
+    subtasksCount?: number;
+    completedSubtasksCount?: number;
+  }>
+>([]);
 
 const currentSpace = computed<Space | null>(() => {
   if (!listDetails.value) return null;
