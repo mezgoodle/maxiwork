@@ -32,16 +32,16 @@
         <!-- Right Side Actions: Full page, Delete, Close -->
         <div class="flex items-center gap-2 shrink-0 ml-auto">
           <!-- Open as full page button (only in drawer mode) -->
-          <NuxtLink
-            v-if="isDrawer && listId"
-            :to="`/lists/${listId}/tasks/${activeTask._id}`"
+          <button
+            v-if="isDrawer && fullPageUrl"
+            type="button"
             class="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition cursor-pointer text-xs flex items-center gap-1"
             title="Open as Full Page"
-            @click="$emit('close')"
+            @click="openFullPage"
           >
             <span>⛶</span>
             <span class="hidden sm:inline text-xs">Full Page</span>
-          </NuxtLink>
+          </button>
 
           <!-- Delete Task Button -->
           <button
@@ -304,6 +304,24 @@ const parentTaskInfo = computed<{ _id: string; title: string; taskKey: string } 
   }
   return null;
 });
+
+const fullPageUrl = computed(() => {
+  const lId = props.listId || (activeTask.value.listId ? String(activeTask.value.listId) : '');
+  if (lId) {
+    return `/lists/${lId}/tasks/${activeTask.value._id}`;
+  }
+  const pId = props.projectId || (activeTask.value.projectId ? String(activeTask.value.projectId) : '');
+  if (pId) {
+    return `/projects/${pId}/tasks/${activeTask.value._id}`;
+  }
+  return '';
+});
+
+function openFullPage() {
+  if (!fullPageUrl.value) return;
+  emit('close');
+  navigateTo(fullPageUrl.value);
+}
 
 const taskAssigneeId = computed(() => {
   if (!activeTask.value.assignee) return '';

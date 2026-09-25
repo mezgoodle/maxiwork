@@ -408,17 +408,17 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { useHierarchyStore } from '../../stores/hierarchy';
-import { useApi } from '../../composables/useApi';
-import { useToast } from '../../composables/useToast';
-import { extractApiErrorMessage } from '../../utils/error';
-import { getPriorityBadgeClass, getUserDisplayName, getUserInitials } from '../../utils/task';
-import type { List, Space } from '../../types/hierarchy';
-import type { Task, TaskPriority, TaskStatus } from '../../types/task';
-import KanbanBoard from '../../components/board/KanbanBoard.vue';
-import TaskFormModal from '../../components/task/TaskFormModal.vue';
-import TaskDetailDrawer from '../../components/task/TaskDetailDrawer.vue';
-import ConfirmDialog from '../../components/ui/ConfirmDialog.vue';
+import { useHierarchyStore } from '../../../stores/hierarchy';
+import { useApi } from '../../../composables/useApi';
+import { useToast } from '../../../composables/useToast';
+import { extractApiErrorMessage } from '../../../utils/error';
+import { getPriorityBadgeClass, getUserDisplayName, getUserInitials } from '../../../utils/task';
+import type { List, Space } from '../../../types/hierarchy';
+import type { Task, TaskPriority, TaskStatus } from '../../../types/task';
+import KanbanBoard from '../../../components/board/KanbanBoard.vue';
+import TaskFormModal from '../../../components/task/TaskFormModal.vue';
+import TaskDetailDrawer from '../../../components/task/TaskDetailDrawer.vue';
+import ConfirmDialog from '../../../components/ui/ConfirmDialog.vue';
 
 definePageMeta({
   middleware: ['auth'],
