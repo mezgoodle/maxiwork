@@ -45,4 +45,14 @@ export class GetTasksQueryDto {
     typeof value === 'string' ? value.trim() : value,
   )
   search?: string;
+
+  @IsOptional()
+  @Transform(
+    ({ value }: { value: unknown }) => value === 'true' || value === true,
+  )
+  rootOnly?: boolean;
+
+  @IsOptional()
+  @IsMongoId()
+  listId?: string;
 }

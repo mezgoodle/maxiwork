@@ -46,6 +46,12 @@ export class UpdateTaskDto {
   @ValidateIf(
     (_, value) => value !== undefined && value !== null && value !== '',
   )
+  @IsMongoId()
+  list?: string | null;
+
+  @ValidateIf(
+    (_, value) => value !== undefined && value !== null && value !== '',
+  )
   @IsDateString()
   startDate?: string | null;
 

@@ -5,6 +5,8 @@ import { CreateTaskDto } from './create-task.dto';
 import { UpdateTaskDto } from './update-task.dto';
 import { UpdateTaskStatusDto } from './update-task-status.dto';
 import { GetTasksQueryDto } from './get-tasks-query.dto';
+import { CreateSubtaskDto } from './create-subtask.dto';
+import { MoveSubtaskDto } from './move-subtask.dto';
 import { TaskStatus } from '../enums/task-status.enum';
 import { TaskPriority } from '../enums/task-priority.enum';
 
@@ -150,6 +152,65 @@ describe('Tasks DTOs', () => {
       const errors = await validate(dto);
       expect(errors.length).toBeGreaterThan(0);
       expect(errors[0].property).toBe('search');
+    });
+
+    it('should parse rootOnly boolean and listId MongoId', async () => {
+      const dto = plainToInstance(GetTasksQueryDto, {
+        rootOnly: 'true',
+        listId: '507f1f77bcf86cd799439011',
+      });
+      const errors = await validate(dto);
+      expect(errors.length).toBe(0);
+      expect(dto.rootOnly).toBe(true);
+      expect(dto.listId).toBe('507f1f77bcf86cd799439011');
+    });
+  });
+
+  describe('CreateSubtaskDto', () => {
+    it('should validate valid subtask payload', async () => {
+      const dto = plainToInstance(CreateSubtaskDto, {
+        title: 'Child Task',
+        priority: TaskPriority.HIGH,
+        order: 1,
+      });
+      const errors = await validate(dto);
+      expect(errors.length).toBe(0);
+      expect(dto.title).toBe('Child Task');
+    });
+
+    it('should reject empty title', async () => {
+      const dto = plainToInstance(CreateSubtaskDto, {
+        title: '',
+      });
+      const errors = await validate(dto);
+      expect(errors.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('MoveSubtaskDto', () => {
+    it('should validate valid payload with newParentTaskId and order', async () => {
+      const dto = plainToInstance(MoveSubtaskDto, {
+        newParentTaskId: '507f1f77bcf86cd799439011',
+        order: 2,
+      });
+      const errors = await validate(dto);
+      expect(errors.length).toBe(0);
+    });
+
+    it('should allow null newParentTaskId for moving to root', async () => {
+      const dto = plainToInstance(MoveSubtaskDto, {
+        newParentTaskId: null,
+      });
+      const errors = await validate(dto);
+      expect(errors.length).toBe(0);
+    });
+
+    it('should reject invalid Mongo ID', async () => {
+      const dto = plainToInstance(MoveSubtaskDto, {
+        newParentTaskId: 'invalid-id',
+      });
+      const errors = await validate(dto);
+      expect(errors.length).toBeGreaterThan(0);
     });
   });
 });
