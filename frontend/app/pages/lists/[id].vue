@@ -124,7 +124,7 @@
         </button>
       </div>
 
-      <!-- Board View (Kanban columns) -->
+      <!-- Board View (Kanban columns with Drag-and-Drop) -->
       <div
         v-else-if="activeView === 'board'"
         class="flex gap-6 overflow-x-auto pb-6 items-start scrollbar-thin scrollbar-thumb-slate-700"
@@ -132,7 +132,13 @@
         <div
           v-for="col in columns"
           :key="col.status"
-          class="flex-shrink-0 w-80 bg-slate-900/60 border border-slate-800/90 rounded-2xl flex flex-col max-h-[calc(100vh-16rem)]"
+          class="flex-shrink-0 w-80 bg-slate-900/60 border border-slate-800/90 rounded-2xl flex flex-col max-h-[calc(100vh-16rem)] transition-all duration-200"
+          :class="{
+            'ring-2 ring-indigo-500/60 bg-slate-800/70 border-indigo-500/40': dragOverColumn === col.status,
+          }"
+          @dragover.prevent="handleDragOver($event, col.status)"
+          @dragleave="handleDragLeave(col.status)"
+          @drop.prevent="handleDrop($event, col.status)"
         >
           <!-- Column Header -->
           <div class="p-4 border-b border-slate-800/80 flex items-center justify-between">
@@ -159,7 +165,7 @@
           </div>
 
           <!-- Cards List -->
-          <div class="flex-1 overflow-y-auto p-3 space-y-3 min-h-[100px]">
+          <div class="flex-1 overflow-y-auto p-3 space-y-3 min-h-[120px]">
             <div
               v-if="!tasksByStatus[col.status] || tasksByStatus[col.status].length === 0"
               class="h-24 border-2 border-dashed border-slate-800/80 rounded-xl flex items-center justify-center text-xs text-slate-500"
@@ -170,35 +176,30 @@
             <div
               v-for="task in tasksByStatus[col.status]"
               :key="task._id"
-              class="group p-3.5 bg-slate-800/70 hover:bg-slate-800 border border-slate-700/60 hover:border-slate-600 rounded-xl transition shadow-sm space-y-2.5"
+              draggable="true"
+              class="group p-3.5 bg-slate-800/70 hover:bg-slate-800 border border-slate-700/60 hover:border-slate-500 rounded-xl transition shadow-sm space-y-2.5 cursor-grab active:cursor-grabbing select-none"
+              :class="{ 'opacity-50 ring-2 ring-indigo-500': draggedTaskId === task._id }"
+              @dragstart="handleDragStart($event, task._id)"
+              @dragend="handleDragEnd"
+              @click="openTaskDetail(task)"
             >
               <div class="flex items-center justify-between">
                 <span class="text-xs font-mono font-bold text-indigo-400">
                   {{ task.taskKey || 'TASK' }}
                 </span>
-                <div class="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition">
-                  <select
-                    :value="task.status"
-                    class="bg-slate-900 border border-slate-700 text-[11px] rounded px-1.5 py-0.5 text-slate-300 focus:outline-none"
-                    @change="handleStatusChange(task._id, ($event.target as HTMLSelectElement).value as TaskStatus)"
-                  >
-                    <option value="todo">To Do</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="in_review">In Review</option>
-                    <option value="done">Done</option>
-                  </select>
+                <div class="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition" @click.stop>
                   <button
                     type="button"
                     class="text-slate-400 hover:text-rose-400 p-0.5 rounded transition cursor-pointer text-xs"
                     title="Delete task"
-                    @click="handleDeleteTask(task._id)"
+                    @click.stop="handleDeleteTask(task._id)"
                   >
                     ✕
                   </button>
                 </div>
               </div>
 
-              <h4 class="text-sm font-medium text-slate-100 leading-snug">
+              <h4 class="text-sm font-medium text-slate-100 leading-snug line-clamp-2">
                 {{ task.title }}
               </h4>
 
@@ -210,14 +211,25 @@
                   {{ task.priority || 'medium' }}
                 </span>
 
-                <span
-                  v-if="task.subtasksCount && task.subtasksCount > 0"
-                  class="text-xs font-mono px-2 py-0.5 rounded-md bg-slate-900/60 border border-slate-700/60"
-                  :class="task.completedSubtasksCount === task.subtasksCount ? 'text-emerald-400 border-emerald-500/30' : 'text-slate-400'"
-                  title="Subtasks"
-                >
-                  ↳ {{ task.completedSubtasksCount || 0 }}/{{ task.subtasksCount }}
-                </span>
+                <div class="flex items-center gap-2">
+                  <span
+                    v-if="task.subtasksCount && task.subtasksCount > 0"
+                    class="text-xs font-mono px-1.5 py-0.5 rounded-md bg-slate-900/60 border border-slate-700/60"
+                    :class="task.completedSubtasksCount === task.subtasksCount ? 'text-emerald-400 border-emerald-500/30' : 'text-slate-400'"
+                    title="Subtasks"
+                  >
+                    ↳ {{ task.completedSubtasksCount || 0 }}/{{ task.subtasksCount }}
+                  </span>
+
+                  <!-- Assignee Avatar -->
+                  <span
+                    v-if="task.assignee"
+                    class="w-5 h-5 rounded-full bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 flex items-center justify-center text-[10px] font-bold"
+                    :title="getUserDisplayName(task.assignee)"
+                  >
+                    {{ getUserInitials(task.assignee) }}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -229,7 +241,8 @@
         <div
           v-for="task in tasks"
           :key="task._id"
-          class="p-4 bg-slate-800/60 border border-slate-700/60 rounded-xl hover:border-slate-600 transition flex items-center justify-between gap-4"
+          class="p-4 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 hover:border-slate-500 rounded-xl transition flex items-center justify-between gap-4 cursor-pointer"
+          @click="openTaskDetail(task)"
         >
           <div class="flex items-center gap-3 min-w-0 flex-1">
             <span class="text-xs font-mono font-bold text-indigo-400 shrink-0">
@@ -248,12 +261,21 @@
             </span>
           </div>
 
-          <div class="flex items-center gap-3 shrink-0">
+          <div class="flex items-center gap-3 shrink-0" @click.stop>
             <span
               class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full"
               :class="getPriorityClass(task.priority)"
             >
               {{ task.priority || 'medium' }}
+            </span>
+
+            <!-- Assignee avatar -->
+            <span
+              v-if="task.assignee"
+              class="w-6 h-6 rounded-full bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 flex items-center justify-center text-xs font-bold"
+              :title="getUserDisplayName(task.assignee)"
+            >
+              {{ getUserInitials(task.assignee) }}
             </span>
 
             <select
@@ -271,7 +293,7 @@
               type="button"
               class="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-slate-700/50 transition cursor-pointer text-xs"
               title="Delete task"
-              @click="handleDeleteTask(task._id)"
+              @click.stop="handleDeleteTask(task._id)"
             >
               ✕
             </button>
@@ -288,6 +310,16 @@
       @close="isCreateModalOpen = false"
       @saved="handleTaskSaved"
     />
+
+    <!-- Task Detail Drawer / Modal -->
+    <TaskDetailDrawer
+      :is-open="isDetailOpen"
+      :list-id="listId"
+      :task="selectedTask"
+      @close="isDetailOpen = false"
+      @updated="handleTaskUpdated"
+      @deleted="handleTaskDeleted"
+    />
   </div>
 </template>
 
@@ -300,7 +332,9 @@ import { useToast } from '../../composables/useToast';
 import { extractApiErrorMessage } from '../../utils/error';
 import type { List, Space } from '../../types/hierarchy';
 import type { Task, TaskPriority, TaskStatus } from '../../types/task';
+import type { User } from '../../types/auth';
 import ListTaskModal from '../../components/task/ListTaskModal.vue';
+import TaskDetailDrawer from '../../components/task/TaskDetailDrawer.vue';
 
 definePageMeta({
   middleware: ['auth'],
@@ -322,8 +356,15 @@ const tasks = ref<Task[]>([]);
 const isCreateModalOpen = ref(false);
 const modalDefaultStatus = ref<TaskStatus>('todo');
 
+const selectedTask = ref<Task | null>(null);
+const isDetailOpen = ref(false);
+
 const quickTitle = ref('');
 const isQuickAdding = ref(false);
+
+// Drag and drop state
+const draggedTaskId = ref<string | null>(null);
+const dragOverColumn = ref<TaskStatus | null>(null);
 
 const columns: { status: TaskStatus; title: string; dotClass: string }[] = [
   { status: 'todo', title: 'To Do', dotClass: 'bg-slate-400' },
@@ -367,6 +408,20 @@ const currentSpace = computed<Space | null>(() => {
     updatedAt: '',
   };
 });
+
+function getUserDisplayName(user?: User | string | null): string {
+  if (!user) return 'Unassigned';
+  if (typeof user === 'string') return user;
+  return [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email;
+}
+
+function getUserInitials(user?: User | string | null): string {
+  if (!user) return '?';
+  if (typeof user === 'string') return user.substring(0, 2).toUpperCase();
+  const f = user.firstName ? user.firstName[0] : '';
+  const l = user.lastName ? user.lastName[0] : '';
+  return (f + l).toUpperCase() || user.email.substring(0, 2).toUpperCase();
+}
 
 function getPriorityClass(priority?: TaskPriority): string {
   switch (priority) {
@@ -414,6 +469,11 @@ function openCreateTaskModal(status?: TaskStatus) {
   isCreateModalOpen.value = true;
 }
 
+function openTaskDetail(task: Task) {
+  selectedTask.value = task;
+  isDetailOpen.value = true;
+}
+
 function handleTaskSaved(task: Task) {
   const existingIdx = tasks.value.findIndex((t) => t._id === task._id);
   if (existingIdx !== -1) {
@@ -421,6 +481,20 @@ function handleTaskSaved(task: Task) {
   } else {
     tasks.value.unshift(task);
   }
+}
+
+function handleTaskUpdated(updated: Task) {
+  const idx = tasks.value.findIndex((t) => t._id === updated._id);
+  if (idx !== -1) {
+    tasks.value[idx] = updated;
+  }
+  if (selectedTask.value?._id === updated._id) {
+    selectedTask.value = updated;
+  }
+}
+
+function handleTaskDeleted(taskId: string) {
+  tasks.value = tasks.value.filter((t) => t._id !== taskId);
 }
 
 async function handleQuickAdd() {
@@ -449,10 +523,7 @@ async function handleStatusChange(taskId: string, newStatus: TaskStatus) {
       method: 'PATCH',
       body: { status: newStatus },
     });
-    const idx = tasks.value.findIndex((t) => t._id === taskId);
-    if (idx !== -1) {
-      tasks.value[idx] = updated;
-    }
+    handleTaskUpdated(updated);
     showToast(`Status updated to ${newStatus}`, 'success');
   } catch (err: unknown) {
     showToast(extractApiErrorMessage(err, 'Failed to update status'), 'error');
@@ -464,11 +535,53 @@ async function handleDeleteTask(taskId: string) {
     await apiFetch(`/lists/${listId.value}/tasks/${taskId}`, {
       method: 'DELETE',
     });
-    tasks.value = tasks.value.filter((t) => t._id !== taskId);
+    handleTaskDeleted(taskId);
     showToast('Task deleted', 'success');
   } catch (err: unknown) {
     showToast(extractApiErrorMessage(err, 'Failed to delete task'), 'error');
   }
+}
+
+// ----------------------------------------------------
+// Drag and Drop Handlers
+// ----------------------------------------------------
+
+function handleDragStart(e: DragEvent, taskId: string) {
+  draggedTaskId.value = taskId;
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', taskId);
+  }
+}
+
+function handleDragEnd() {
+  draggedTaskId.value = null;
+  dragOverColumn.value = null;
+}
+
+function handleDragOver(e: DragEvent, status: TaskStatus) {
+  if (e.dataTransfer) {
+    e.dataTransfer.dropEffect = 'move';
+  }
+  dragOverColumn.value = status;
+}
+
+function handleDragLeave(status: TaskStatus) {
+  if (dragOverColumn.value === status) {
+    dragOverColumn.value = null;
+  }
+}
+
+async function handleDrop(e: DragEvent, newStatus: TaskStatus) {
+  dragOverColumn.value = null;
+  const taskId = e.dataTransfer?.getData('text/plain') || draggedTaskId.value;
+  draggedTaskId.value = null;
+
+  if (!taskId) return;
+  const targetTask = tasks.value.find((t) => t._id === taskId);
+  if (!targetTask || targetTask.status === newStatus) return;
+
+  await handleStatusChange(taskId, newStatus);
 }
 
 onMounted(() => {

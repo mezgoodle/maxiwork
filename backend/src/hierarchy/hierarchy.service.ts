@@ -24,6 +24,7 @@ import { UpdateFolderDto } from './dto/update-folder.dto';
 import { CreateListDto } from './dto/create-list.dto';
 import { UpdateListDto } from './dto/update-list.dto';
 import { CreateTaskDto } from '../tasks/dto/create-task.dto';
+import { CreateSubtaskDto } from '../tasks/dto/create-subtask.dto';
 import { UpdateTaskDto } from '../tasks/dto/update-task.dto';
 import { TaskStatus } from '../tasks/enums/task-status.enum';
 import { TaskPriority } from '../tasks/enums/task-priority.enum';
@@ -1091,5 +1092,100 @@ export class HierarchyService implements OnModuleInit {
       .exec();
 
     return { success: true, message: 'Task deleted successfully' };
+  }
+
+  async findOneListTask(
+    listId: string,
+    taskId: string,
+    userId: string,
+  ): Promise<TaskDocument> {
+    await this.checkListAccess(listId, userId);
+
+    const task = await this.taskModel
+      .findOne({
+        _id: new Types.ObjectId(taskId),
+        list: new Types.ObjectId(listId),
+      })
+      .populate('reporter', 'firstName lastName email avatarUrl')
+      .populate('assignee', 'firstName lastName email avatarUrl')
+      .exec();
+    if (!task) {
+      throw new NotFoundException('Task not found in this list');
+    }
+    return task;
+  }
+
+  async findListSubtasks(
+    listId: string,
+    parentTaskId: string,
+    userId: string,
+  ): Promise<TaskDocument[]> {
+    await this.checkListAccess(listId, userId);
+
+    return this.taskModel
+      .find({
+        list: new Types.ObjectId(listId),
+        parentTaskId: new Types.ObjectId(parentTaskId),
+      })
+      .sort({ order: 1, createdAt: 1 })
+      .populate('reporter', 'firstName lastName email avatarUrl')
+      .populate('assignee', 'firstName lastName email avatarUrl')
+      .exec();
+  }
+
+  async createListSubtask(
+    listId: string,
+    parentTaskId: string,
+    dto: CreateSubtaskDto,
+    userId: string,
+  ): Promise<TaskDocument> {
+    const { list } = await this.checkListAccess(listId, userId);
+
+    const parent = await this.taskModel
+      .findOne({
+        _id: new Types.ObjectId(parentTaskId),
+        list: list._id,
+      })
+      .exec();
+    if (!parent) {
+      throw new NotFoundException('Parent task not found in this list');
+    }
+
+    const order =
+      dto.order !== undefined ? dto.order : parent.subtasksCount || 0;
+    const taskKey = `${parent.taskKey}-${order + 1}`;
+
+    const subtask = new this.taskModel({
+      title: dto.title,
+      description: dto.description || '',
+      priority: dto.priority || TaskPriority.MEDIUM,
+      status: TaskStatus.TODO,
+      list: list._id,
+      parentTaskId: parent._id,
+      reporter: new Types.ObjectId(userId),
+      assignee: dto.assignee ? new Types.ObjectId(dto.assignee) : undefined,
+      startDate: dto.startDate ? new Date(dto.startDate) : undefined,
+      dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
+      taskKey,
+      order,
+      subtasksCount: 0,
+      completedSubtasksCount: 0,
+    });
+
+    const saved = await subtask.save();
+
+    await this.taskModel
+      .updateOne({ _id: parent._id }, { $inc: { subtasksCount: 1 } })
+      .exec();
+
+    const result = await this.taskModel
+      .findById(saved._id)
+      .populate('reporter', 'firstName lastName email avatarUrl')
+      .populate('assignee', 'firstName lastName email avatarUrl')
+      .exec();
+    if (!result) {
+      throw new NotFoundException('Failed to retrieve created subtask');
+    }
+    return result;
   }
 }

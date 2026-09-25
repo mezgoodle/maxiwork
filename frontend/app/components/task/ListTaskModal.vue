@@ -101,6 +101,36 @@
               </div>
             </div>
 
+            <!-- Assignee -->
+            <div>
+              <div class="flex items-center justify-between mb-1.5">
+                <label class="block text-sm font-medium text-slate-300">
+                  Assignee
+                </label>
+                <button
+                  v-if="currentUserId"
+                  type="button"
+                  class="text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition cursor-pointer flex items-center gap-1 hover:underline"
+                  @click="assignToMe"
+                >
+                  <span>⚡ Assign to me</span>
+                </button>
+              </div>
+              <select
+                v-model="form.assignee"
+                class="w-full px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 transition"
+              >
+                <option value="">Unassigned</option>
+                <option
+                  v-for="user in assignableUsers"
+                  :key="user._id"
+                  :value="user._id"
+                >
+                  {{ user.name }} ({{ user.email }})
+                </option>
+              </select>
+            </div>
+
             <!-- Start Date & Due Date (Grid) -->
             <div class="grid grid-cols-2 gap-4">
               <div>
@@ -154,10 +184,12 @@
 </template>
 
 <script lang="ts" setup>
-import { reactive, ref, watch } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import type { Task, TaskPriority, TaskStatus } from '../../types/task';
 import { useApi } from '../../composables/useApi';
 import { useToast } from '../../composables/useToast';
+import { useAuthStore } from '../../stores/auth';
+import { useHierarchyStore } from '../../stores/hierarchy';
 import { extractApiErrorMessage } from '../../utils/error';
 import DatePickerMenu from '../ui/DatePickerMenu.vue';
 
@@ -177,16 +209,61 @@ const emit = defineEmits<Emits>();
 
 const { apiFetch } = useApi();
 const { showToast } = useToast();
+const authStore = useAuthStore();
+const hierarchyStore = useHierarchyStore();
 
 const loading = ref(false);
 const errorMessage = ref('');
 const titleError = ref('');
+
+const currentUserId = computed(() => authStore.user?._id || '');
+
+const assignableUsers = computed(() => {
+  const users: { _id: string; name: string; email: string }[] = [];
+
+  if (authStore.user) {
+    const name =
+      [authStore.user.firstName, authStore.user.lastName]
+        .filter(Boolean)
+        .join(' ') || authStore.user.email;
+    users.push({
+      _id: authStore.user._id,
+      name: `${name} (You)`,
+      email: authStore.user.email,
+    });
+  }
+
+  const ws = hierarchyStore.currentWorkspace;
+  if (ws && Array.isArray(ws.members)) {
+    for (const m of ws.members) {
+      const u = typeof m.user === 'object' && m.user ? (m.user as { _id?: string; firstName?: string; lastName?: string; email?: string }) : null;
+      if (u && u._id && u._id !== authStore.user?._id) {
+        const name =
+          [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email || 'Member';
+        users.push({
+          _id: u._id,
+          name,
+          email: u.email || '',
+        });
+      }
+    }
+  }
+
+  return users;
+});
+
+function assignToMe() {
+  if (currentUserId.value) {
+    form.assignee = currentUserId.value;
+  }
+}
 
 const form = reactive({
   title: '',
   description: '',
   status: 'todo' as TaskStatus,
   priority: 'medium' as TaskPriority,
+  assignee: '',
   startDate: '',
   dueDate: '',
 });
@@ -201,6 +278,7 @@ watch(
       form.description = '';
       form.status = defaultStatus || 'todo';
       form.priority = 'medium';
+      form.assignee = '';
       form.startDate = '';
       form.dueDate = '';
     }
@@ -229,6 +307,7 @@ async function handleSubmit() {
       description: form.description.trim() || undefined,
       status: form.status,
       priority: form.priority,
+      assignee: form.assignee || undefined,
       startDate: form.startDate ? new Date(form.startDate).toISOString() : undefined,
       dueDate: form.dueDate ? new Date(form.dueDate).toISOString() : undefined,
     };

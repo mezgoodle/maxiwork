@@ -24,6 +24,7 @@ import { UpdateFolderDto } from './dto/update-folder.dto';
 import { CreateListDto } from './dto/create-list.dto';
 import { UpdateListDto } from './dto/update-list.dto';
 import { CreateTaskDto } from '../tasks/dto/create-task.dto';
+import { CreateSubtaskDto } from '../tasks/dto/create-subtask.dto';
 import { UpdateTaskDto } from '../tasks/dto/update-task.dto';
 
 interface AuthenticatedUser {
@@ -289,6 +290,48 @@ export class HierarchyController {
     return this.hierarchyService.deleteListTask(
       listId,
       taskId,
+      String(user._id),
+    );
+  }
+
+  @Get('lists/:listId/tasks/:taskId')
+  async findOneListTask(
+    @Param('listId', ParseObjectIdPipe) listId: string,
+    @Param('taskId', ParseObjectIdPipe) taskId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.hierarchyService.findOneListTask(
+      listId,
+      taskId,
+      String(user._id),
+    );
+  }
+
+  @Get('lists/:listId/tasks/:taskId/subtasks')
+  async findListSubtasks(
+    @Param('listId', ParseObjectIdPipe) listId: string,
+    @Param('taskId', ParseObjectIdPipe) taskId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.hierarchyService.findListSubtasks(
+      listId,
+      taskId,
+      String(user._id),
+    );
+  }
+
+  @Post('lists/:listId/tasks/:taskId/subtasks')
+  @HttpCode(HttpStatus.CREATED)
+  async createListSubtask(
+    @Param('listId', ParseObjectIdPipe) listId: string,
+    @Param('taskId', ParseObjectIdPipe) taskId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateSubtaskDto,
+  ) {
+    return this.hierarchyService.createListSubtask(
+      listId,
+      taskId,
+      dto,
       String(user._id),
     );
   }
