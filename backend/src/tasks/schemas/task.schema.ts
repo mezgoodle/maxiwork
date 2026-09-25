@@ -50,6 +50,13 @@ export class Task {
 
   @Prop({
     type: MongooseSchema.Types.ObjectId,
+    ref: 'List',
+    index: true,
+  })
+  list?: Types.ObjectId;
+
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
     ref: User.name,
     index: true,
   })
@@ -79,3 +86,5 @@ TaskSchema.index({ project: 1, taskKey: 1 }, { unique: true });
 TaskSchema.index({ project: 1, status: 1 });
 TaskSchema.index({ project: 1, assignee: 1 });
 TaskSchema.index({ project: 1, dueDate: 1 });
+TaskSchema.index({ list: 1 });
+TaskSchema.index({ list: 1, status: 1 });
