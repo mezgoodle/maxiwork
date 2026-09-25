@@ -1058,6 +1058,7 @@ export class HierarchyService implements OnModuleInit {
       .findById(task._id)
       .populate('reporter', 'firstName lastName email avatarUrl')
       .populate('assignee', 'firstName lastName email avatarUrl')
+      .populate('parentTaskId', 'title taskKey')
       .exec();
     if (!updated) {
       throw new NotFoundException('Failed to retrieve updated task');
@@ -1108,6 +1109,7 @@ export class HierarchyService implements OnModuleInit {
       })
       .populate('reporter', 'firstName lastName email avatarUrl')
       .populate('assignee', 'firstName lastName email avatarUrl')
+      .populate('parentTaskId', 'title taskKey')
       .exec();
     if (!task) {
       throw new NotFoundException('Task not found in this list');
@@ -1130,6 +1132,7 @@ export class HierarchyService implements OnModuleInit {
       .sort({ order: 1, createdAt: 1 })
       .populate('reporter', 'firstName lastName email avatarUrl')
       .populate('assignee', 'firstName lastName email avatarUrl')
+      .populate('parentTaskId', 'title taskKey')
       .exec();
   }
 

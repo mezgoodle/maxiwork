@@ -29,6 +29,23 @@
 
       <!-- Action Buttons -->
       <div class="flex items-center gap-3">
+        <!-- Subtasks Toggle (in List View) -->
+        <button
+          v-if="activeView === 'list'"
+          type="button"
+          class="px-3 py-1.5 rounded-xl text-xs font-semibold border transition cursor-pointer flex items-center gap-1.5"
+          :class="
+            showSubtasks
+              ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40 shadow-xs'
+              : 'bg-slate-800/80 text-slate-400 border-slate-700/80 hover:text-white'
+          "
+          :title="showSubtasks ? 'Hide subtasks in list' : 'Show subtasks under parent tasks'"
+          @click="toggleShowSubtasks"
+        >
+          <span>↳</span>
+          <span>{{ showSubtasks ? 'Subtasks: Shown' : 'Show Subtasks' }}</span>
+        </button>
+
         <!-- View Toggle -->
         <div class="flex items-center bg-slate-800/80 border border-slate-700/80 rounded-xl p-1 text-xs font-medium text-slate-300">
           <button
@@ -137,117 +154,219 @@
         />
       </div>
 
-      <!-- List View (Detailed Task Rows) -->
+      <!-- List View (Detailed Task Rows + Expandable Subtasks) -->
       <div v-else class="space-y-2">
         <div
           v-for="task in tasks"
           :key="task._id"
-          class="p-3.5 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 hover:border-slate-500/80 rounded-xl transition flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 cursor-pointer shadow-sm group"
-          @click="openTaskDetail(task)"
+          class="space-y-1"
         >
-          <!-- Left: Done Checkbox + Key + Title + Subtasks -->
-          <div class="flex items-center gap-3 min-w-0 flex-1">
-            <!-- Quick Done toggle button replacing delete button -->
-            <button
-              type="button"
-              class="w-6 h-6 rounded-md border flex items-center justify-center transition-colors cursor-pointer shrink-0"
-              :class="
-                task.status === 'done'
-                  ? 'bg-emerald-500 border-emerald-400 text-slate-950 hover:bg-emerald-400 shadow-xs shadow-emerald-500/30'
-                  : 'bg-slate-900 border-slate-700 text-slate-500 hover:text-emerald-400 hover:border-emerald-500/50'
-              "
-              :title="task.status === 'done' ? 'Reopen task (To Do)' : 'Mark task as Done'"
-              @click.stop="toggleTaskDone(task)"
-            >
-              <span class="text-xs font-bold leading-none">✓</span>
-            </button>
+          <!-- Parent Task Row -->
+          <div
+            class="p-3.5 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 hover:border-slate-500/80 rounded-xl transition flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 cursor-pointer shadow-sm group"
+            @click="openTaskDetail(task)"
+          >
+            <!-- Left: Expand Arrow + Done Checkbox + Key + Title + Subtasks count -->
+            <div class="flex items-center gap-2.5 min-w-0 flex-1">
+              <!-- Expand / Collapse arrow button for subtasks -->
+              <button
+                v-if="task.subtasksCount && task.subtasksCount > 0"
+                type="button"
+                class="w-5 h-5 rounded flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700/60 transition cursor-pointer shrink-0 text-xs"
+                :title="isTaskExpanded(task._id) ? 'Collapse subtasks' : 'Expand subtasks'"
+                @click.stop="toggleTaskExpand(task._id)"
+              >
+                <span
+                  class="transition-transform duration-200"
+                  :class="isTaskExpanded(task._id) ? 'rotate-90' : ''"
+                >
+                  ▶
+                </span>
+              </button>
+              <div v-else class="w-5 shrink-0" />
 
-            <!-- Key Badge -->
-            <span class="text-xs font-mono font-bold text-indigo-400 shrink-0">
-              {{ task.taskKey || 'TASK' }}
-            </span>
+              <!-- Quick Done toggle button -->
+              <button
+                type="button"
+                class="w-6 h-6 rounded-md border flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                :class="
+                  task.status === 'done'
+                    ? 'bg-emerald-500 border-emerald-400 text-slate-950 hover:bg-emerald-400 shadow-xs shadow-emerald-500/30'
+                    : 'bg-slate-900 border-slate-700 text-slate-500 hover:text-emerald-400 hover:border-emerald-500/50'
+                "
+                :title="task.status === 'done' ? 'Reopen task (To Do)' : 'Mark task as Done'"
+                @click.stop="toggleTaskDone(task)"
+              >
+                <span class="text-xs font-bold leading-none">✓</span>
+              </button>
 
-            <!-- Title -->
-            <span
-              class="text-sm font-medium truncate transition"
-              :class="task.status === 'done' ? 'line-through text-slate-400' : 'text-slate-100 group-hover:text-indigo-300'"
-            >
-              {{ task.title }}
-            </span>
+              <!-- Key Badge -->
+              <span class="text-xs font-mono font-bold text-indigo-400 shrink-0">
+                {{ task.taskKey || 'TASK' }}
+              </span>
 
-            <!-- Description snippet if present -->
-            <span
-              v-if="task.description"
-              class="text-xs text-slate-500 truncate max-w-xs hidden lg:inline"
-            >
-              — {{ task.description }}
-            </span>
+              <!-- Title -->
+              <span
+                class="text-sm font-medium truncate transition"
+                :class="task.status === 'done' ? 'line-through text-slate-400' : 'text-slate-100 group-hover:text-indigo-300'"
+              >
+                {{ task.title }}
+              </span>
 
-            <!-- Subtasks pill -->
-            <span
-              v-if="task.subtasksCount && task.subtasksCount > 0"
-              class="text-xs font-mono px-2 py-0.5 rounded-md bg-slate-900/60 border border-slate-700/60 shrink-0 hidden sm:inline"
-              :class="task.completedSubtasksCount === task.subtasksCount ? 'text-emerald-400 border-emerald-500/30' : 'text-slate-400'"
-              title="Subtasks"
-            >
-              ↳ {{ task.completedSubtasksCount || 0 }}/{{ task.subtasksCount }}
-            </span>
+              <!-- Description snippet if present -->
+              <span
+                v-if="task.description"
+                class="text-xs text-slate-500 truncate max-w-xs hidden lg:inline"
+              >
+                — {{ task.description }}
+              </span>
+
+              <!-- Subtasks pill -->
+              <span
+                v-if="task.subtasksCount && task.subtasksCount > 0"
+                class="text-xs font-mono px-2 py-0.5 rounded-md bg-slate-900/60 border border-slate-700/60 shrink-0 hidden sm:inline cursor-pointer hover:border-indigo-500/50"
+                :class="task.completedSubtasksCount === task.subtasksCount ? 'text-emerald-400 border-emerald-500/30' : 'text-slate-400'"
+                title="Click to toggle subtasks"
+                @click.stop="toggleTaskExpand(task._id)"
+              >
+                ↳ {{ task.completedSubtasksCount || 0 }}/{{ task.subtasksCount }}
+              </span>
+            </div>
+
+            <!-- Right: Detailed fields (Dates, Assignee, Priority, Status) -->
+            <div class="flex items-center gap-3 shrink-0 self-end sm:self-auto" @click.stop>
+              <!-- Due Date badge -->
+              <div
+                v-if="task.dueDate"
+                class="flex items-center gap-1 font-mono text-xs px-2.5 py-1 rounded-lg bg-slate-900/70 border shrink-0"
+                :class="getDateBadgeClass(task.dueDate, task.status)"
+                :title="`Due date: ${formatDate(task.dueDate)}`"
+              >
+                <span>📅</span>
+                <span>{{ formatDate(task.dueDate) }}</span>
+              </div>
+
+              <!-- Priority badge -->
+              <span
+                class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full shrink-0"
+                :class="getPriorityClass(task.priority)"
+              >
+                {{ task.priority || 'medium' }}
+              </span>
+
+              <!-- Assignee avatar + name -->
+              <div
+                v-if="task.assignee"
+                class="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-900/60 border border-slate-700/60 shrink-0"
+                :title="getUserDisplayName(task.assignee)"
+              >
+                <span
+                  class="w-5 h-5 rounded-full bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 flex items-center justify-center text-[10px] font-bold"
+                >
+                  {{ getUserInitials(task.assignee) }}
+                </span>
+                <span class="text-xs text-slate-300 max-w-[120px] truncate hidden md:inline">
+                  {{ getUserDisplayName(task.assignee) }}
+                </span>
+              </div>
+              <div
+                v-else
+                class="text-xs text-slate-500 italic shrink-0 hidden sm:inline px-1"
+              >
+                Unassigned
+              </div>
+
+              <!-- Status selector -->
+              <select
+                :value="task.status"
+                class="bg-slate-900 border border-slate-700 text-xs rounded-lg px-2.5 py-1 text-slate-200 focus:outline-none capitalize cursor-pointer shrink-0"
+                @change="handleStatusChange(task._id, ($event.target as HTMLSelectElement).value as TaskStatus)"
+              >
+                <option value="todo">To Do</option>
+                <option value="in_progress">In Progress</option>
+                <option value="in_review">In Review</option>
+                <option value="done">Done</option>
+              </select>
+            </div>
           </div>
 
-          <!-- Right: Detailed fields (Dates, Assignee, Priority, Status) -->
-          <div class="flex items-center gap-3 shrink-0 self-end sm:self-auto" @click.stop>
-            <!-- Due Date badge -->
+          <!-- Indented Subtasks Section under Parent Task -->
+          <div
+            v-if="isTaskExpanded(task._id) && subtasksMap[task._id]?.length"
+            class="pl-7 sm:pl-10 space-y-1.5 pt-0.5 pb-1"
+          >
             <div
-              v-if="task.dueDate"
-              class="flex items-center gap-1 font-mono text-xs px-2.5 py-1 rounded-lg bg-slate-900/70 border shrink-0"
-              :class="getDateBadgeClass(task.dueDate, task.status)"
-              :title="`Due date: ${formatDate(task.dueDate)}`"
+              v-for="sub in subtasksMap[task._id]"
+              :key="sub._id"
+              class="p-2.5 bg-slate-900/70 hover:bg-slate-850 border border-slate-800/80 hover:border-slate-700 rounded-xl transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer group/sub shadow-xs"
+              @click="openTaskDetail(sub)"
             >
-              <span>📅</span>
-              <span>{{ formatDate(task.dueDate) }}</span>
-            </div>
+              <!-- Left: Checkbox + Subtask Key + Title -->
+              <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                <button
+                  type="button"
+                  class="w-5 h-5 rounded-md border flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                  :class="
+                    sub.status === 'done'
+                      ? 'bg-emerald-500 border-emerald-400 text-slate-950 hover:bg-emerald-400'
+                      : 'bg-slate-900 border-slate-700 text-slate-500 hover:text-emerald-400'
+                  "
+                  :title="sub.status === 'done' ? 'Reopen subtask' : 'Mark subtask as Done'"
+                  @click.stop="toggleTaskDone(sub)"
+                >
+                  <span class="text-[10px] font-bold leading-none">✓</span>
+                </button>
 
-            <!-- Priority badge -->
-            <span
-              class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full shrink-0"
-              :class="getPriorityClass(task.priority)"
-            >
-              {{ task.priority || 'medium' }}
-            </span>
+                <span class="text-slate-500 font-mono text-xs font-semibold shrink-0">↳</span>
+                <span class="text-[11px] font-mono font-bold text-slate-400 shrink-0">
+                  {{ sub.taskKey }}
+                </span>
 
-            <!-- Assignee avatar + name -->
-            <div
-              v-if="task.assignee"
-              class="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-900/60 border border-slate-700/60 shrink-0"
-              :title="getUserDisplayName(task.assignee)"
-            >
-              <span
-                class="w-5 h-5 rounded-full bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 flex items-center justify-center text-[10px] font-bold"
-              >
-                {{ getUserInitials(task.assignee) }}
-              </span>
-              <span class="text-xs text-slate-300 max-w-[120px] truncate hidden md:inline">
-                {{ getUserDisplayName(task.assignee) }}
-              </span>
-            </div>
-            <div
-              v-else
-              class="text-xs text-slate-500 italic shrink-0 hidden sm:inline px-1"
-            >
-              Unassigned
-            </div>
+                <span
+                  class="text-xs font-medium truncate transition"
+                  :class="sub.status === 'done' ? 'line-through text-slate-500' : 'text-slate-200 group-hover/sub:text-indigo-300'"
+                >
+                  {{ sub.title }}
+                </span>
+              </div>
 
-            <!-- Status selector -->
-            <select
-              :value="task.status"
-              class="bg-slate-900 border border-slate-700 text-xs rounded-lg px-2.5 py-1 text-slate-200 focus:outline-none capitalize cursor-pointer shrink-0"
-              @change="handleStatusChange(task._id, ($event.target as HTMLSelectElement).value as TaskStatus)"
-            >
-              <option value="todo">To Do</option>
-              <option value="in_progress">In Progress</option>
-              <option value="in_review">In Review</option>
-              <option value="done">Done</option>
-            </select>
+              <!-- Right: Subtask Fields (Date, Priority, Assignee, Status) -->
+              <div class="flex items-center gap-2.5 shrink-0 self-end sm:self-auto" @click.stop>
+                <span
+                  v-if="sub.dueDate"
+                  class="font-mono text-[11px] px-2 py-0.5 rounded-md bg-slate-900 border"
+                  :class="getDateBadgeClass(sub.dueDate, sub.status)"
+                >
+                  📅 {{ formatDate(sub.dueDate) }}
+                </span>
+
+                <span
+                  class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full shrink-0"
+                  :class="getPriorityClass(sub.priority)"
+                >
+                  {{ sub.priority || 'medium' }}
+                </span>
+
+                <span
+                  v-if="sub.assignee"
+                  class="w-5 h-5 rounded-full bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 flex items-center justify-center text-[10px] font-bold"
+                  :title="getUserDisplayName(sub.assignee)"
+                >
+                  {{ getUserInitials(sub.assignee) }}
+                </span>
+
+                <select
+                  :value="sub.status"
+                  class="bg-slate-900 border border-slate-700 text-xs rounded-lg px-2 py-0.5 text-slate-200 focus:outline-none capitalize cursor-pointer shrink-0"
+                  @change="handleStatusChange(sub._id, ($event.target as HTMLSelectElement).value as TaskStatus)"
+                >
+                  <option value="todo">To Do</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="in_review">In Review</option>
+                  <option value="done">Done</option>
+                </select>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -318,6 +437,11 @@ const error = ref<string | null>(null);
 const listDetails = ref<List | null>(null);
 const tasks = ref<Task[]>([]);
 
+const showSubtasks = ref(false);
+const expandedTaskIds = ref<Set<string>>(new Set());
+const subtasksMap = ref<Record<string, Task[]>>({});
+const loadingSubtasksMap = ref<Record<string, boolean>>({});
+
 const isCreateModalOpen = ref(false);
 const modalDefaultStatus = ref<TaskStatus>('todo');
 
@@ -375,6 +499,47 @@ function getDateBadgeClass(dueDate?: string, status?: TaskStatus): string {
   return 'text-slate-300 border-slate-700/60';
 }
 
+function isTaskExpanded(taskId: string): boolean {
+  return showSubtasks.value || expandedTaskIds.value.has(taskId);
+}
+
+async function loadSubtasksForTask(taskId: string) {
+  if (!listId.value || loadingSubtasksMap.value[taskId]) return;
+  loadingSubtasksMap.value[taskId] = true;
+  try {
+    const list = await apiFetch<Task[]>(
+      `/lists/${listId.value}/tasks/${taskId}/subtasks`,
+      { method: 'GET' },
+    );
+    subtasksMap.value[taskId] = Array.isArray(list) ? list : [];
+  } catch {
+    subtasksMap.value[taskId] = [];
+  } finally {
+    loadingSubtasksMap.value[taskId] = false;
+  }
+}
+
+async function toggleTaskExpand(taskId: string) {
+  if (expandedTaskIds.value.has(taskId)) {
+    expandedTaskIds.value.delete(taskId);
+  } else {
+    expandedTaskIds.value.add(taskId);
+    if (!subtasksMap.value[taskId]) {
+      await loadSubtasksForTask(taskId);
+    }
+  }
+}
+
+async function toggleShowSubtasks() {
+  showSubtasks.value = !showSubtasks.value;
+  if (showSubtasks.value) {
+    const promises = tasks.value
+      .filter((t) => t.subtasksCount && t.subtasksCount > 0)
+      .map((t) => loadSubtasksForTask(t._id));
+    await Promise.allSettled(promises);
+  }
+}
+
 async function loadList() {
   if (!listId.value) return;
 
@@ -391,6 +556,13 @@ async function loadList() {
         { method: 'GET' },
       );
       tasks.value = Array.isArray(taskRes) ? taskRes : [];
+
+      if (showSubtasks.value) {
+        const promises = tasks.value
+          .filter((t) => t.subtasksCount && t.subtasksCount > 0)
+          .map((t) => loadSubtasksForTask(t._id));
+        await Promise.allSettled(promises);
+      }
     } catch {
       tasks.value = [];
     }
@@ -428,10 +600,23 @@ function handleTaskUpdated(updated: Task) {
   if (selectedTask.value?._id === updated._id) {
     selectedTask.value = updated;
   }
+
+  // Update in subtasksMap if it is a subtask
+  for (const parentId of Object.keys(subtasksMap.value)) {
+    const subIdx = subtasksMap.value[parentId].findIndex((s) => s._id === updated._id);
+    if (subIdx !== -1) {
+      subtasksMap.value[parentId][subIdx] = updated;
+    }
+  }
 }
 
 function handleTaskDeleted(taskId: string) {
   tasks.value = tasks.value.filter((t) => t._id !== taskId);
+  for (const parentId of Object.keys(subtasksMap.value)) {
+    subtasksMap.value[parentId] = subtasksMap.value[parentId].filter(
+      (s) => s._id !== taskId,
+    );
+  }
 }
 
 async function handleQuickAdd() {
