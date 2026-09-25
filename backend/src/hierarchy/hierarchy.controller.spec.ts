@@ -56,6 +56,10 @@ describe('HierarchyController', () => {
       findOneList: jest.fn(),
       updateList: jest.fn(),
       deleteList: jest.fn(),
+      createListTask: jest.fn(),
+      findListTasks: jest.fn(),
+      updateListTask: jest.fn(),
+      deleteListTask: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -165,5 +169,77 @@ describe('HierarchyController', () => {
       String(mockUser._id),
     );
     expect(result.workspace.name).toBe('Acme');
+  });
+
+  it('createListTask should forward to service', async () => {
+    const dto = { title: 'Implement feature' };
+    mockHierarchyService.createListTask.mockResolvedValue({
+      _id: 't1',
+      ...dto,
+    });
+
+    const result = await controller.createListTask(
+      '507f1f77bcf86cd799439011',
+      mockUser,
+      dto,
+    );
+    expect(mockHierarchyService.createListTask).toHaveBeenCalledWith(
+      '507f1f77bcf86cd799439011',
+      dto,
+      String(mockUser._id),
+    );
+    expect(result).toEqual({ _id: 't1', ...dto });
+  });
+
+  it('findListTasks should forward to service', async () => {
+    mockHierarchyService.findListTasks.mockResolvedValue([{ _id: 't1' }]);
+
+    const result = await controller.findListTasks(
+      '507f1f77bcf86cd799439011',
+      mockUser,
+    );
+    expect(mockHierarchyService.findListTasks).toHaveBeenCalledWith(
+      '507f1f77bcf86cd799439011',
+      String(mockUser._id),
+    );
+    expect(result).toEqual([{ _id: 't1' }]);
+  });
+
+  it('updateListTask should forward to service', async () => {
+    const dto = { title: 'Updated title' };
+    mockHierarchyService.updateListTask.mockResolvedValue({
+      _id: 't1',
+      ...dto,
+    });
+
+    const result = await controller.updateListTask(
+      '507f1f77bcf86cd799439011',
+      '507f1f77bcf86cd799439022',
+      mockUser,
+      dto,
+    );
+    expect(mockHierarchyService.updateListTask).toHaveBeenCalledWith(
+      '507f1f77bcf86cd799439011',
+      '507f1f77bcf86cd799439022',
+      dto,
+      String(mockUser._id),
+    );
+    expect(result).toEqual({ _id: 't1', ...dto });
+  });
+
+  it('deleteListTask should forward to service', async () => {
+    mockHierarchyService.deleteListTask.mockResolvedValue({ success: true });
+
+    const result = await controller.deleteListTask(
+      '507f1f77bcf86cd799439011',
+      '507f1f77bcf86cd799439022',
+      mockUser,
+    );
+    expect(mockHierarchyService.deleteListTask).toHaveBeenCalledWith(
+      '507f1f77bcf86cd799439011',
+      '507f1f77bcf86cd799439022',
+      String(mockUser._id),
+    );
+    expect(result).toEqual({ success: true });
   });
 });

@@ -52,7 +52,7 @@
         <button
           type="button"
           class="px-4 py-2 rounded-xl text-sm font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition flex items-center gap-2 cursor-pointer shadow-lg shadow-indigo-600/20"
-          @click="openCreateTaskModal"
+          @click="openCreateTaskModal('todo')"
         >
           <span>+</span>
           <span>New Task</span>
@@ -75,6 +75,30 @@
       </button>
     </div>
 
+    <!-- Quick Inline Add Task -->
+    <div class="mb-6">
+      <form
+        class="flex items-center gap-2 bg-slate-900/60 border border-slate-800 rounded-2xl p-2 sm:p-2.5"
+        @submit.prevent="handleQuickAdd"
+      >
+        <span class="pl-3 text-slate-500 text-sm font-bold">+</span>
+        <input
+          v-model="quickTitle"
+          type="text"
+          placeholder="Add a new task to this list... (press Enter)"
+          class="flex-1 bg-transparent border-none text-sm text-slate-100 placeholder-slate-500 focus:outline-none px-2"
+          :disabled="isQuickAdding"
+        >
+        <button
+          type="submit"
+          :disabled="!quickTitle.trim() || isQuickAdding"
+          class="px-4 py-1.5 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition cursor-pointer disabled:opacity-40"
+        >
+          {{ isQuickAdding ? 'Adding...' : 'Add Task' }}
+        </button>
+      </form>
+    </div>
+
     <!-- Content Area: Board or List View -->
     <div v-if="loading" class="flex-1 flex items-center justify-center py-16">
       <div class="text-slate-400 text-sm animate-pulse">Loading list items...</div>
@@ -94,39 +118,176 @@
         <button
           type="button"
           class="px-4 py-2 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition cursor-pointer shadow-lg shadow-indigo-600/20"
-          @click="openCreateTaskModal"
+          @click="openCreateTaskModal('todo')"
         >
           + Add First Task
         </button>
       </div>
 
-      <!-- Tasks Render -->
+      <!-- Board View (Kanban columns) -->
+      <div
+        v-else-if="activeView === 'board'"
+        class="flex gap-6 overflow-x-auto pb-6 items-start scrollbar-thin scrollbar-thumb-slate-700"
+      >
+        <div
+          v-for="col in columns"
+          :key="col.status"
+          class="flex-shrink-0 w-80 bg-slate-900/60 border border-slate-800/90 rounded-2xl flex flex-col max-h-[calc(100vh-16rem)]"
+        >
+          <!-- Column Header -->
+          <div class="p-4 border-b border-slate-800/80 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full" :class="col.dotClass" />
+              <h3 class="font-bold text-sm text-slate-200">
+                {{ col.title }}
+              </h3>
+              <span
+                class="text-xs font-mono font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700/60"
+              >
+                {{ tasksByStatus[col.status]?.length || 0 }}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer text-sm font-semibold"
+              title="Add task in this column"
+              @click="openCreateTaskModal(col.status)"
+            >
+              +
+            </button>
+          </div>
+
+          <!-- Cards List -->
+          <div class="flex-1 overflow-y-auto p-3 space-y-3 min-h-[100px]">
+            <div
+              v-if="!tasksByStatus[col.status] || tasksByStatus[col.status].length === 0"
+              class="h-24 border-2 border-dashed border-slate-800/80 rounded-xl flex items-center justify-center text-xs text-slate-500"
+            >
+              No tasks
+            </div>
+
+            <div
+              v-for="task in tasksByStatus[col.status]"
+              :key="task._id"
+              class="group p-3.5 bg-slate-800/70 hover:bg-slate-800 border border-slate-700/60 hover:border-slate-600 rounded-xl transition shadow-sm space-y-2.5"
+            >
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-mono font-bold text-indigo-400">
+                  {{ task.taskKey || 'TASK' }}
+                </span>
+                <div class="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition">
+                  <select
+                    :value="task.status"
+                    class="bg-slate-900 border border-slate-700 text-[11px] rounded px-1.5 py-0.5 text-slate-300 focus:outline-none"
+                    @change="handleStatusChange(task._id, ($event.target as HTMLSelectElement).value as TaskStatus)"
+                  >
+                    <option value="todo">To Do</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="in_review">In Review</option>
+                    <option value="done">Done</option>
+                  </select>
+                  <button
+                    type="button"
+                    class="text-slate-400 hover:text-rose-400 p-0.5 rounded transition cursor-pointer text-xs"
+                    title="Delete task"
+                    @click="handleDeleteTask(task._id)"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              <h4 class="text-sm font-medium text-slate-100 leading-snug">
+                {{ task.title }}
+              </h4>
+
+              <div class="flex items-center justify-between pt-1 text-xs">
+                <span
+                  class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full"
+                  :class="getPriorityClass(task.priority)"
+                >
+                  {{ task.priority || 'medium' }}
+                </span>
+
+                <span
+                  v-if="task.subtasksCount && task.subtasksCount > 0"
+                  class="text-xs font-mono px-2 py-0.5 rounded-md bg-slate-900/60 border border-slate-700/60"
+                  :class="task.completedSubtasksCount === task.subtasksCount ? 'text-emerald-400 border-emerald-500/30' : 'text-slate-400'"
+                  title="Subtasks"
+                >
+                  ↳ {{ task.completedSubtasksCount || 0 }}/{{ task.subtasksCount }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- List View (Table / Rows) -->
       <div v-else class="space-y-2">
         <div
           v-for="task in tasks"
           :key="task._id"
-          class="p-4 bg-slate-800/60 border border-slate-700/60 rounded-xl hover:border-slate-600 transition flex items-center justify-between"
+          class="p-4 bg-slate-800/60 border border-slate-700/60 rounded-xl hover:border-slate-600 transition flex items-center justify-between gap-4"
         >
-          <div class="flex items-center gap-3">
-            <span class="text-xs font-mono font-bold text-indigo-400">{{ task.taskKey || 'TASK' }}</span>
-            <span class="text-sm font-medium text-slate-100">{{ task.title }}</span>
+          <div class="flex items-center gap-3 min-w-0 flex-1">
+            <span class="text-xs font-mono font-bold text-indigo-400 shrink-0">
+              {{ task.taskKey || 'TASK' }}
+            </span>
+            <span class="text-sm font-medium text-slate-100 truncate">
+              {{ task.title }}
+            </span>
             <span
               v-if="task.subtasksCount && task.subtasksCount > 0"
-              class="text-xs font-mono px-2 py-0.5 rounded-md bg-slate-900/60 border border-slate-700/60"
+              class="text-xs font-mono px-2 py-0.5 rounded-md bg-slate-900/60 border border-slate-700/60 shrink-0"
               :class="task.completedSubtasksCount === task.subtasksCount ? 'text-emerald-400 border-emerald-500/30' : 'text-slate-400'"
               title="Subtasks"
             >
               ↳ {{ task.completedSubtasksCount || 0 }}/{{ task.subtasksCount }}
             </span>
           </div>
-          <div class="flex items-center gap-2">
-            <span class="px-2 py-0.5 text-xs rounded-full bg-slate-700 text-slate-300 capitalize">
-              {{ task.status }}
+
+          <div class="flex items-center gap-3 shrink-0">
+            <span
+              class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full"
+              :class="getPriorityClass(task.priority)"
+            >
+              {{ task.priority || 'medium' }}
             </span>
+
+            <select
+              :value="task.status"
+              class="bg-slate-900 border border-slate-700 text-xs rounded-lg px-2.5 py-1 text-slate-200 focus:outline-none capitalize"
+              @change="handleStatusChange(task._id, ($event.target as HTMLSelectElement).value as TaskStatus)"
+            >
+              <option value="todo">To Do</option>
+              <option value="in_progress">In Progress</option>
+              <option value="in_review">In Review</option>
+              <option value="done">Done</option>
+            </select>
+
+            <button
+              type="button"
+              class="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-slate-700/50 transition cursor-pointer text-xs"
+              title="Delete task"
+              @click="handleDeleteTask(task._id)"
+            >
+              ✕
+            </button>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Task Creation Modal -->
+    <ListTaskModal
+      :is-open="isCreateModalOpen"
+      :list-id="listId"
+      :default-status="modalDefaultStatus"
+      @close="isCreateModalOpen = false"
+      @saved="handleTaskSaved"
+    />
   </div>
 </template>
 
@@ -135,7 +296,11 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useHierarchyStore } from '../../stores/hierarchy';
 import { useApi } from '../../composables/useApi';
+import { useToast } from '../../composables/useToast';
+import { extractApiErrorMessage } from '../../utils/error';
 import type { List, Space } from '../../types/hierarchy';
+import type { Task, TaskPriority, TaskStatus } from '../../types/task';
+import ListTaskModal from '../../components/task/ListTaskModal.vue';
 
 definePageMeta({
   middleware: ['auth'],
@@ -145,21 +310,44 @@ const route = useRoute();
 const listId = computed(() => String(route.params.id || ''));
 
 const hierarchyStore = useHierarchyStore();
-const activeView = ref<'board' | 'list'>('board');
+const { apiFetch } = useApi();
+const { showToast } = useToast();
 
+const activeView = ref<'board' | 'list'>('board');
 const loading = ref(false);
 const error = ref<string | null>(null);
 const listDetails = ref<List | null>(null);
-const tasks = ref<
-  Array<{
-    _id: string;
-    title: string;
-    taskKey?: string;
-    status: string;
-    subtasksCount?: number;
-    completedSubtasksCount?: number;
-  }>
->([]);
+const tasks = ref<Task[]>([]);
+
+const isCreateModalOpen = ref(false);
+const modalDefaultStatus = ref<TaskStatus>('todo');
+
+const quickTitle = ref('');
+const isQuickAdding = ref(false);
+
+const columns: { status: TaskStatus; title: string; dotClass: string }[] = [
+  { status: 'todo', title: 'To Do', dotClass: 'bg-slate-400' },
+  { status: 'in_progress', title: 'In Progress', dotClass: 'bg-blue-400' },
+  { status: 'in_review', title: 'In Review', dotClass: 'bg-amber-400' },
+  { status: 'done', title: 'Done', dotClass: 'bg-emerald-400' },
+];
+
+const tasksByStatus = computed(() => {
+  const map: Record<TaskStatus, Task[]> = {
+    todo: [],
+    in_progress: [],
+    in_review: [],
+    done: [],
+  };
+  for (const t of tasks.value) {
+    if (map[t.status]) {
+      map[t.status].push(t);
+    } else {
+      map.todo.push(t);
+    }
+  }
+  return map;
+});
 
 const currentSpace = computed<Space | null>(() => {
   if (!listDetails.value) return null;
@@ -180,6 +368,21 @@ const currentSpace = computed<Space | null>(() => {
   };
 });
 
+function getPriorityClass(priority?: TaskPriority): string {
+  switch (priority) {
+    case 'critical':
+      return 'bg-rose-500/20 text-rose-400 border border-rose-500/30';
+    case 'high':
+      return 'bg-amber-500/20 text-amber-400 border border-amber-500/30';
+    case 'medium':
+      return 'bg-blue-500/20 text-blue-400 border border-blue-500/30';
+    case 'low':
+      return 'bg-slate-500/20 text-slate-400 border border-slate-500/30';
+    default:
+      return 'bg-slate-700/50 text-slate-300';
+  }
+}
+
 async function loadList() {
   if (!listId.value) return;
 
@@ -187,31 +390,85 @@ async function loadList() {
   error.value = null;
 
   try {
-    const { apiFetch } = useApi();
     const res = await apiFetch<List>(`/lists/${listId.value}`, { method: 'GET' });
     listDetails.value = res;
 
-    // Fetch tasks if available
     try {
-      const taskRes = await apiFetch<Array<{ _id: string; title: string; taskKey?: string; status: string }>>(
-        `/tasks?list=${listId.value}`,
+      const taskRes = await apiFetch<Task[]>(
+        `/lists/${listId.value}/tasks`,
         { method: 'GET' },
       );
       tasks.value = Array.isArray(taskRes) ? taskRes : [];
     } catch {
-      // Endpoint fallback
       tasks.value = [];
     }
   } catch (err: unknown) {
-    const fetchErr = err as { data?: { message?: string }; message?: string };
-    error.value = fetchErr?.data?.message || fetchErr?.message || 'Failed to load list details';
+    error.value = extractApiErrorMessage(err, 'Failed to load list details');
   } finally {
     loading.value = false;
   }
 }
 
-function openCreateTaskModal() {
-  // Navigation or modal trigger
+function openCreateTaskModal(status?: TaskStatus) {
+  modalDefaultStatus.value = status || 'todo';
+  isCreateModalOpen.value = true;
+}
+
+function handleTaskSaved(task: Task) {
+  const existingIdx = tasks.value.findIndex((t) => t._id === task._id);
+  if (existingIdx !== -1) {
+    tasks.value[existingIdx] = task;
+  } else {
+    tasks.value.unshift(task);
+  }
+}
+
+async function handleQuickAdd() {
+  const title = quickTitle.value.trim();
+  if (!title || !listId.value) return;
+
+  isQuickAdding.value = true;
+  try {
+    const created = await apiFetch<Task>(`/lists/${listId.value}/tasks`, {
+      method: 'POST',
+      body: { title, status: 'todo' },
+    });
+    tasks.value.unshift(created);
+    quickTitle.value = '';
+    showToast(`Created task ${created.taskKey}`, 'success');
+  } catch (err: unknown) {
+    showToast(extractApiErrorMessage(err, 'Failed to add task'), 'error');
+  } finally {
+    isQuickAdding.value = false;
+  }
+}
+
+async function handleStatusChange(taskId: string, newStatus: TaskStatus) {
+  try {
+    const updated = await apiFetch<Task>(`/lists/${listId.value}/tasks/${taskId}`, {
+      method: 'PATCH',
+      body: { status: newStatus },
+    });
+    const idx = tasks.value.findIndex((t) => t._id === taskId);
+    if (idx !== -1) {
+      tasks.value[idx] = updated;
+    }
+    showToast(`Status updated to ${newStatus}`, 'success');
+  } catch (err: unknown) {
+    showToast(extractApiErrorMessage(err, 'Failed to update status'), 'error');
+  }
+}
+
+async function handleDeleteTask(taskId: string) {
+  try {
+    await apiFetch(`/lists/${listId.value}/tasks/${taskId}`, {
+      method: 'DELETE',
+    });
+    tasks.value = tasks.value.filter((t) => t._id !== taskId);
+    showToast('Task deleted', 'success');
+  } catch (err: unknown) {
+    showToast(extractApiErrorMessage(err, 'Failed to delete task'), 'error');
+  }
 }
 
 onMounted(() => {

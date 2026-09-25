@@ -135,8 +135,23 @@ describe('HierarchyService', () => {
     });
     mockListModel = listConstructor as unknown as MockModel;
 
-    mockTaskModel = {
-      findOne: jest.fn(),
+    const taskConstructor = jest
+      .fn()
+      .mockImplementation((dto: Record<string, unknown>) => ({
+        ...dto,
+        _id: '507f1f77bcf86cd799439099',
+        save: jest.fn().mockResolvedValue({
+          ...dto,
+          _id: '507f1f77bcf86cd799439099',
+        }),
+      }));
+    Object.assign(taskConstructor, {
+      findOne: jest.fn().mockReturnValue({
+        lean: jest
+          .fn()
+          .mockReturnValue({ exec: jest.fn().mockResolvedValue(null) }),
+        exec: jest.fn().mockResolvedValue(null),
+      }),
       find: jest.fn(),
       findById: jest.fn(),
       findByIdAndDelete: jest.fn(),
@@ -146,7 +161,11 @@ describe('HierarchyService', () => {
       updateMany: jest
         .fn()
         .mockReturnValue({ exec: jest.fn().mockResolvedValue({}) }),
-    };
+      countDocuments: jest
+        .fn()
+        .mockReturnValue({ exec: jest.fn().mockResolvedValue(0) }),
+    });
+    mockTaskModel = taskConstructor as unknown as MockModel;
 
     mockProjectModel = {
       findOne: jest.fn(),
@@ -331,6 +350,143 @@ describe('HierarchyService', () => {
 
       expect(list).toBeDefined();
       expect(list.name).toBe('Sprint Backlog');
+    });
+
+    it('should create a task in a list with candidate key', async () => {
+      const mockWs = {
+        _id: mockWorkspaceId,
+        owner: mockUserId,
+        members: [{ user: mockUserId, role: WorkspaceRole.OWNER }],
+      };
+      const mockSpace = {
+        _id: mockSpaceId,
+        workspaceId: mockWorkspaceId,
+        name: 'General',
+        isPrivate: false,
+      };
+      const mockList = {
+        _id: mockListId,
+        spaceId: mockSpaceId,
+        name: 'Tasks',
+      };
+
+      mockListModel.findById.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockList),
+      });
+      mockSpaceModel.findById.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockSpace),
+      });
+      mockWorkspaceModel.findById.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockWs),
+      });
+
+      const mockPopulated = {
+        _id: '507f1f77bcf86cd799439099',
+        title: 'New Feature',
+        taskKey: 'GENE-1',
+      };
+      mockTaskModel.findById.mockReturnValue({
+        populate: jest.fn().mockReturnValue({
+          populate: jest.fn().mockReturnValue({
+            exec: jest.fn().mockResolvedValue(mockPopulated),
+          }),
+        }),
+      });
+
+      const task = await service.createListTask(
+        mockListId,
+        { title: 'New Feature' },
+        mockUserId,
+      );
+
+      expect(task).toBeDefined();
+      expect(task.taskKey).toBe('GENE-1');
+    });
+
+    it('should find tasks belonging to a list', async () => {
+      const mockWs = {
+        _id: mockWorkspaceId,
+        owner: mockUserId,
+        members: [{ user: mockUserId, role: WorkspaceRole.OWNER }],
+      };
+      const mockSpace = {
+        _id: mockSpaceId,
+        workspaceId: mockWorkspaceId,
+        name: 'General',
+        isPrivate: false,
+      };
+      const mockList = {
+        _id: mockListId,
+        spaceId: mockSpaceId,
+        name: 'Tasks',
+      };
+
+      mockListModel.findById.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockList),
+      });
+      mockSpaceModel.findById.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockSpace),
+      });
+      mockWorkspaceModel.findById.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockWs),
+      });
+
+      const mockTaskList = [{ _id: 't1', title: 'Task 1' }];
+      mockTaskModel.find.mockReturnValue({
+        sort: jest.fn().mockReturnValue({
+          populate: jest.fn().mockReturnValue({
+            populate: jest.fn().mockReturnValue({
+              exec: jest.fn().mockResolvedValue(mockTaskList),
+            }),
+          }),
+        }),
+      });
+
+      const tasks = await service.findListTasks(mockListId, mockUserId);
+      expect(tasks).toEqual(mockTaskList);
+    });
+
+    it('should delete task and its subtasks', async () => {
+      const mockWs = {
+        _id: mockWorkspaceId,
+        owner: mockUserId,
+        members: [{ user: mockUserId, role: WorkspaceRole.OWNER }],
+      };
+      const mockSpace = {
+        _id: mockSpaceId,
+        workspaceId: mockWorkspaceId,
+        name: 'General',
+        isPrivate: false,
+      };
+      const mockList = {
+        _id: mockListId,
+        spaceId: mockSpaceId,
+        name: 'Tasks',
+      };
+
+      mockListModel.findById.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockList),
+      });
+      mockSpaceModel.findById.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockSpace),
+      });
+      mockWorkspaceModel.findById.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockWs),
+      });
+
+      mockTaskModel.findOne.mockReturnValue({
+        exec: jest.fn().mockResolvedValue({ _id: '507f1f77bcf86cd799439099' }),
+      });
+
+      const res = await service.deleteListTask(
+        mockListId,
+        '507f1f77bcf86cd799439099',
+        mockUserId,
+      );
+      expect(res).toEqual({
+        success: true,
+        message: 'Task deleted successfully',
+      });
     });
   });
 });
