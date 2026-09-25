@@ -5,6 +5,8 @@ import type {
   TaskStatus,
   CreateTaskPayload,
   UpdateTaskPayload,
+  CreateSubtaskPayload,
+  MoveSubtaskPayload,
   GetTasksQuery,
   PaginatedTasksResponse,
   TasksPaginationMeta,
@@ -222,6 +224,114 @@ export const useTasksStore = defineStore('tasks', () => {
     }
   }
 
+  async function fetchSubtasks(
+    projectId: string,
+    parentTaskId: string,
+  ): Promise<Task[]> {
+    loading.value = true;
+    error.value = null;
+    try {
+      const client = getClient();
+      const res = await client<Task[]>(
+        `/projects/${projectId}/tasks/${parentTaskId}/subtasks`,
+        { method: 'GET' },
+      );
+      if (currentTask.value?._id === parentTaskId) {
+        currentTask.value.subtasks = res;
+      }
+      return res;
+    } catch (err: unknown) {
+      error.value = extractApiErrorMessage(err, 'Failed to fetch subtasks');
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function fetchTaskTree(
+    projectId: string,
+    taskId: string,
+  ): Promise<Task> {
+    loading.value = true;
+    error.value = null;
+    try {
+      const client = getClient();
+      const res = await client<Task>(
+        `/projects/${projectId}/tasks/${taskId}/tree`,
+        { method: 'GET' },
+      );
+      currentTask.value = res;
+      return res;
+    } catch (err: unknown) {
+      error.value = extractApiErrorMessage(err, 'Failed to fetch task tree');
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function createSubtask(
+    projectId: string,
+    parentTaskId: string,
+    payload: CreateSubtaskPayload,
+  ): Promise<Task> {
+    loading.value = true;
+    error.value = null;
+    try {
+      const client = getClient();
+      const created = await client<Task>(
+        `/projects/${projectId}/tasks/${parentTaskId}/subtasks`,
+        {
+          method: 'POST',
+          body: payload,
+        },
+      );
+      const parentInTasks = tasks.value.find((t) => t._id === parentTaskId);
+      if (parentInTasks) {
+        parentInTasks.subtasksCount = (parentInTasks.subtasksCount || 0) + 1;
+      }
+      if (currentTask.value?._id === parentTaskId) {
+        currentTask.value.subtasksCount =
+          (currentTask.value.subtasksCount || 0) + 1;
+        if (!currentTask.value.subtasks) {
+          currentTask.value.subtasks = [];
+        }
+        currentTask.value.subtasks.push(created);
+      }
+      return created;
+    } catch (err: unknown) {
+      error.value = extractApiErrorMessage(err, 'Failed to create subtask');
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function moveSubtask(
+    projectId: string,
+    taskId: string,
+    payload: MoveSubtaskPayload,
+  ): Promise<Task> {
+    loading.value = true;
+    error.value = null;
+    try {
+      const client = getClient();
+      const updated = await client<Task>(
+        `/projects/${projectId}/tasks/${taskId}/move`,
+        {
+          method: 'PATCH',
+          body: payload,
+        },
+      );
+      return updated;
+    } catch (err: unknown) {
+      error.value = extractApiErrorMessage(err, 'Failed to move subtask');
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
   return {
     tasks,
     currentTask,
@@ -235,5 +345,9 @@ export const useTasksStore = defineStore('tasks', () => {
     updateTask,
     updateTaskStatus,
     deleteTask,
+    fetchSubtasks,
+    fetchTaskTree,
+    createSubtask,
+    moveSubtask,
   };
 });

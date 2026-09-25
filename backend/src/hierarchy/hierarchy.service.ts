@@ -23,6 +23,11 @@ import { CreateFolderDto } from './dto/create-folder.dto';
 import { UpdateFolderDto } from './dto/update-folder.dto';
 import { CreateListDto } from './dto/create-list.dto';
 import { UpdateListDto } from './dto/update-list.dto';
+import { CreateTaskDto } from '../tasks/dto/create-task.dto';
+import { CreateSubtaskDto } from '../tasks/dto/create-subtask.dto';
+import { UpdateTaskDto } from '../tasks/dto/update-task.dto';
+import { TaskStatus } from '../tasks/enums/task-status.enum';
+import { TaskPriority } from '../tasks/enums/task-priority.enum';
 
 export interface HierarchyTreeNodeList {
   id: string;
@@ -939,5 +944,251 @@ export class HierarchyService implements OnModuleInit {
         )
         .exec();
     }
+  }
+
+  // ----------------------------------------------------
+  // List Tasks CRUD
+  // ----------------------------------------------------
+
+  async createListTask(
+    listId: string,
+    dto: CreateTaskDto,
+    userId: string,
+  ): Promise<TaskDocument> {
+    const { list, space } = await this.checkListAccess(listId, userId);
+
+    const spaceName = space.name || 'TASK';
+    const prefix =
+      spaceName
+        .replace(/[^a-zA-Z0-9]/g, '')
+        .substring(0, 4)
+        .toUpperCase() || 'TSK';
+
+    const count = await this.taskModel
+      .countDocuments({ list: list._id })
+      .exec();
+    let num = count + 1;
+    let candidateKey = `${prefix}-${num}`;
+    while (
+      await this.taskModel.findOne({ taskKey: candidateKey }).lean().exec()
+    ) {
+      num++;
+      candidateKey = `${prefix}-${num}`;
+    }
+
+    const createdTask = new this.taskModel({
+      title: dto.title,
+      description: dto.description || '',
+      status: dto.status || TaskStatus.TODO,
+      priority: dto.priority || TaskPriority.MEDIUM,
+      list: list._id,
+      reporter: new Types.ObjectId(userId),
+      assignee: dto.assignee ? new Types.ObjectId(dto.assignee) : undefined,
+      startDate: dto.startDate ? new Date(dto.startDate) : undefined,
+      dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
+      taskKey: candidateKey,
+      subtasksCount: 0,
+      completedSubtasksCount: 0,
+      order: num,
+    });
+
+    const saved = await createdTask.save();
+    const result = await this.taskModel
+      .findById(saved._id)
+      .populate('reporter', 'firstName lastName email avatarUrl')
+      .populate('assignee', 'firstName lastName email avatarUrl')
+      .exec();
+    if (!result) {
+      throw new NotFoundException('Failed to retrieve created task');
+    }
+    return result;
+  }
+
+  async findListTasks(listId: string, userId: string): Promise<TaskDocument[]> {
+    await this.checkListAccess(listId, userId);
+
+    return this.taskModel
+      .find({
+        list: new Types.ObjectId(listId),
+        $or: [{ parentTaskId: { $exists: false } }, { parentTaskId: null }],
+      })
+      .sort({ order: 1, createdAt: -1 })
+      .populate('reporter', 'firstName lastName email avatarUrl')
+      .populate('assignee', 'firstName lastName email avatarUrl')
+      .exec();
+  }
+
+  async updateListTask(
+    listId: string,
+    taskId: string,
+    dto: UpdateTaskDto,
+    userId: string,
+  ): Promise<TaskDocument> {
+    await this.checkListAccess(listId, userId);
+
+    const task = await this.taskModel
+      .findOne({
+        _id: new Types.ObjectId(taskId),
+        list: new Types.ObjectId(listId),
+      })
+      .exec();
+    if (!task) {
+      throw new NotFoundException('Task not found in this list');
+    }
+
+    if (dto.title !== undefined) task.title = dto.title;
+    if (dto.description !== undefined) task.description = dto.description;
+    if (dto.status !== undefined) task.status = dto.status;
+    if (dto.priority !== undefined) task.priority = dto.priority;
+    if (dto.assignee !== undefined) {
+      task.assignee = dto.assignee
+        ? new Types.ObjectId(dto.assignee)
+        : undefined;
+    }
+    if (dto.startDate !== undefined) {
+      task.startDate = dto.startDate ? new Date(dto.startDate) : undefined;
+    }
+    if (dto.dueDate !== undefined) {
+      task.dueDate = dto.dueDate ? new Date(dto.dueDate) : undefined;
+    }
+
+    await task.save();
+
+    const updated = await this.taskModel
+      .findById(task._id)
+      .populate('reporter', 'firstName lastName email avatarUrl')
+      .populate('assignee', 'firstName lastName email avatarUrl')
+      .populate('parentTaskId', 'title taskKey')
+      .exec();
+    if (!updated) {
+      throw new NotFoundException('Failed to retrieve updated task');
+    }
+    return updated;
+  }
+
+  async deleteListTask(
+    listId: string,
+    taskId: string,
+    userId: string,
+  ): Promise<{ success: boolean; message: string }> {
+    await this.checkListAccess(listId, userId);
+
+    const task = await this.taskModel
+      .findOne({
+        _id: new Types.ObjectId(taskId),
+        list: new Types.ObjectId(listId),
+      })
+      .exec();
+    if (!task) {
+      throw new NotFoundException('Task not found in this list');
+    }
+
+    await this.taskModel
+      .deleteMany({
+        $or: [
+          { _id: new Types.ObjectId(taskId) },
+          { parentTaskId: new Types.ObjectId(taskId) },
+        ],
+      })
+      .exec();
+
+    return { success: true, message: 'Task deleted successfully' };
+  }
+
+  async findOneListTask(
+    listId: string,
+    taskId: string,
+    userId: string,
+  ): Promise<TaskDocument> {
+    await this.checkListAccess(listId, userId);
+
+    const task = await this.taskModel
+      .findOne({
+        _id: new Types.ObjectId(taskId),
+        list: new Types.ObjectId(listId),
+      })
+      .populate('reporter', 'firstName lastName email avatarUrl')
+      .populate('assignee', 'firstName lastName email avatarUrl')
+      .populate('parentTaskId', 'title taskKey')
+      .exec();
+    if (!task) {
+      throw new NotFoundException('Task not found in this list');
+    }
+    return task;
+  }
+
+  async findListSubtasks(
+    listId: string,
+    parentTaskId: string,
+    userId: string,
+  ): Promise<TaskDocument[]> {
+    await this.checkListAccess(listId, userId);
+
+    return this.taskModel
+      .find({
+        list: new Types.ObjectId(listId),
+        parentTaskId: new Types.ObjectId(parentTaskId),
+      })
+      .sort({ order: 1, createdAt: 1 })
+      .populate('reporter', 'firstName lastName email avatarUrl')
+      .populate('assignee', 'firstName lastName email avatarUrl')
+      .populate('parentTaskId', 'title taskKey')
+      .exec();
+  }
+
+  async createListSubtask(
+    listId: string,
+    parentTaskId: string,
+    dto: CreateSubtaskDto,
+    userId: string,
+  ): Promise<TaskDocument> {
+    const { list } = await this.checkListAccess(listId, userId);
+
+    const parent = await this.taskModel
+      .findOne({
+        _id: new Types.ObjectId(parentTaskId),
+        list: list._id,
+      })
+      .exec();
+    if (!parent) {
+      throw new NotFoundException('Parent task not found in this list');
+    }
+
+    const order =
+      dto.order !== undefined ? dto.order : parent.subtasksCount || 0;
+    const taskKey = `${parent.taskKey}-${order + 1}`;
+
+    const subtask = new this.taskModel({
+      title: dto.title,
+      description: dto.description || '',
+      priority: dto.priority || TaskPriority.MEDIUM,
+      status: TaskStatus.TODO,
+      list: list._id,
+      parentTaskId: parent._id,
+      reporter: new Types.ObjectId(userId),
+      assignee: dto.assignee ? new Types.ObjectId(dto.assignee) : undefined,
+      startDate: dto.startDate ? new Date(dto.startDate) : undefined,
+      dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
+      taskKey,
+      order,
+      subtasksCount: 0,
+      completedSubtasksCount: 0,
+    });
+
+    const saved = await subtask.save();
+
+    await this.taskModel
+      .updateOne({ _id: parent._id }, { $inc: { subtasksCount: 1 } })
+      .exec();
+
+    const result = await this.taskModel
+      .findById(saved._id)
+      .populate('reporter', 'firstName lastName email avatarUrl')
+      .populate('assignee', 'firstName lastName email avatarUrl')
+      .exec();
+    if (!result) {
+      throw new NotFoundException('Failed to retrieve created subtask');
+    }
+    return result;
   }
 }

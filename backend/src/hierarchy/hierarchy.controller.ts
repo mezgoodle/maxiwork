@@ -23,6 +23,9 @@ import { CreateFolderDto } from './dto/create-folder.dto';
 import { UpdateFolderDto } from './dto/update-folder.dto';
 import { CreateListDto } from './dto/create-list.dto';
 import { UpdateListDto } from './dto/update-list.dto';
+import { CreateTaskDto } from '../tasks/dto/create-task.dto';
+import { CreateSubtaskDto } from '../tasks/dto/create-subtask.dto';
+import { UpdateTaskDto } from '../tasks/dto/update-task.dto';
 
 interface AuthenticatedUser {
   _id: Types.ObjectId | string;
@@ -239,5 +242,97 @@ export class HierarchyController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.hierarchyService.deleteList(listId, String(user._id));
+  }
+
+  // ----------------------------------------------------
+  // List Tasks
+  // ----------------------------------------------------
+
+  @Post('lists/:listId/tasks')
+  @HttpCode(HttpStatus.CREATED)
+  async createListTask(
+    @Param('listId', ParseObjectIdPipe) listId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateTaskDto,
+  ) {
+    return this.hierarchyService.createListTask(listId, dto, String(user._id));
+  }
+
+  @Get('lists/:listId/tasks')
+  async findListTasks(
+    @Param('listId', ParseObjectIdPipe) listId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.hierarchyService.findListTasks(listId, String(user._id));
+  }
+
+  @Patch('lists/:listId/tasks/:taskId')
+  async updateListTask(
+    @Param('listId', ParseObjectIdPipe) listId: string,
+    @Param('taskId', ParseObjectIdPipe) taskId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdateTaskDto,
+  ) {
+    return this.hierarchyService.updateListTask(
+      listId,
+      taskId,
+      dto,
+      String(user._id),
+    );
+  }
+
+  @Delete('lists/:listId/tasks/:taskId')
+  async deleteListTask(
+    @Param('listId', ParseObjectIdPipe) listId: string,
+    @Param('taskId', ParseObjectIdPipe) taskId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.hierarchyService.deleteListTask(
+      listId,
+      taskId,
+      String(user._id),
+    );
+  }
+
+  @Get('lists/:listId/tasks/:taskId')
+  async findOneListTask(
+    @Param('listId', ParseObjectIdPipe) listId: string,
+    @Param('taskId', ParseObjectIdPipe) taskId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.hierarchyService.findOneListTask(
+      listId,
+      taskId,
+      String(user._id),
+    );
+  }
+
+  @Get('lists/:listId/tasks/:taskId/subtasks')
+  async findListSubtasks(
+    @Param('listId', ParseObjectIdPipe) listId: string,
+    @Param('taskId', ParseObjectIdPipe) taskId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.hierarchyService.findListSubtasks(
+      listId,
+      taskId,
+      String(user._id),
+    );
+  }
+
+  @Post('lists/:listId/tasks/:taskId/subtasks')
+  @HttpCode(HttpStatus.CREATED)
+  async createListSubtask(
+    @Param('listId', ParseObjectIdPipe) listId: string,
+    @Param('taskId', ParseObjectIdPipe) taskId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateSubtaskDto,
+  ) {
+    return this.hierarchyService.createListSubtask(
+      listId,
+      taskId,
+      dto,
+      String(user._id),
+    );
   }
 }

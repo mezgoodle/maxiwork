@@ -116,6 +116,9 @@ Before submitting code, pushing branches, or opening PRs, agents MUST verify:
 ## 🛑 5. Agent Behavioral Guardrails (STRICT)
 
 - **Scope Control**: Touch ONLY files directly related to the active Jira ticket. Do NOT reformat untouched files or modify shared configs unless explicitly instructed.
+- **DRY & Anti-Duplication Rule**: When evolving architecture or migrating between concepts (e.g. Project-centric to ClickUp Hierarchy Lists), NEVER create "parallel" duplicate components or copies (e.g. creating `ListTaskModal.vue` next to `TaskFormModal.vue`, or duplicating board/card logic). Always generalize existing components to handle both contexts (`listId?: string; projectId?: string;`) or refactor them into a single source of truth.
+- **Dead Code Elimination**: Every component, route, store, and utility must be actively utilized. When a new view, modal, or pattern supersedes an old one, immediately delete obsolete files and clean up unreferenced code. Never leave orphaned files or half-migrated copies in the repository.
+- **Safe Destructive Actions**: Any deletion action (tasks, subtasks, lists, spaces, folders, workspaces, projects) in UI components MUST ALWAYS trigger an explicit confirmation modal (`ConfirmDialog.vue`) before dispatching destructive API requests. One-click instant deletions without confirmation are strictly prohibited.
 - **Dependency Freeze**: NEVER run `npm install <package>` without prior approval. Always leverage already installed packages (`lodash`, `date-fns`, existing utils, etc.).
 - **Self-Correction Rule**: If any lint, build, or test step fails during verification, inspect the error output, fix the root cause, and re-run the verification commands automatically. Do not ask for user intervention on errors introduced by your changes.
 - **No Cheat Directives**:
@@ -138,3 +141,5 @@ Before submitting code, pushing branches, or opening PRs, agents MUST verify:
 - **SSR Safety**: Never access browser-only globals (`window`, `localStorage`, `document`) outside `onMounted()` or client-only lifecycle guards.
 - **Data Fetching**: Use the provided `useApi` composable for all internal backend calls. Avoid raw `fetch()` or third-party axios instances.
 - **Component Consistency**: Follow Vue 3 `<script setup lang="ts">` strictly. Define explicit `defineProps<{ ... }>()` and `defineEmits<{ ... }>()` with TypeScript types.
+- **Component Generalization (DRY)**: Design reusable components to be context-agnostic where appropriate. For example, `<KanbanBoard>`, `<KanbanColumn>`, `<TaskCard>`, `<TaskFormModal>`, and `<SubtaskList>` must be universal components shared across lists, projects, and detail drawers rather than being re-implemented or copied for each view.
+- **Consolidated Modals & Drawers**: Maintain a single authoritative modal or drawer for entity creation/editing. Do not introduce separate modal files for each hierarchy level when a single configurable component can serve all contexts cleanly.
