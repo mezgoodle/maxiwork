@@ -66,15 +66,6 @@
 
         <button
           type="button"
-          class="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-white rounded hover:bg-slate-700 transition cursor-pointer text-xs"
-          title="Edit Task"
-          @click.stop="$emit('edit', task)"
-        >
-          ✎
-        </button>
-
-        <button
-          type="button"
           class="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-400 rounded hover:bg-rose-500/10 transition cursor-pointer text-xs"
           title="Delete Task"
           @click.stop="$emit('delete', task._id)"
@@ -99,7 +90,7 @@ interface Props {
 
 interface Emits {
   (e: 'dragstart', event: DragEvent, task: Task): void;
-  (e: 'click' | 'edit', task: Task): void;
+  (e: 'click', task: Task): void;
   (e: 'delete', taskId: string): void;
 }
 

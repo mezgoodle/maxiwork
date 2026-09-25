@@ -48,7 +48,6 @@
         :project-id="projectId"
         :list-id="listId"
         @click="emit('task-click', task)"
-        @edit="emit('edit-task', task)"
         @delete="emit('delete-task', $event)"
       />
     </div>
@@ -71,7 +70,7 @@ interface Props {
 interface Emits {
   (e: 'task-drop', taskId: string, newStatus: TaskStatus): void;
   (e: 'create-task', status: TaskStatus): void;
-  (e: 'edit-task' | 'task-click', task: Task): void;
+  (e: 'task-click', task: Task): void;
   (e: 'delete-task', taskId: string): void;
 }
 

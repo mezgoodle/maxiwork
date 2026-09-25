@@ -133,28 +133,60 @@
           @task-drop="handleDrop"
           @create-task="openCreateTaskModal"
           @task-click="openTaskDetail"
-          @delete-task="handleDeleteTask"
+          @delete-task="promptDeleteTask"
         />
       </div>
 
-      <!-- List View (Table / Rows) -->
+      <!-- List View (Detailed Task Rows) -->
       <div v-else class="space-y-2">
         <div
           v-for="task in tasks"
           :key="task._id"
-          class="p-4 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 hover:border-slate-500 rounded-xl transition flex items-center justify-between gap-4 cursor-pointer"
+          class="p-3.5 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 hover:border-slate-500/80 rounded-xl transition flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 cursor-pointer shadow-sm group"
           @click="openTaskDetail(task)"
         >
+          <!-- Left: Done Checkbox + Key + Title + Subtasks -->
           <div class="flex items-center gap-3 min-w-0 flex-1">
+            <!-- Quick Done toggle button replacing delete button -->
+            <button
+              type="button"
+              class="w-6 h-6 rounded-md border flex items-center justify-center transition-colors cursor-pointer shrink-0"
+              :class="
+                task.status === 'done'
+                  ? 'bg-emerald-500 border-emerald-400 text-slate-950 hover:bg-emerald-400 shadow-xs shadow-emerald-500/30'
+                  : 'bg-slate-900 border-slate-700 text-slate-500 hover:text-emerald-400 hover:border-emerald-500/50'
+              "
+              :title="task.status === 'done' ? 'Reopen task (To Do)' : 'Mark task as Done'"
+              @click.stop="toggleTaskDone(task)"
+            >
+              <span class="text-xs font-bold leading-none">✓</span>
+            </button>
+
+            <!-- Key Badge -->
             <span class="text-xs font-mono font-bold text-indigo-400 shrink-0">
               {{ task.taskKey || 'TASK' }}
             </span>
-            <span class="text-sm font-medium text-slate-100 truncate">
+
+            <!-- Title -->
+            <span
+              class="text-sm font-medium truncate transition"
+              :class="task.status === 'done' ? 'line-through text-slate-400' : 'text-slate-100 group-hover:text-indigo-300'"
+            >
               {{ task.title }}
             </span>
+
+            <!-- Description snippet if present -->
+            <span
+              v-if="task.description"
+              class="text-xs text-slate-500 truncate max-w-xs hidden lg:inline"
+            >
+              — {{ task.description }}
+            </span>
+
+            <!-- Subtasks pill -->
             <span
               v-if="task.subtasksCount && task.subtasksCount > 0"
-              class="text-xs font-mono px-2 py-0.5 rounded-md bg-slate-900/60 border border-slate-700/60 shrink-0"
+              class="text-xs font-mono px-2 py-0.5 rounded-md bg-slate-900/60 border border-slate-700/60 shrink-0 hidden sm:inline"
               :class="task.completedSubtasksCount === task.subtasksCount ? 'text-emerald-400 border-emerald-500/30' : 'text-slate-400'"
               title="Subtasks"
             >
@@ -162,26 +194,53 @@
             </span>
           </div>
 
-          <div class="flex items-center gap-3 shrink-0" @click.stop>
+          <!-- Right: Detailed fields (Dates, Assignee, Priority, Status) -->
+          <div class="flex items-center gap-3 shrink-0 self-end sm:self-auto" @click.stop>
+            <!-- Due Date badge -->
+            <div
+              v-if="task.dueDate"
+              class="flex items-center gap-1 font-mono text-xs px-2.5 py-1 rounded-lg bg-slate-900/70 border shrink-0"
+              :class="getDateBadgeClass(task.dueDate, task.status)"
+              :title="`Due date: ${formatDate(task.dueDate)}`"
+            >
+              <span>📅</span>
+              <span>{{ formatDate(task.dueDate) }}</span>
+            </div>
+
+            <!-- Priority badge -->
             <span
-              class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full"
+              class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full shrink-0"
               :class="getPriorityClass(task.priority)"
             >
               {{ task.priority || 'medium' }}
             </span>
 
-            <!-- Assignee avatar -->
-            <span
+            <!-- Assignee avatar + name -->
+            <div
               v-if="task.assignee"
-              class="w-6 h-6 rounded-full bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 flex items-center justify-center text-xs font-bold"
+              class="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-900/60 border border-slate-700/60 shrink-0"
               :title="getUserDisplayName(task.assignee)"
             >
-              {{ getUserInitials(task.assignee) }}
-            </span>
+              <span
+                class="w-5 h-5 rounded-full bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 flex items-center justify-center text-[10px] font-bold"
+              >
+                {{ getUserInitials(task.assignee) }}
+              </span>
+              <span class="text-xs text-slate-300 max-w-[120px] truncate hidden md:inline">
+                {{ getUserDisplayName(task.assignee) }}
+              </span>
+            </div>
+            <div
+              v-else
+              class="text-xs text-slate-500 italic shrink-0 hidden sm:inline px-1"
+            >
+              Unassigned
+            </div>
 
+            <!-- Status selector -->
             <select
               :value="task.status"
-              class="bg-slate-900 border border-slate-700 text-xs rounded-lg px-2.5 py-1 text-slate-200 focus:outline-none capitalize cursor-pointer"
+              class="bg-slate-900 border border-slate-700 text-xs rounded-lg px-2.5 py-1 text-slate-200 focus:outline-none capitalize cursor-pointer shrink-0"
               @change="handleStatusChange(task._id, ($event.target as HTMLSelectElement).value as TaskStatus)"
             >
               <option value="todo">To Do</option>
@@ -189,15 +248,6 @@
               <option value="in_review">In Review</option>
               <option value="done">Done</option>
             </select>
-
-            <button
-              type="button"
-              class="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-slate-700/50 transition cursor-pointer text-xs"
-              title="Delete task"
-              @click.stop="handleDeleteTask(task._id)"
-            >
-              ✕
-            </button>
           </div>
         </div>
       </div>
@@ -221,6 +271,18 @@
       @updated="handleTaskUpdated"
       @deleted="handleTaskDeleted"
     />
+
+    <!-- Delete Task Confirmation Dialog -->
+    <ConfirmDialog
+      :is-open="isConfirmDeleteDialogOpen"
+      title="Delete Task"
+      :message="`Are you sure you want to delete task ${taskToDelete?.taskKey || ''}? This action cannot be undone.`"
+      confirm-text="Delete Task"
+      :is-destructive="true"
+      :loading="isDeletingTask"
+      @confirm="confirmDeleteTask"
+      @cancel="isConfirmDeleteDialogOpen = false"
+    />
   </div>
 </template>
 
@@ -237,6 +299,7 @@ import type { Task, TaskPriority, TaskStatus } from '../../types/task';
 import KanbanBoard from '../../components/board/KanbanBoard.vue';
 import TaskFormModal from '../../components/task/TaskFormModal.vue';
 import TaskDetailDrawer from '../../components/task/TaskDetailDrawer.vue';
+import ConfirmDialog from '../../components/ui/ConfirmDialog.vue';
 
 definePageMeta({
   middleware: ['auth'],
@@ -260,6 +323,10 @@ const modalDefaultStatus = ref<TaskStatus>('todo');
 
 const selectedTask = ref<Task | null>(null);
 const isDetailOpen = ref(false);
+
+const isConfirmDeleteDialogOpen = ref(false);
+const taskToDelete = ref<Task | null>(null);
+const isDeletingTask = ref(false);
 
 const quickTitle = ref('');
 const isQuickAdding = ref(false);
@@ -285,6 +352,27 @@ const currentSpace = computed<Space | null>(() => {
 
 function getPriorityClass(priority?: TaskPriority): string {
   return getPriorityBadgeClass(priority);
+}
+
+function formatDate(dateStr?: string): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+function getDateBadgeClass(dueDate?: string, status?: TaskStatus): string {
+  if (!dueDate) return 'text-slate-400 border-slate-700/60';
+  if (status === 'done') return 'text-slate-400 border-slate-700/60';
+  const due = new Date(dueDate).getTime();
+  const now = Date.now();
+  if (due < now) {
+    return 'text-rose-400 border-rose-500/40 bg-rose-500/10 font-semibold';
+  }
+  return 'text-slate-300 border-slate-700/60';
 }
 
 async function loadList() {
@@ -379,15 +467,34 @@ async function handleStatusChange(taskId: string, newStatus: TaskStatus) {
   }
 }
 
-async function handleDeleteTask(taskId: string) {
+async function toggleTaskDone(task: Task) {
+  const newStatus: TaskStatus = task.status === 'done' ? 'todo' : 'done';
+  await handleStatusChange(task._id, newStatus);
+}
+
+function promptDeleteTask(taskId: string) {
+  const target = tasks.value.find((t) => t._id === taskId);
+  if (target) {
+    taskToDelete.value = target;
+    isConfirmDeleteDialogOpen.value = true;
+  }
+}
+
+async function confirmDeleteTask() {
+  if (!taskToDelete.value || !listId.value) return;
+  isDeletingTask.value = true;
   try {
-    await apiFetch(`/lists/${listId.value}/tasks/${taskId}`, {
+    await apiFetch(`/lists/${listId.value}/tasks/${taskToDelete.value._id}`, {
       method: 'DELETE',
     });
-    handleTaskDeleted(taskId);
-    showToast('Task deleted', 'success');
+    handleTaskDeleted(taskToDelete.value._id);
+    showToast('Task deleted successfully', 'success');
+    isConfirmDeleteDialogOpen.value = false;
+    taskToDelete.value = null;
   } catch (err: unknown) {
     showToast(extractApiErrorMessage(err, 'Failed to delete task'), 'error');
+  } finally {
+    isDeletingTask.value = false;
   }
 }
 

@@ -28,7 +28,6 @@
         :list-id="listId"
         @task-drop="handleTaskDrop"
         @create-task="(status) => emit('create-task', status)"
-        @edit-task="(task) => emit('edit-task', task)"
         @task-click="(task) => emit('task-click', task)"
         @delete-task="(taskId) => emit('delete-task', taskId)"
       />
@@ -41,7 +40,6 @@
         :list-id="listId"
         @task-drop="handleTaskDrop"
         @create-task="(status) => emit('create-task', status)"
-        @edit-task="(task) => emit('edit-task', task)"
         @task-click="(task) => emit('task-click', task)"
         @delete-task="(taskId) => emit('delete-task', taskId)"
       />
@@ -54,7 +52,6 @@
         :list-id="listId"
         @task-drop="handleTaskDrop"
         @create-task="(status) => emit('create-task', status)"
-        @edit-task="(task) => emit('edit-task', task)"
         @task-click="(task) => emit('task-click', task)"
         @delete-task="(taskId) => emit('delete-task', taskId)"
       />
@@ -67,7 +64,6 @@
         :list-id="listId"
         @task-drop="handleTaskDrop"
         @create-task="(status) => emit('create-task', status)"
-        @edit-task="(task) => emit('edit-task', task)"
         @task-click="(task) => emit('task-click', task)"
         @delete-task="(taskId) => emit('delete-task', taskId)"
       />
@@ -92,7 +88,7 @@ interface Props {
 interface Emits {
   (e: 'task-drop', taskId: string, newStatus: TaskStatus): void;
   (e: 'create-task', status?: TaskStatus): void;
-  (e: 'edit-task' | 'task-click', task: Task): void;
+  (e: 'task-click', task: Task): void;
   (e: 'delete-task', taskId: string): void;
 }
 

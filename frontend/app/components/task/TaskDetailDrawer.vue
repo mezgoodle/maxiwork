@@ -33,6 +33,22 @@
               <option value="done">Done</option>
             </select>
 
+            <!-- Quick Done toggle button -->
+            <button
+              type="button"
+              class="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition cursor-pointer border"
+              :class="
+                task.status === 'done'
+                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/30'
+                  : 'bg-slate-800 text-slate-300 border-slate-700 hover:text-emerald-400 hover:border-emerald-500/50'
+              "
+              :title="task.status === 'done' ? 'Reopen task (To Do)' : 'Mark task as Done'"
+              @click="toggleComplete"
+            >
+              <span class="text-sm font-bold leading-none">✓</span>
+              <span>{{ task.status === 'done' ? 'Done' : 'Mark Done' }}</span>
+            </button>
+
             <!-- Priority dropdown -->
             <select
               :value="task.priority"
@@ -358,6 +374,12 @@ async function assignToMe() {
   if (currentUserId.value) {
     await updateField({ assignee: currentUserId.value });
   }
+}
+
+async function toggleComplete() {
+  if (!props.task) return;
+  const newStatus: TaskStatus = props.task.status === 'done' ? 'todo' : 'done';
+  await updateField({ status: newStatus });
 }
 
 function handleSubtaskUpdated() {

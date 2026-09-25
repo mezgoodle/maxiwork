@@ -94,7 +94,7 @@
       <KanbanBoard
         :project-id="projectId"
         @create-task="(status) => openCreateModal(status)"
-        @edit-task="openEditModal"
+        @task-click="openEditModal"
       />
     </div>
 
