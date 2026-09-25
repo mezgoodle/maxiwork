@@ -99,7 +99,7 @@
           <span
             v-if="subtask.priority"
             class="text-[10px] font-medium px-2 py-0.5 rounded-full border capitalize"
-            :class="getPriorityClass(subtask.priority)"
+            :class="getPriorityBadgeClass(subtask.priority)"
           >
             {{ subtask.priority }}
           </span>
@@ -116,7 +116,7 @@
             type="button"
             class="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-400 rounded hover:bg-rose-500/10 transition cursor-pointer text-xs"
             title="Delete subtask"
-            @click="deleteSubtask(subtask._id)"
+            @click="promptDeleteSubtask(subtask)"
           >
             ✕
           </button>
@@ -154,16 +154,30 @@
         </button>
       </form>
     </div>
+
+    <!-- Confirm Delete Subtask Dialog -->
+    <ConfirmDialog
+      :is-open="isConfirmDeleteDialogOpen"
+      title="Delete Subtask"
+      :message="`Are you sure you want to delete subtask ${subtaskToDelete?.taskKey || subtaskToDelete?.title || ''}? This action cannot be undone.`"
+      confirm-text="Delete Subtask"
+      is-destructive
+      :loading="isDeletingSubtask"
+      @confirm="confirmDeleteSubtask"
+      @cancel="isConfirmDeleteDialogOpen = false"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import type { Task, TaskPriority, TaskStatus } from '../../types/task';
+import type { Task, TaskStatus } from '../../types/task';
 import { useTasksStore } from '../../stores/tasks';
 import { useApi } from '../../composables/useApi';
 import { useToast } from '../../composables/useToast';
 import { extractApiErrorMessage } from '../../utils/error';
+import { getPriorityBadgeClass } from '../../utils/task';
+import ConfirmDialog from '../ui/ConfirmDialog.vue';
 
 interface Props {
   parentTask: Task;
@@ -292,7 +306,19 @@ async function toggleSubtaskStatus(subtask: Task) {
   }
 }
 
-async function deleteSubtask(subtaskId: string) {
+const isConfirmDeleteDialogOpen = ref(false);
+const subtaskToDelete = ref<Task | null>(null);
+const isDeletingSubtask = ref(false);
+
+function promptDeleteSubtask(subtask: Task) {
+  subtaskToDelete.value = subtask;
+  isConfirmDeleteDialogOpen.value = true;
+}
+
+async function confirmDeleteSubtask() {
+  if (!subtaskToDelete.value) return;
+  isDeletingSubtask.value = true;
+  const subtaskId = subtaskToDelete.value._id;
   try {
     if (props.listId) {
       await apiFetch(`/lists/${props.listId}/tasks/${subtaskId}`, {
@@ -309,21 +335,10 @@ async function deleteSubtask(subtaskId: string) {
     }
   } catch (err: unknown) {
     showToast(extractApiErrorMessage(err, 'Failed to delete subtask'), 'error');
-  }
-}
-
-function getPriorityClass(priority: TaskPriority): string {
-  switch (priority) {
-    case 'critical':
-      return 'bg-rose-500/10 text-rose-400 border-rose-500/20';
-    case 'high':
-      return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
-    case 'medium':
-      return 'bg-sky-500/10 text-sky-400 border-sky-500/20';
-    case 'low':
-      return 'bg-slate-500/10 text-slate-400 border-slate-500/20';
-    default:
-      return 'bg-slate-700 text-slate-300 border-slate-600';
+  } finally {
+    isDeletingSubtask.value = false;
+    isConfirmDeleteDialogOpen.value = false;
+    subtaskToDelete.value = null;
   }
 }
 

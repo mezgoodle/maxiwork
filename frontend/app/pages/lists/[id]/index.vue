@@ -500,7 +500,7 @@ function getDateBadgeClass(dueDate?: string, status?: TaskStatus): string {
 }
 
 function isTaskExpanded(taskId: string): boolean {
-  return showSubtasks.value || expandedTaskIds.value.has(taskId);
+  return expandedTaskIds.value.has(taskId);
 }
 
 async function loadSubtasksForTask(taskId: string) {
@@ -528,14 +528,23 @@ async function toggleTaskExpand(taskId: string) {
       await loadSubtasksForTask(taskId);
     }
   }
+  const tasksWithSubtasks = tasks.value.filter((t) => (t.subtasksCount || 0) > 0);
+  showSubtasks.value =
+    tasksWithSubtasks.length > 0 &&
+    tasksWithSubtasks.every((t) => expandedTaskIds.value.has(t._id));
 }
 
 async function toggleShowSubtasks() {
-  showSubtasks.value = !showSubtasks.value;
+  const tasksWithSubtasks = tasks.value.filter((t) => (t.subtasksCount || 0) > 0);
   if (showSubtasks.value) {
-    const promises = tasks.value
-      .filter((t) => t.subtasksCount && t.subtasksCount > 0)
-      .map((t) => loadSubtasksForTask(t._id));
+    showSubtasks.value = false;
+    expandedTaskIds.value.clear();
+  } else {
+    showSubtasks.value = true;
+    for (const t of tasksWithSubtasks) {
+      expandedTaskIds.value.add(t._id);
+    }
+    const promises = tasksWithSubtasks.map((t) => loadSubtasksForTask(t._id));
     await Promise.allSettled(promises);
   }
 }
@@ -640,6 +649,20 @@ async function handleQuickAdd() {
 }
 
 async function handleStatusChange(taskId: string, newStatus: TaskStatus) {
+  const originalTask = tasks.value.find((t) => t._id === taskId);
+  const oldStatus = originalTask?.status;
+  if (originalTask) {
+    originalTask.status = newStatus;
+  }
+  let foundSubtask: Task | undefined;
+  for (const list of Object.values(subtasksMap.value)) {
+    foundSubtask = list.find((s) => s._id === taskId);
+    if (foundSubtask) {
+      foundSubtask.status = newStatus;
+      break;
+    }
+  }
+
   try {
     const updated = await apiFetch<Task>(`/lists/${listId.value}/tasks/${taskId}`, {
       method: 'PATCH',
@@ -648,6 +671,12 @@ async function handleStatusChange(taskId: string, newStatus: TaskStatus) {
     handleTaskUpdated(updated);
     showToast(`Status updated to ${newStatus.replace('_', ' ')}`, 'success');
   } catch (err: unknown) {
+    if (originalTask && oldStatus) {
+      originalTask.status = oldStatus;
+    }
+    if (foundSubtask && oldStatus) {
+      foundSubtask.status = oldStatus;
+    }
     showToast(extractApiErrorMessage(err, 'Failed to update status'), 'error');
   }
 }
