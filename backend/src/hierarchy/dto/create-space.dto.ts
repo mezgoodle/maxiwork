@@ -1,6 +1,7 @@
 import {
   IsArray,
   IsBoolean,
+  IsMongoId,
   IsNotEmpty,
   IsNumber,
   IsObject,
@@ -52,7 +53,10 @@ export class CreateSpaceDto {
 
   @IsOptional()
   @IsArray()
-  @IsString({ each: true })
+  @IsMongoId({
+    each: true,
+    message: 'Each member must be a valid MongoDB ObjectId',
+  })
   members?: string[];
 
   @IsOptional()

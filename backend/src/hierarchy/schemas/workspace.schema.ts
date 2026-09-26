@@ -85,6 +85,4 @@ export class Workspace {
 }
 
 export const WorkspaceSchema = SchemaFactory.createForClass(Workspace);
-WorkspaceSchema.index({ slug: 1 }, { unique: true });
-WorkspaceSchema.index({ owner: 1 });
 WorkspaceSchema.index({ 'members.user': 1 });

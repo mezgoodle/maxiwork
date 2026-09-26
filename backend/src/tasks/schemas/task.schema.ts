@@ -104,7 +104,6 @@ TaskSchema.index({ project: 1, status: 1 });
 TaskSchema.index({ project: 1, assignee: 1 });
 TaskSchema.index({ project: 1, dueDate: 1 });
 TaskSchema.index({ project: 1, parentTaskId: 1 });
-TaskSchema.index({ list: 1 });
 TaskSchema.index({ list: 1, status: 1 });
 TaskSchema.index({ list: 1, parentTaskId: 1 });
 TaskSchema.index({ parentTaskId: 1, order: 1 });

@@ -92,7 +92,15 @@ export class HierarchyService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    await this.migrateLegacyProjects();
+    try {
+      await this.migrateLegacyProjects();
+    } catch (err: unknown) {
+      // Log migration warning without crashing module initialization
+      console.warn(
+        'HierarchyService: Legacy project migration encountered an issue:',
+        err,
+      );
+    }
   }
 
   private extractId(ref: unknown): string {
@@ -255,13 +263,18 @@ export class HierarchyService implements OnModuleInit {
     userId: string,
   ): Promise<WorkspaceDocument> {
     let slug = dto.slug;
-    if (!slug) {
+    if (slug) {
+      const existingSlug = await this.workspaceModel.findOne({ slug }).exec();
+      if (existingSlug) {
+        throw new BadRequestException('Workspace slug is already taken');
+      }
+    } else {
       slug = this.generateSlug(dto.name);
-    }
-
-    const existingSlug = await this.workspaceModel.findOne({ slug }).exec();
-    if (existingSlug) {
-      slug = this.generateSlug(dto.name);
+      for (let i = 0; i < 5; i++) {
+        const taken = await this.workspaceModel.findOne({ slug }).exec();
+        if (!taken) break;
+        slug = this.generateSlug(dto.name);
+      }
     }
 
     const workspace = new this.workspaceModel({
@@ -449,7 +462,12 @@ export class HierarchyService implements OnModuleInit {
       icon: dto.icon || 'folder',
       color: dto.color || '#4F46E5',
       isPrivate: dto.isPrivate || false,
-      members: (dto.members || []).map((m) => new Types.ObjectId(m)),
+      members: [
+        ...new Set([
+          ...(dto.members || []),
+          ...(dto.isPrivate ? [userId] : []),
+        ]),
+      ].map((m) => new Types.ObjectId(m)),
       features: dto.features || {
         customStatuses: true,
         customFields: true,

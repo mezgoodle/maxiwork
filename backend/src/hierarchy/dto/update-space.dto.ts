@@ -1,6 +1,7 @@
 import {
   IsArray,
   IsBoolean,
+  IsMongoId,
   IsNumber,
   IsObject,
   IsOptional,
@@ -38,7 +39,10 @@ export class UpdateSpaceDto {
 
   @IsOptional()
   @IsArray()
-  @IsString({ each: true })
+  @IsMongoId({
+    each: true,
+    message: 'Each member must be a valid MongoDB ObjectId',
+  })
   members?: string[];
 
   @IsOptional()
