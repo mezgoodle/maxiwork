@@ -15,6 +15,7 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
 import { GetTasksQueryDto } from './dto/get-tasks-query.dto';
+import { CreateSubtaskDto } from './dto/create-subtask.dto';
 
 interface MockTaskModelConstructor {
   new (dto: Record<string, unknown>): {
@@ -24,8 +25,12 @@ interface MockTaskModelConstructor {
   };
   find: jest.Mock;
   findOne: jest.Mock;
+  findById: jest.Mock;
   countDocuments: jest.Mock;
   findOneAndDelete: jest.Mock;
+  deleteOne: jest.Mock;
+  deleteMany: jest.Mock;
+  updateOne: jest.Mock;
 }
 
 interface MockProjectModel {
@@ -75,10 +80,26 @@ describe('TasksService', () => {
         }),
       })) as unknown as MockTaskModelConstructor;
 
-    taskModelFn.find = jest.fn();
+    taskModelFn.find = jest.fn().mockReturnValue({
+      select: jest.fn().mockReturnValue({
+        lean: jest.fn().mockReturnValue({
+          exec: jest.fn().mockResolvedValue([]),
+        }),
+      }),
+    });
     taskModelFn.findOne = jest.fn();
+    taskModelFn.findById = jest.fn();
     taskModelFn.countDocuments = jest.fn();
     taskModelFn.findOneAndDelete = jest.fn();
+    taskModelFn.deleteOne = jest.fn().mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ deletedCount: 1 }),
+    });
+    taskModelFn.deleteMany = jest.fn().mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ deletedCount: 1 }),
+    });
+    taskModelFn.updateOne = jest.fn().mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
+    });
 
     mockTaskModel = taskModelFn;
 
@@ -463,8 +484,19 @@ describe('TasksService', () => {
 
   describe('remove', () => {
     it('should delete task and return confirmation', async () => {
-      mockTaskModel.findOneAndDelete.mockReturnValue({
-        exec: jest.fn().mockResolvedValue({ _id: mockTaskId }),
+      mockTaskModel.findOne.mockReturnValue({
+        exec: jest.fn().mockResolvedValue({
+          _id: mockTaskId,
+          status: TaskStatus.TODO,
+          parentTaskId: null,
+        }),
+      });
+      mockTaskModel.find.mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          lean: jest.fn().mockReturnValue({
+            exec: jest.fn().mockResolvedValue([]),
+          }),
+        }),
       });
 
       const result = await service.remove(
@@ -476,16 +508,233 @@ describe('TasksService', () => {
         message: 'Task deleted successfully',
         id: mockTaskId,
       });
+      expect(mockTaskModel.deleteOne).toHaveBeenCalled();
+    });
+
+    it('should decrement parent counters when deleting a subtask', async () => {
+      const parentId = '807f1f77bcf86cd799439001';
+      mockTaskModel.findOne.mockReturnValue({
+        exec: jest.fn().mockResolvedValue({
+          _id: mockTaskId,
+          status: TaskStatus.DONE,
+          parentTaskId: new Types.ObjectId(parentId),
+        }),
+      });
+      mockTaskModel.find.mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          lean: jest.fn().mockReturnValue({
+            exec: jest.fn().mockResolvedValue([]),
+          }),
+        }),
+      });
+
+      await service.remove(mockProjectId, mockTaskId, mockOwnerId);
+      expect(mockTaskModel.updateOne).toHaveBeenCalledWith(
+        { _id: new Types.ObjectId(parentId) },
+        { $inc: { subtasksCount: -1, completedSubtasksCount: -1 } },
+      );
     });
 
     it('should throw NotFoundException when task to delete is not found', async () => {
-      mockTaskModel.findOneAndDelete.mockReturnValue({
+      mockTaskModel.findOne.mockReturnValue({
         exec: jest.fn().mockResolvedValue(null),
       });
 
       await expect(
         service.remove(mockProjectId, mockTaskId, mockOwnerId),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('createSubtask', () => {
+    const parentId = '807f1f77bcf86cd799439001';
+    const subtaskDto: CreateSubtaskDto = {
+      title: 'Child Subtask',
+      priority: TaskPriority.HIGH,
+    };
+
+    it('should create subtask and increment parent subtasksCount', async () => {
+      mockTaskModel.findOne.mockReturnValue({
+        exec: jest.fn().mockResolvedValue({
+          _id: parentId,
+          subtasksCount: 2,
+          list: new Types.ObjectId('907f1f77bcf86cd799439001'),
+        }),
+      });
+
+      const result = await service.createSubtask(
+        mockProjectId,
+        parentId,
+        subtaskDto,
+        mockOwnerId,
+      );
+      expect(result).toBeDefined();
+      expect(mockTaskModel.updateOne).toHaveBeenCalledWith(
+        { _id: parentId },
+        { $inc: { subtasksCount: 1 } },
+      );
+    });
+
+    it('should throw NotFoundException if parent task does not exist', async () => {
+      mockTaskModel.findOne.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(null),
+      });
+
+      await expect(
+        service.createSubtask(mockProjectId, parentId, subtaskDto, mockOwnerId),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('findSubtasks', () => {
+    const parentId = '807f1f77bcf86cd799439001';
+
+    it('should return list of subtasks for a parent task', async () => {
+      mockTaskModel.findOne.mockReturnValue({
+        exec: jest.fn().mockResolvedValue({ _id: parentId }),
+      });
+      mockTaskModel.find.mockReturnValue({
+        sort: jest.fn().mockReturnValue({
+          populate: jest.fn().mockReturnValue({
+            populate: jest.fn().mockReturnValue({
+              exec: jest.fn().mockResolvedValue([{ _id: mockTaskId }]),
+            }),
+          }),
+        }),
+      });
+
+      const result = await service.findSubtasks(
+        mockProjectId,
+        parentId,
+        mockOwnerId,
+      );
+      expect(result).toHaveLength(1);
+    });
+
+    it('should throw NotFoundException if parent does not exist', async () => {
+      mockTaskModel.findOne.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(null),
+      });
+
+      await expect(
+        service.findSubtasks(mockProjectId, parentId, mockOwnerId),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('getTaskTree', () => {
+    it('should return hierarchical task tree recursively', async () => {
+      mockTaskModel.findOne.mockReturnValue({
+        populate: jest.fn().mockReturnValue({
+          populate: jest.fn().mockReturnValue({
+            lean: jest.fn().mockReturnValue({
+              exec: jest
+                .fn()
+                .mockResolvedValue({ _id: mockTaskId, title: 'Root Task' }),
+            }),
+          }),
+        }),
+      });
+
+      // Child query for root
+      mockTaskModel.find.mockReturnValueOnce({
+        sort: jest.fn().mockReturnValue({
+          populate: jest.fn().mockReturnValue({
+            populate: jest.fn().mockReturnValue({
+              lean: jest.fn().mockReturnValue({
+                exec: jest
+                  .fn()
+                  .mockResolvedValue([{ _id: 'sub-1', title: 'Subtask 1' }]),
+              }),
+            }),
+          }),
+        }),
+      });
+
+      // Child query for sub-1 (leaf)
+      mockTaskModel.find.mockReturnValueOnce({
+        sort: jest.fn().mockReturnValue({
+          populate: jest.fn().mockReturnValue({
+            populate: jest.fn().mockReturnValue({
+              lean: jest.fn().mockReturnValue({
+                exec: jest.fn().mockResolvedValue([]),
+              }),
+            }),
+          }),
+        }),
+      });
+
+      const result = await service.getTaskTree(
+        mockProjectId,
+        mockTaskId,
+        mockOwnerId,
+      );
+      expect(result).toBeDefined();
+      expect(result._id).toBe(mockTaskId);
+      expect(Array.isArray(result.subtasks)).toBe(true);
+      expect((result.subtasks as unknown[]).length).toBe(1);
+    });
+  });
+
+  describe('moveSubtask', () => {
+    const oldParentId = '807f1f77bcf86cd799439001';
+    const newParentId = '807f1f77bcf86cd799439002';
+
+    it('should move subtask to new parent and adjust counters', async () => {
+      const mockTaskDoc = {
+        _id: mockTaskId,
+        parentTaskId: new Types.ObjectId(oldParentId),
+        status: TaskStatus.DONE,
+        save: jest.fn().mockResolvedValue({
+          _id: mockTaskId,
+          populate: jest.fn().mockResolvedValue({ _id: mockTaskId }),
+        }),
+      };
+      mockTaskModel.findOne
+        .mockReturnValueOnce({
+          exec: jest.fn().mockResolvedValue(mockTaskDoc),
+        })
+        .mockReturnValueOnce({
+          exec: jest.fn().mockResolvedValue({
+            _id: newParentId,
+            list: 'list-1',
+            parentTaskId: null,
+          }),
+        });
+
+      const result = await service.moveSubtask(
+        mockProjectId,
+        mockTaskId,
+        { newParentTaskId: newParentId },
+        mockOwnerId,
+      );
+      expect(result).toBeDefined();
+      expect(mockTaskModel.updateOne).toHaveBeenCalledWith(
+        { _id: oldParentId },
+        { $inc: { subtasksCount: -1, completedSubtasksCount: -1 } },
+      );
+      expect(mockTaskModel.updateOne).toHaveBeenCalledWith(
+        { _id: newParentId },
+        { $inc: { subtasksCount: 1, completedSubtasksCount: 1 } },
+      );
+    });
+
+    it('should prevent self-parenting', async () => {
+      mockTaskModel.findOne.mockReturnValue({
+        exec: jest.fn().mockResolvedValue({
+          _id: mockTaskId,
+          parentTaskId: null,
+        }),
+      });
+
+      await expect(
+        service.moveSubtask(
+          mockProjectId,
+          mockTaskId,
+          { newParentTaskId: mockTaskId },
+          mockOwnerId,
+        ),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });

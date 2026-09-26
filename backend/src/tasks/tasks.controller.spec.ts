@@ -7,6 +7,8 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
 import { GetTasksQueryDto } from './dto/get-tasks-query.dto';
+import { CreateSubtaskDto } from './dto/create-subtask.dto';
+import { MoveSubtaskDto } from './dto/move-subtask.dto';
 
 describe('TasksController', () => {
   let controller: TasksController;
@@ -30,6 +32,10 @@ describe('TasksController', () => {
       update: jest.fn(),
       updateStatus: jest.fn(),
       remove: jest.fn(),
+      createSubtask: jest.fn(),
+      findSubtasks: jest.fn(),
+      getTaskTree: jest.fn(),
+      moveSubtask: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -164,6 +170,91 @@ describe('TasksController', () => {
       expect(service.remove).toHaveBeenCalledWith(
         mockProjectId,
         mockTaskId,
+        mockUserId,
+      );
+      expect(result).toEqual(expected);
+    });
+  });
+
+  describe('createSubtask', () => {
+    it('should delegate createSubtask to TasksService', async () => {
+      const dto: CreateSubtaskDto = {
+        title: 'Child Task',
+        priority: TaskPriority.MEDIUM,
+      };
+      const expected = { _id: 'child-1', ...dto };
+      service.createSubtask.mockResolvedValue(expected);
+
+      const result = await controller.createSubtask(
+        mockProjectId,
+        mockTaskId,
+        mockUser,
+        dto,
+      );
+      expect(service.createSubtask).toHaveBeenCalledWith(
+        mockProjectId,
+        mockTaskId,
+        dto,
+        mockUserId,
+      );
+      expect(result).toEqual(expected);
+    });
+  });
+
+  describe('findSubtasks', () => {
+    it('should delegate findSubtasks to TasksService', async () => {
+      const expected = [{ _id: 'child-1' }];
+      service.findSubtasks.mockResolvedValue(expected);
+
+      const result = await controller.findSubtasks(
+        mockProjectId,
+        mockTaskId,
+        mockUser,
+      );
+      expect(service.findSubtasks).toHaveBeenCalledWith(
+        mockProjectId,
+        mockTaskId,
+        mockUserId,
+      );
+      expect(result).toEqual(expected);
+    });
+  });
+
+  describe('getTaskTree', () => {
+    it('should delegate getTaskTree to TasksService', async () => {
+      const expected = { _id: mockTaskId, subtasks: [] };
+      service.getTaskTree.mockResolvedValue(expected);
+
+      const result = await controller.getTaskTree(
+        mockProjectId,
+        mockTaskId,
+        mockUser,
+      );
+      expect(service.getTaskTree).toHaveBeenCalledWith(
+        mockProjectId,
+        mockTaskId,
+        mockUserId,
+      );
+      expect(result).toEqual(expected);
+    });
+  });
+
+  describe('moveSubtask', () => {
+    it('should delegate moveSubtask to TasksService', async () => {
+      const dto: MoveSubtaskDto = { newParentTaskId: 'new-parent' };
+      const expected = { _id: mockTaskId, parentTaskId: 'new-parent' };
+      service.moveSubtask.mockResolvedValue(expected);
+
+      const result = await controller.moveSubtask(
+        mockProjectId,
+        mockTaskId,
+        mockUser,
+        dto,
+      );
+      expect(service.moveSubtask).toHaveBeenCalledWith(
+        mockProjectId,
+        mockTaskId,
+        dto,
         mockUserId,
       );
       expect(result).toEqual(expected);
