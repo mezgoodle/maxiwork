@@ -43,10 +43,10 @@ export class Task {
   @Prop({
     type: MongooseSchema.Types.ObjectId,
     ref: Project.name,
-    required: true,
+    required: false,
     index: true,
   })
-  project: Types.ObjectId | Project;
+  project?: Types.ObjectId | Project;
 
   @Prop({
     type: MongooseSchema.Types.ObjectId,
@@ -71,6 +71,22 @@ export class Task {
   reporter: Types.ObjectId | User;
 
   @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Task',
+    index: true,
+  })
+  parentTaskId?: Types.ObjectId | Task;
+
+  @Prop({ type: Number, default: 0 })
+  subtasksCount: number;
+
+  @Prop({ type: Number, default: 0 })
+  completedSubtasksCount: number;
+
+  @Prop({ type: Number, default: 0 })
+  order: number;
+
+  @Prop({
     required: true,
     uppercase: true,
     trim: true,
@@ -82,9 +98,13 @@ export class Task {
 }
 
 export const TaskSchema = SchemaFactory.createForClass(Task);
-TaskSchema.index({ project: 1, taskKey: 1 }, { unique: true });
+TaskSchema.index({ project: 1, taskKey: 1 }, { unique: true, sparse: true });
+TaskSchema.index({ list: 1, taskKey: 1 }, { unique: true, sparse: true });
 TaskSchema.index({ project: 1, status: 1 });
 TaskSchema.index({ project: 1, assignee: 1 });
 TaskSchema.index({ project: 1, dueDate: 1 });
+TaskSchema.index({ project: 1, parentTaskId: 1 });
 TaskSchema.index({ list: 1 });
 TaskSchema.index({ list: 1, status: 1 });
+TaskSchema.index({ list: 1, parentTaskId: 1 });
+TaskSchema.index({ parentTaskId: 1, order: 1 });

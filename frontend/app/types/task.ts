@@ -13,9 +13,15 @@ export interface Task {
   startDate?: string;
   dueDate?: string;
   project: string | { _id: string; name?: string; prefix?: string };
+  list?: string;
   assignee?: User | string | null;
   reporter: User | string;
   taskKey: string;
+  parentTaskId?: string | Task | null;
+  subtasksCount?: number;
+  completedSubtasksCount?: number;
+  order?: number;
+  subtasks?: Task[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -28,6 +34,7 @@ export interface CreateTaskPayload {
   assignee?: string;
   startDate?: string;
   dueDate?: string;
+  list?: string;
 }
 
 export interface UpdateTaskPayload {
@@ -38,6 +45,22 @@ export interface UpdateTaskPayload {
   assignee?: string | null;
   startDate?: string | null;
   dueDate?: string | null;
+  list?: string | null;
+}
+
+export interface CreateSubtaskPayload {
+  title: string;
+  description?: string;
+  priority?: TaskPriority;
+  assignee?: string;
+  startDate?: string;
+  dueDate?: string;
+  order?: number;
+}
+
+export interface MoveSubtaskPayload {
+  newParentTaskId?: string | null;
+  order?: number;
 }
 
 export interface GetTasksQuery {
@@ -47,6 +70,8 @@ export interface GetTasksQuery {
   priority?: TaskPriority;
   assignee?: string;
   search?: string;
+  rootOnly?: boolean;
+  listId?: string;
 }
 
 export interface TasksPaginationMeta {
@@ -60,3 +85,4 @@ export interface PaginatedTasksResponse {
   data: Task[];
   meta: TasksPaginationMeta;
 }
+
