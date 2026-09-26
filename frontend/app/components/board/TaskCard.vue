@@ -2,9 +2,10 @@
   <div
     draggable="true"
     class="bg-slate-800/90 border border-slate-700/80 hover:border-slate-500/80 rounded-xl p-4 shadow-sm hover:shadow-md transition-all cursor-grab active:cursor-grabbing group select-none backdrop-blur-xs"
-    :class="{ 'opacity-50 ring-2 ring-emerald-500': isDragging }"
+    :class="{ 'opacity-50 ring-2 ring-indigo-500': isDragging }"
     @dragstart="handleDragStart"
     @dragend="handleDragEnd"
+    @click="handleCardClick"
   >
     <div class="flex items-center justify-between gap-2 mb-2">
       <span
@@ -21,12 +22,12 @@
       </span>
     </div>
 
-    <NuxtLink
-      :to="`/projects/${projectId}/tasks/${task._id}`"
-      class="block text-sm font-semibold text-slate-100 hover:text-emerald-400 transition mb-2.5 line-clamp-2"
+    <div
+      class="block text-sm font-semibold text-slate-100 hover:text-indigo-400 transition mb-2.5 line-clamp-2 cursor-pointer"
+      @click.stop="handleTitleClick"
     >
       {{ task.title }}
-    </NuxtLink>
+    </div>
 
     <p
       v-if="task.description"
@@ -37,14 +38,26 @@
 
     <!-- Due Date & Assignee row -->
     <div class="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-700/50 mt-auto">
-      <div v-if="task.dueDate" class="flex items-center gap-1 font-mono text-[11px]" :class="dueDateClass">
-        <span>📅</span>
-        <span>{{ formattedDueDate }}</span>
+      <div class="flex items-center gap-2">
+        <div v-if="task.dueDate" class="flex items-center gap-1 font-mono text-[11px]" :class="dueDateClass">
+          <span>📅</span>
+          <span>{{ formattedDueDate }}</span>
+        </div>
+
+        <div
+          v-if="task.subtasksCount && task.subtasksCount > 0"
+          class="flex items-center gap-1 text-[11px] font-mono px-1.5 py-0.5 rounded-md bg-slate-900/60 border border-slate-700/60"
+          :class="task.completedSubtasksCount === task.subtasksCount ? 'text-emerald-400 border-emerald-500/30' : 'text-slate-400'"
+          title="Subtasks completed"
+        >
+          <span>↳</span>
+          <span>{{ task.completedSubtasksCount || 0 }}/{{ task.subtasksCount }}</span>
+        </div>
       </div>
-      <div v-else />
 
       <div class="flex items-center gap-1.5">
         <span
+          v-if="task.assignee"
           class="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-200 border border-slate-600"
           :title="assigneeName"
         >
@@ -53,11 +66,11 @@
 
         <button
           type="button"
-          class="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-white rounded hover:bg-slate-700 transition cursor-pointer"
-          title="Edit Task"
-          @click.stop="$emit('edit', task)"
+          class="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-400 rounded hover:bg-rose-500/10 transition cursor-pointer text-xs"
+          title="Delete Task"
+          @click.stop="$emit('delete', task._id)"
         >
-          ✎
+          ✕
         </button>
       </div>
     </div>
@@ -67,15 +80,18 @@
 <script lang="ts" setup>
 import { computed, ref } from 'vue';
 import type { Task } from '../../types/task';
+import { getPriorityBadgeClass, getUserDisplayName, getUserInitials } from '../../utils/task';
 
 interface Props {
   task: Task;
-  projectId: string;
+  projectId?: string;
+  listId?: string;
 }
 
 interface Emits {
   (e: 'dragstart', event: DragEvent, task: Task): void;
-  (e: 'edit', task: Task): void;
+  (e: 'click', task: Task): void;
+  (e: 'delete', taskId: string): void;
 }
 
 const props = defineProps<Props>();
@@ -124,5 +140,16 @@ function handleDragStart(e: DragEvent) {
 
 function handleDragEnd() {
   isDragging.value = false;
+}
+
+function handleCardClick() {
+  emit('click', props.task);
+}
+
+function handleTitleClick() {
+  emit('click', props.task);
+  if (props.projectId && !props.listId) {
+    navigateTo(`/projects/${props.projectId}/tasks/${props.task._id}`);
+  }
 }
 </script>

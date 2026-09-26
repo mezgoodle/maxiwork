@@ -181,4 +181,110 @@ describe('useTasksStore', () => {
     expect(store.tasks[0]._id).toBe('t2');
     expect(store.currentTask).toBeNull();
   });
+
+  it('fetchSubtasks fetches child subtasks and sets currentTask.subtasks', async () => {
+    const store = useTasksStore();
+    store.currentTask = { ...sampleTasks[0] };
+    const mockSubtasks: Task[] = [
+      {
+        _id: 'sub1',
+        title: 'Subtask 1',
+        status: 'todo',
+        priority: 'medium',
+        project: 'p1',
+        reporter: 'u1',
+        taskKey: 'TEST-1-1',
+        parentTaskId: 't1',
+      },
+    ];
+
+    global.$fetch = vi.fn().mockResolvedValue(mockSubtasks);
+
+    const res = await store.fetchSubtasks('p1', 't1');
+    expect(res).toEqual(mockSubtasks);
+    expect(store.currentTask?.subtasks).toEqual(mockSubtasks);
+    expect(store.loading).toBe(false);
+  });
+
+  it('fetchTaskTree fetches recursive tree for a task', async () => {
+    const store = useTasksStore();
+    const mockTree: Task = {
+      ...sampleTasks[0],
+      subtasks: [
+        {
+          _id: 'sub1',
+          title: 'Subtask 1',
+          status: 'todo',
+          priority: 'medium',
+          project: 'p1',
+          reporter: 'u1',
+          taskKey: 'TEST-1-1',
+          subtasks: [],
+        },
+      ],
+    };
+
+    global.$fetch = vi.fn().mockResolvedValue(mockTree);
+
+    const res = await store.fetchTaskTree('p1', 't1');
+    expect(res).toEqual(mockTree);
+    expect(store.currentTask).toEqual(mockTree);
+  });
+
+  it('createSubtask creates subtask and increments parent subtasksCount', async () => {
+    const store = useTasksStore();
+    store.tasks = [{ ...sampleTasks[0], subtasksCount: 0 }];
+    store.currentTask = { ...sampleTasks[0], subtasksCount: 0, subtasks: [] };
+
+    const newSubtask: Task = {
+      _id: 'sub1',
+      title: 'New Subtask',
+      status: 'todo',
+      priority: 'medium',
+      project: 'p1',
+      reporter: 'u1',
+      taskKey: 'TEST-4',
+      parentTaskId: 't1',
+    };
+
+    global.$fetch = vi.fn().mockResolvedValue(newSubtask);
+
+    const res = await store.createSubtask('p1', 't1', {
+      title: 'New Subtask',
+    });
+
+    expect(res).toEqual(newSubtask);
+    expect(store.tasks[0].subtasksCount).toBe(1);
+    expect(store.currentTask?.subtasksCount).toBe(1);
+    expect(store.currentTask?.subtasks).toContainEqual(newSubtask);
+  });
+
+  it('moveSubtask calls move endpoint with payload', async () => {
+    const store = useTasksStore();
+    const updatedSubtask: Task = {
+      _id: 'sub1',
+      title: 'Subtask',
+      status: 'todo',
+      priority: 'medium',
+      project: 'p1',
+      reporter: 'u1',
+      taskKey: 'TEST-4',
+      parentTaskId: 't2',
+    };
+
+    global.$fetch = vi.fn().mockResolvedValue(updatedSubtask);
+
+    const res = await store.moveSubtask('p1', 'sub1', {
+      newParentTaskId: 't2',
+    });
+
+    expect(res).toEqual(updatedSubtask);
+    expect(global.$fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/projects/p1/tasks/sub1/move'),
+      expect.objectContaining({
+        method: 'PATCH',
+        body: { newParentTaskId: 't2' },
+      }),
+    );
+  });
 });

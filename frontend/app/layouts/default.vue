@@ -12,12 +12,6 @@
         <nav class="flex items-center gap-3">
           <template v-if="authStore.isAuthenticated">
             <NuxtLink
-              to="/projects"
-              class="px-3 py-1 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-white transition"
-            >
-              Projects
-            </NuxtLink>
-            <NuxtLink
               to="/dashboard"
               class="px-3 py-1 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-white transition"
             >
