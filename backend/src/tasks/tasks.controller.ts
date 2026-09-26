@@ -20,6 +20,8 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
 import { GetTasksQueryDto } from './dto/get-tasks-query.dto';
+import { CreateSubtaskDto } from './dto/create-subtask.dto';
+import { MoveSubtaskDto } from './dto/move-subtask.dto';
 
 interface AuthenticatedUser {
   _id: Types.ObjectId | string;
@@ -97,5 +99,54 @@ export class TasksController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.tasksService.remove(projectId, taskId, String(user._id));
+  }
+
+  @Post(':taskId/subtasks')
+  @HttpCode(HttpStatus.CREATED)
+  async createSubtask(
+    @Param('projectId', ParseObjectIdPipe) projectId: string,
+    @Param('taskId', ParseObjectIdPipe) taskId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() createSubtaskDto: CreateSubtaskDto,
+  ) {
+    return this.tasksService.createSubtask(
+      projectId,
+      taskId,
+      createSubtaskDto,
+      String(user._id),
+    );
+  }
+
+  @Get(':taskId/subtasks')
+  async findSubtasks(
+    @Param('projectId', ParseObjectIdPipe) projectId: string,
+    @Param('taskId', ParseObjectIdPipe) taskId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.tasksService.findSubtasks(projectId, taskId, String(user._id));
+  }
+
+  @Get(':taskId/tree')
+  async getTaskTree(
+    @Param('projectId', ParseObjectIdPipe) projectId: string,
+    @Param('taskId', ParseObjectIdPipe) taskId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.tasksService.getTaskTree(projectId, taskId, String(user._id));
+  }
+
+  @Patch(':taskId/move')
+  async moveSubtask(
+    @Param('projectId', ParseObjectIdPipe) projectId: string,
+    @Param('taskId', ParseObjectIdPipe) taskId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() moveSubtaskDto: MoveSubtaskDto,
+  ) {
+    return this.tasksService.moveSubtask(
+      projectId,
+      taskId,
+      moveSubtaskDto,
+      String(user._id),
+    );
   }
 }

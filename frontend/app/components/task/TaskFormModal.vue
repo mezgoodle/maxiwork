@@ -47,7 +47,7 @@
                 required
                 maxlength="255"
                 placeholder="e.g. Implement user login API"
-                class="w-full px-4 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 text-sm transition"
+                class="w-full px-4 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 text-sm transition"
               >
               <p v-if="titleError" class="text-xs text-rose-400 mt-1">
                 {{ titleError }}
@@ -64,7 +64,7 @@
                 rows="3"
                 maxlength="5000"
                 placeholder="Provide task details or acceptance criteria..."
-                class="w-full px-4 py-2 bg-slate-800/80 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 text-sm transition"
+                class="w-full px-4 py-2 bg-slate-800/80 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 text-sm transition"
               />
             </div>
 
@@ -76,7 +76,7 @@
                 </label>
                 <select
                   v-model="form.status"
-                  class="w-full px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500"
+                  class="w-full px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 capitalize"
                 >
                   <option value="todo">To Do</option>
                   <option value="in_progress">In Progress</option>
@@ -91,7 +91,7 @@
                 </label>
                 <select
                   v-model="form.priority"
-                  class="w-full px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500"
+                  class="w-full px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 capitalize"
                 >
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
@@ -110,7 +110,7 @@
                 <button
                   v-if="currentUserId"
                   type="button"
-                  class="text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition cursor-pointer flex items-center gap-1 hover:underline"
+                  class="text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition cursor-pointer flex items-center gap-1 hover:underline"
                   @click="assignToMe"
                 >
                   <span>⚡ Assign to me</span>
@@ -118,7 +118,7 @@
               </div>
               <select
                 v-model="form.assignee"
-                class="w-full px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition"
+                class="w-full px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 transition"
               >
                 <option value="">Unassigned</option>
                 <option
@@ -126,7 +126,7 @@
                   :key="user._id"
                   :value="user._id"
                 >
-                  {{ user.name }} ({{ user.email }})
+                  {{ user.name }}
                 </option>
               </select>
             </div>
@@ -168,11 +168,11 @@
             <button
               type="submit"
               :disabled="loading"
-              class="px-5 py-2 rounded-xl text-sm font-medium bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              class="px-5 py-2 rounded-xl text-sm font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition flex items-center gap-2 cursor-pointer disabled:opacity-50 shadow-lg shadow-indigo-600/20"
             >
               <span
                 v-if="loading"
-                class="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin"
+                class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"
               />
               <span>{{ isEditing ? 'Save Changes' : 'Create Task' }}</span>
             </button>
@@ -188,13 +188,17 @@ import { computed, reactive, ref, watch } from 'vue';
 import type { Task, TaskPriority, TaskStatus } from '../../types/task';
 import { useTasksStore } from '../../stores/tasks';
 import { useProjectsStore } from '../../stores/projects';
+import { useHierarchyStore } from '../../stores/hierarchy';
 import { useAuthStore } from '../../stores/auth';
+import { useApi } from '../../composables/useApi';
 import { useToast } from '../../composables/useToast';
+import { extractApiErrorMessage } from '../../utils/error';
 import DatePickerMenu from '../ui/DatePickerMenu.vue';
 
 interface Props {
   isOpen: boolean;
-  projectId: string;
+  projectId?: string;
+  listId?: string;
   task?: Task | null;
   defaultStatus?: TaskStatus;
 }
@@ -209,7 +213,9 @@ const emit = defineEmits<Emits>();
 
 const tasksStore = useTasksStore();
 const projectsStore = useProjectsStore();
+const hierarchyStore = useHierarchyStore();
 const authStore = useAuthStore();
+const { apiFetch } = useApi();
 const { showToast } = useToast();
 
 const currentUserId = computed(() => authStore.user?._id || '');
@@ -276,47 +282,56 @@ watch(
 );
 
 const assignableUsers = computed(() => {
-  const users: { _id: string; name: string; email: string }[] = [];
-  const project = projectsStore.currentProject;
-  if (!project) return users;
+  const users: { _id: string; name: string }[] = [];
 
-  if (typeof project.owner === 'object' && project.owner) {
-    const name =
-      [project.owner.firstName, project.owner.lastName]
-        .filter(Boolean)
-        .join(' ') || project.owner.email;
-    users.push({
-      _id: project.owner._id,
-      name: `${name} (Owner)`,
-      email: project.owner.email,
-    });
-  }
-
-  if (Array.isArray(project.members)) {
-    for (const member of project.members) {
-      if (typeof member === 'object' && member && member._id !== (typeof project.owner === 'object' ? project.owner._id : project.owner)) {
-        const name =
-          [member.firstName, member.lastName].filter(Boolean).join(' ') ||
-          member.email;
-        users.push({
-          _id: member._id,
-          name,
-          email: member.email,
-        });
-      }
-    }
-  }
-
-  if (authStore.user && !users.some((u) => u._id === authStore.user?._id)) {
+  if (authStore.user) {
     const name =
       [authStore.user.firstName, authStore.user.lastName]
         .filter(Boolean)
         .join(' ') || authStore.user.email;
     users.push({
       _id: authStore.user._id,
-      name,
-      email: authStore.user.email,
+      name: `${name} (You)`,
     });
+  }
+
+  // Workspace members
+  const ws = hierarchyStore.currentWorkspace;
+  if (ws && Array.isArray(ws.members)) {
+    for (const m of ws.members) {
+      const u =
+        typeof m.user === 'object' && m.user
+          ? (m.user as { _id?: string; firstName?: string; lastName?: string; email?: string })
+          : null;
+      if (u && u._id && !users.some((x) => x._id === u._id)) {
+        const name =
+          [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email || 'Member';
+        users.push({ _id: u._id, name });
+      }
+    }
+  }
+
+  // Project members if in project
+  const project = projectsStore.currentProject;
+  if (props.projectId && project) {
+    if (typeof project.owner === 'object' && project.owner && !users.some((x) => x._id === project.owner._id)) {
+      const name =
+        [project.owner.firstName, project.owner.lastName]
+          .filter(Boolean)
+          .join(' ') || project.owner.email;
+      users.push({ _id: project.owner._id, name: `${name} (Owner)` });
+    }
+
+    if (Array.isArray(project.members)) {
+      for (const member of project.members) {
+        if (typeof member === 'object' && member && !users.some((x) => x._id === member._id)) {
+          const name =
+            [member.firstName, member.lastName].filter(Boolean).join(' ') ||
+            member.email;
+          users.push({ _id: member._id, name });
+        }
+      }
+    }
   }
 
   return users;
@@ -343,30 +358,41 @@ async function handleSubmit() {
       description: form.description.trim() || undefined,
       status: form.status,
       priority: form.priority,
-      assignee: form.assignee || null,
-      startDate: form.startDate ? new Date(form.startDate).toISOString() : null,
-      dueDate: form.dueDate ? new Date(form.dueDate).toISOString() : null,
+      assignee: form.assignee || undefined,
+      startDate: form.startDate ? new Date(form.startDate).toISOString() : undefined,
+      dueDate: form.dueDate ? new Date(form.dueDate).toISOString() : undefined,
     };
 
     let result: Task;
-    if (isEditing.value && props.task) {
-      result = await tasksStore.updateTask(
-        props.projectId,
-        props.task._id,
-        payload,
-      );
-      showToast('Task updated successfully', 'success');
+
+    if (props.listId) {
+      if (isEditing.value && props.task) {
+        result = await apiFetch<Task>(`/lists/${props.listId}/tasks/${props.task._id}`, {
+          method: 'PATCH',
+          body: payload,
+        });
+        showToast('Task updated successfully', 'success');
+      } else {
+        result = await apiFetch<Task>(`/lists/${props.listId}/tasks`, {
+          method: 'POST',
+          body: payload,
+        });
+        showToast(`Created task ${result.taskKey}`, 'success');
+      }
+    } else if (props.projectId) {
+      if (isEditing.value && props.task) {
+        result = await tasksStore.updateTask(
+          props.projectId,
+          props.task._id,
+          payload,
+        );
+        showToast('Task updated successfully', 'success');
+      } else {
+        result = await tasksStore.createTask(props.projectId, payload);
+        showToast(`Created task ${result.taskKey}`, 'success');
+      }
     } else {
-      result = await tasksStore.createTask(props.projectId, {
-        title: payload.title,
-        description: payload.description,
-        status: payload.status,
-        priority: payload.priority,
-        assignee: payload.assignee || undefined,
-        startDate: payload.startDate || undefined,
-        dueDate: payload.dueDate || undefined,
-      });
-      showToast(`Created task ${result.taskKey}`, 'success');
+      throw new Error('Either listId or projectId must be provided');
     }
 
     emit('saved', result);

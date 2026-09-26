@@ -232,6 +232,15 @@
           </div>
         </div>
       </div>
+
+      <!-- Subtasks Section -->
+      <div class="bg-slate-800/60 border border-slate-700/80 rounded-2xl p-6 sm:p-8 backdrop-blur shadow-xl">
+        <SubtaskList
+          :project-id="projectId"
+          :parent-task="task"
+          @updated="refreshTask"
+        />
+      </div>
     </div>
 
 
@@ -260,6 +269,7 @@ import { useAuthStore } from '../../../../stores/auth';
 import { useToast } from '../../../../composables/useToast';
 import DatePickerMenu from '../../../../components/ui/DatePickerMenu.vue';
 import ConfirmDialog from '../../../../components/ui/ConfirmDialog.vue';
+import SubtaskList from '../../../../components/task/SubtaskList.vue';
 
 definePageMeta({
   middleware: ['auth'],
@@ -466,6 +476,12 @@ async function handleDeleteTask() {
     showToast(errorMsg, 'error');
   } finally {
     isDeleting.value = false;
+  }
+}
+
+async function refreshTask() {
+  if (projectId.value && taskId.value) {
+    await tasksStore.fetchTask(projectId.value, taskId.value);
   }
 }
 
