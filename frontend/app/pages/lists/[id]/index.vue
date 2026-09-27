@@ -23,6 +23,16 @@
           <h1 class="text-2xl font-extrabold text-white">
             {{ listDetails.name }}
           </h1>
+          <button
+            type="button"
+            class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition cursor-pointer"
+            title="Delete List"
+            @click="promptDeleteList"
+          >
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
         </div>
         <div v-else-if="loading" class="h-8 w-48 bg-slate-800 rounded animate-pulse" />
       </div>
@@ -402,6 +412,18 @@
       @confirm="confirmDeleteTask"
       @cancel="isConfirmDeleteDialogOpen = false"
     />
+
+    <!-- Delete List Confirmation Dialog -->
+    <ConfirmDialog
+      :is-open="isConfirmDeleteListOpen"
+      title="Delete List"
+      :message="`Are you sure you want to delete '${listToDelete?.name || listDetails?.name || 'this list'}' and all associated tasks? This action cannot be undone.`"
+      confirm-text="Delete List"
+      :is-destructive="true"
+      :loading="isDeletingList"
+      @confirm="confirmDeleteList"
+      @cancel="isConfirmDeleteListOpen = false; listToDelete = null"
+    />
   </div>
 </template>
 
@@ -451,6 +473,10 @@ const isDetailOpen = ref(false);
 const isConfirmDeleteDialogOpen = ref(false);
 const taskToDelete = ref<Task | null>(null);
 const isDeletingTask = ref(false);
+
+const isConfirmDeleteListOpen = ref(false);
+const listToDelete = ref<{ id: string; name: string } | null>(null);
+const isDeletingList = ref(false);
 
 const quickTitle = ref('');
 const isQuickAdding = ref(false);
@@ -712,6 +738,32 @@ async function confirmDeleteTask() {
   }
 }
 
+function promptDeleteList() {
+  if (!listId.value || !listDetails.value) return;
+  listToDelete.value = {
+    id: listId.value,
+    name: listDetails.value.name,
+  };
+  isConfirmDeleteListOpen.value = true;
+}
+
+async function confirmDeleteList() {
+  if (!listToDelete.value?.id) return;
+  const targetId = listToDelete.value.id;
+  isDeletingList.value = true;
+  try {
+    await hierarchyStore.deleteList(targetId);
+    showToast('List deleted successfully', 'success');
+    isConfirmDeleteListOpen.value = false;
+    listToDelete.value = null;
+    await navigateTo('/dashboard');
+  } catch (err: unknown) {
+    showToast(extractApiErrorMessage(err, 'Failed to delete list'), 'error');
+  } finally {
+    isDeletingList.value = false;
+  }
+}
+
 async function handleDrop(taskId: string, newStatus: TaskStatus) {
   const targetTask = tasks.value.find((t) => t._id === taskId);
   if (!targetTask || targetTask.status === newStatus) return;
@@ -723,6 +775,8 @@ onMounted(() => {
 });
 
 watch(listId, () => {
+  isConfirmDeleteListOpen.value = false;
+  listToDelete.value = null;
   loadList();
 });
 </script>

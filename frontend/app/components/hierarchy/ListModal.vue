@@ -86,31 +86,59 @@
             </div>
           </div>
 
-          <div class="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-slate-800">
-            <button
-              type="button"
-              class="px-4 py-2 text-sm font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition cursor-pointer"
-              @click="handleClose"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              :disabled="submitting"
-              class="px-5 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-lg transition cursor-pointer"
-            >
-              {{ submitting ? 'Saving...' : (isEditing ? 'Save Changes' : 'Create List') }}
-            </button>
+          <div class="flex items-center justify-between mt-6 pt-4 border-t border-slate-800">
+            <div>
+              <button
+                v-if="isEditing"
+                type="button"
+                :disabled="submitting || isDeleting"
+                class="px-3.5 py-2 text-sm font-medium text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-xl transition cursor-pointer disabled:opacity-50"
+                @click="isConfirmDeleteDialogOpen = true"
+              >
+                Delete List
+              </button>
+            </div>
+            <div class="flex items-center gap-3">
+              <button
+                type="button"
+                class="px-4 py-2 text-sm font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition cursor-pointer"
+                @click="handleClose"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                :disabled="submitting || isDeleting"
+                class="px-5 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-lg transition cursor-pointer"
+              >
+                {{ submitting ? 'Saving...' : (isEditing ? 'Save Changes' : 'Create List') }}
+              </button>
+            </div>
           </div>
         </form>
       </div>
     </div>
+
+    <!-- Confirm List Deletion Dialog -->
+    <ConfirmDialog
+      :is-open="isConfirmDeleteDialogOpen"
+      title="Delete List"
+      :message="`Are you sure you want to delete '${props.listToEdit?.name || 'this list'}' and all associated tasks? This action cannot be undone.`"
+      confirm-text="Delete List"
+      :is-destructive="true"
+      :loading="isDeleting"
+      @confirm="handleConfirmDelete"
+      @cancel="isConfirmDeleteDialogOpen = false"
+    />
   </Teleport>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, watch } from 'vue';
 import type { HierarchyTreeNodeFolder, HierarchyTreeNodeList } from '../../types/hierarchy';
+import ConfirmDialog from '../ui/ConfirmDialog.vue';
+import { useToast } from '../../composables/useToast';
+import { extractApiErrorMessage } from '../../utils/error';
 
 const props = defineProps<{
   isOpen: boolean;
@@ -122,6 +150,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close' | 'saved'): void;
+  (e: 'deleted', id: string): void;
 }>();
 
 const presetColors = [
@@ -138,6 +167,10 @@ const presetColors = [
 const submitting = ref(false);
 const errorMessage = ref<string | null>(null);
 const isEditing = ref(false);
+const isConfirmDeleteDialogOpen = ref(false);
+const isDeleting = ref(false);
+
+const { showToast } = useToast();
 
 const form = reactive({
   name: '',
@@ -150,6 +183,7 @@ watch(
   (val) => {
     if (val) {
       errorMessage.value = null;
+      isConfirmDeleteDialogOpen.value = false;
       if (props.listToEdit) {
         isEditing.value = true;
         form.name = props.listToEdit.name;
@@ -168,6 +202,30 @@ watch(
 
 function handleClose() {
   emit('close');
+}
+
+async function handleConfirmDelete() {
+  if (!props.listToEdit) return;
+  const listId = props.listToEdit.id;
+  isDeleting.value = true;
+  errorMessage.value = null;
+
+  try {
+    const { useHierarchyStore } = await import('../../stores/hierarchy');
+    const store = useHierarchyStore();
+    await store.deleteList(listId);
+
+    showToast('List deleted successfully', 'success');
+    emit('deleted', listId);
+    isConfirmDeleteDialogOpen.value = false;
+    handleClose();
+  } catch (err: unknown) {
+    const msg = extractApiErrorMessage(err, 'Failed to delete list');
+    errorMessage.value = msg;
+    showToast(msg, 'error');
+  } finally {
+    isDeleting.value = false;
+  }
 }
 
 async function handleSubmit() {

@@ -301,6 +301,7 @@
       :list-to-edit="listToEdit"
       @close="isListModalOpen = false"
       @saved="handleListSaved"
+      @deleted="handleListDeleted"
     />
   </aside>
 </template>
@@ -443,5 +444,11 @@ function handleFolderSaved() {
 
 function handleListSaved() {
   // refreshed in store
+}
+
+function handleListDeleted(deletedListId: string) {
+  if (route.params.id === deletedListId) {
+    navigateTo('/dashboard');
+  }
 }
 </script>

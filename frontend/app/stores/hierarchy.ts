@@ -375,7 +375,6 @@ export const useHierarchyStore = defineStore('hierarchy', () => {
     try {
       const client = getClient();
       await client(`/lists/${listId}`, { method: 'DELETE' });
-      await fetchTree();
     } catch (err: unknown) {
       const fetchErr = err as { data?: { message?: string }; message?: string };
       error.value =
@@ -383,6 +382,12 @@ export const useHierarchyStore = defineStore('hierarchy', () => {
       throw err;
     } finally {
       loading.value = false;
+    }
+
+    try {
+      await fetchTree();
+    } catch {
+      // Non-fatal: list is already deleted successfully on the server
     }
   }
 
