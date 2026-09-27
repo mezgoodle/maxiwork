@@ -115,4 +115,40 @@ describe('useHierarchyStore', () => {
     expect(created._id).toBe('ws-2');
     expect(store.currentWorkspace?._id).toBe('ws-2');
   });
+
+  it('deleteList calls DELETE /lists/:listId and refreshes tree', async () => {
+    const store = useHierarchyStore();
+    store.currentWorkspace = {
+      _id: 'ws-1',
+      name: 'Acme Corp',
+      slug: 'acme-corp',
+      owner: { _id: 'u-1', firstName: 'John', lastName: 'Doe', email: 'john@example.com' },
+      members: [],
+      settings: { defaultTimezone: 'UTC', allowGuestInvites: true },
+      createdAt: '2026-09-25T00:00:00.000Z',
+      updatedAt: '2026-09-25T00:00:00.000Z',
+    };
+
+    let deleteCalled = false;
+    let treeRefreshed = false;
+
+    global.$fetch = vi.fn().mockImplementation((url: string, opts?: { method?: string }) => {
+      if (url.includes('/lists/list-123') && opts?.method === 'DELETE') {
+        deleteCalled = true;
+        return Promise.resolve({ success: true });
+      }
+      if (url.includes('/tree')) {
+        treeRefreshed = true;
+        return Promise.resolve({
+          workspace: { id: 'ws-1', name: 'Acme Corp' },
+          spaces: [],
+        });
+      }
+      return Promise.resolve({});
+    });
+
+    await store.deleteList('list-123');
+    expect(deleteCalled).toBe(true);
+    expect(treeRefreshed).toBe(true);
+  });
 });

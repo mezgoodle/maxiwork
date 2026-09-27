@@ -6,12 +6,15 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null);
   const loading = ref(false);
 
+  const isProd = process.env.NODE_ENV === 'production';
+
   // Safe cookie accessor for Nuxt and Vitest
   const getAccessTokenCookie = () => {
     if (typeof useCookie === 'function') {
       return useCookie<string | null>('access_token', {
         maxAge: 15 * 60, // 15 minutes
-        sameSite: 'lax',
+        sameSite: isProd ? 'none' : 'lax',
+        secure: isProd,
       });
     }
     return ref<string | null>(null);
@@ -21,7 +24,8 @@ export const useAuthStore = defineStore('auth', () => {
     if (typeof useCookie === 'function') {
       return useCookie<string | null>('refresh_token', {
         maxAge: 7 * 24 * 60 * 60, // 7 days
-        sameSite: 'lax',
+        sameSite: isProd ? 'none' : 'lax',
+        secure: isProd,
       });
     }
     return ref<string | null>(null);
