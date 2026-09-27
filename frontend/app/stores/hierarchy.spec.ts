@@ -151,4 +151,30 @@ describe('useHierarchyStore', () => {
     expect(deleteCalled).toBe(true);
     expect(treeRefreshed).toBe(true);
   });
+
+  it('deleteList succeeds even if subsequent fetchTree fails', async () => {
+    const store = useHierarchyStore();
+    store.currentWorkspace = {
+      _id: 'ws-1',
+      name: 'Acme Corp',
+      slug: 'acme-corp',
+      owner: { _id: 'u-1', firstName: 'John', lastName: 'Doe', email: 'john@example.com' },
+      members: [],
+      settings: { defaultTimezone: 'UTC', allowGuestInvites: true },
+      createdAt: '2026-09-25T00:00:00.000Z',
+      updatedAt: '2026-09-25T00:00:00.000Z',
+    };
+
+    global.$fetch = vi.fn().mockImplementation((url: string, opts?: { method?: string }) => {
+      if (url.includes('/lists/list-123') && opts?.method === 'DELETE') {
+        return Promise.resolve({ success: true });
+      }
+      if (url.includes('/tree')) {
+        return Promise.reject(new Error('Network error during tree refresh'));
+      }
+      return Promise.resolve({});
+    });
+
+    await expect(store.deleteList('list-123')).resolves.not.toThrow();
+  });
 });

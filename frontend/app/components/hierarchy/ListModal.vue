@@ -171,7 +171,6 @@ const isConfirmDeleteDialogOpen = ref(false);
 const isDeleting = ref(false);
 
 const { showToast } = useToast();
-const route = useRoute();
 
 const form = reactive({
   name: '',
@@ -220,10 +219,6 @@ async function handleConfirmDelete() {
     emit('deleted', listId);
     isConfirmDeleteDialogOpen.value = false;
     handleClose();
-
-    if (route.params.id === listId) {
-      await navigateTo('/dashboard');
-    }
   } catch (err: unknown) {
     const msg = extractApiErrorMessage(err, 'Failed to delete list');
     errorMessage.value = msg;
