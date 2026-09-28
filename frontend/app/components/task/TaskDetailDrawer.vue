@@ -18,6 +18,7 @@
           :initial-task="task"
           :list-id="listId"
           :project-id="projectId"
+          :workflow="workflow"
           :is-drawer="true"
           @close="emit('close')"
           @updated="(updated) => emit('updated', updated)"
@@ -29,6 +30,7 @@
 </template>
 
 <script setup lang="ts">
+import type { StatusWorkflow } from '../../types/hierarchy';
 import type { Task } from '../../types/task';
 import TaskDetailView from './TaskDetailView.vue';
 
@@ -37,6 +39,7 @@ interface Props {
   listId?: string;
   projectId?: string;
   task: Task | null;
+  workflow?: StatusWorkflow | null;
 }
 
 interface Emits {

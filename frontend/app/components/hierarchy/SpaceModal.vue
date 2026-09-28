@@ -117,6 +117,25 @@
                 class="w-5 h-5 rounded border-slate-700 bg-slate-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-slate-900 cursor-pointer"
               >
             </div>
+
+            <!-- Custom Statuses Entry -->
+            <div
+              v-if="isEditing && spaceToEdit?._id"
+              class="pt-3 border-t border-slate-800 flex items-center justify-between"
+            >
+              <div>
+                <span class="text-sm font-medium text-slate-200">Custom Statuses</span>
+                <p class="text-xs text-slate-400">Manage workflows inherited by lists in this space</p>
+              </div>
+              <button
+                type="button"
+                class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-750 text-indigo-400 hover:text-indigo-300 border border-slate-700 transition cursor-pointer flex items-center gap-1.5"
+                @click="isStatusWorkflowOpen = true"
+              >
+                <span>⚙️</span>
+                <span>Edit Statuses</span>
+              </button>
+            </div>
           </div>
 
           <div class="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-slate-800">
@@ -138,12 +157,24 @@
         </form>
       </div>
     </div>
+
+    <!-- Status Workflow Modal for Space -->
+    <StatusWorkflowModal
+      v-if="spaceToEdit?._id"
+      :is-open="isStatusWorkflowOpen"
+      target-type="space"
+      :target-id="spaceToEdit._id"
+      :target-name="spaceToEdit.name"
+      @close="isStatusWorkflowOpen = false"
+      @saved="handleStatusWorkflowSaved"
+    />
   </Teleport>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, watch } from 'vue';
 import type { Space } from '../../types/hierarchy';
+import StatusWorkflowModal from './StatusWorkflowModal.vue';
 
 const props = defineProps<{
   isOpen: boolean;
@@ -182,6 +213,11 @@ const iconSymbols: Record<string, string> = {
 const submitting = ref(false);
 const errorMessage = ref<string | null>(null);
 const isEditing = ref(false);
+const isStatusWorkflowOpen = ref(false);
+
+function handleStatusWorkflowSaved() {
+  emit('saved');
+}
 
 const form = reactive({
   name: '',
