@@ -35,7 +35,14 @@ import {
   createDefaultStatusWorkflow,
   isStatusDone,
 } from './schemas/status-workflow.schema';
-import { UpdateStatusWorkflowDto } from './dto/status-workflow.dto';
+import {
+  UpdateStatusWorkflowDto,
+  ResetStatusWorkflowDto,
+} from './dto/status-workflow.dto';
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 export interface HierarchyTreeNodeList {
   id: string;
@@ -555,7 +562,11 @@ export class HierarchyService implements OnModuleInit {
       };
     }
     if (dto.statusWorkflow !== undefined) {
-      await this.updateSpaceStatusWorkflow(spaceId, dto.statusWorkflow, userId);
+      space.statusWorkflow = await this.updateSpaceStatusWorkflow(
+        spaceId,
+        dto.statusWorkflow,
+        userId,
+      );
     }
 
     return space.save();
@@ -758,7 +769,11 @@ export class HierarchyService implements OnModuleInit {
     if (dto.color !== undefined) list.color = dto.color;
 
     if (dto.statusWorkflow !== undefined) {
-      await this.updateListStatusWorkflow(listId, dto.statusWorkflow, userId);
+      list.statusWorkflow = await this.updateListStatusWorkflow(
+        listId,
+        dto.statusWorkflow,
+        userId,
+      );
     }
 
     if (dto.folderId !== undefined) {
@@ -1021,16 +1036,17 @@ export class HierarchyService implements OnModuleInit {
       ? list.statusWorkflow
       : space.statusWorkflow || createDefaultStatusWorkflow();
 
-    let targetStatus = dto.status;
+    let targetStatus = dto.status?.trim();
     if (targetStatus) {
-      const exists = workflow.statuses.some(
-        (s) => s.id.toLowerCase() === targetStatus!.trim().toLowerCase(),
+      const match = workflow.statuses.find(
+        (s) => s.id.toLowerCase() === targetStatus!.toLowerCase(),
       );
-      if (!exists && targetStatus.toLowerCase() !== 'todo') {
+      if (!match) {
         throw new BadRequestException(
           `Status '${targetStatus}' is not valid for this list's workflow`,
         );
       }
+      targetStatus = match.id;
     } else {
       targetStatus = workflow.defaultTodoStatusId || 'todo';
     }
@@ -1122,34 +1138,38 @@ export class HierarchyService implements OnModuleInit {
       };
     }
 
-    if (dto.status !== undefined && dto.status !== task.status) {
-      const exists = workflow.statuses.some(
-        (s) => s.id.toLowerCase() === dto.status!.trim().toLowerCase(),
+    if (dto.status !== undefined) {
+      const trimmedStatus = dto.status.trim();
+      const match = workflow.statuses.find(
+        (s) => s.id.toLowerCase() === trimmedStatus.toLowerCase(),
       );
-      if (!exists) {
+      if (!match) {
         throw new BadRequestException(
           `Status '${dto.status}' is not valid for this list's workflow`,
         );
       }
 
-      const prevStatus = task.status;
-      const newStatus = dto.status;
-      task.status = newStatus;
+      const canonicalStatus = match.id;
+      if (canonicalStatus !== task.status) {
+        const prevStatus = task.status;
+        const newStatus = canonicalStatus;
+        task.status = newStatus;
 
-      if (task.parentTaskId) {
-        const wasDone = isStatusDone(prevStatus, workflow);
-        const isNowDone = isStatusDone(newStatus, workflow);
-        let inc = 0;
-        if (!wasDone && isNowDone) {
-          inc = 1;
-        } else if (wasDone && !isNowDone) {
-          inc = -1;
-        }
+        if (task.parentTaskId) {
+          const wasDone = isStatusDone(prevStatus, workflow);
+          const isNowDone = isStatusDone(newStatus, workflow);
+          let inc = 0;
+          if (!wasDone && isNowDone) {
+            inc = 1;
+          } else if (wasDone && !isNowDone) {
+            inc = -1;
+          }
 
-        if (inc !== 0) {
-          await this.taskModel.findByIdAndUpdate(task.parentTaskId, {
-            $inc: { completedSubtasksCount: inc },
-          });
+          if (inc !== 0) {
+            await this.taskModel.findByIdAndUpdate(task.parentTaskId, {
+              $inc: { completedSubtasksCount: inc },
+            });
+          }
         }
       }
     }
@@ -1489,20 +1509,21 @@ export class HierarchyService implements OnModuleInit {
                 `Migration target '${m.toStatusId}' is not a valid status in the new workflow`,
               );
             }
-            migrationMap.set(m.fromStatusId.toLowerCase(), target.id);
+            migrationMap.set(m.fromStatusId.trim().toLowerCase(), target.id);
           }
         }
 
         for (const deletedId of deletedStatusIds) {
+          const escapedId = escapeRegex(deletedId);
           const taskCount = await this.taskModel
             .countDocuments({
               list: { $in: listIds },
-              status: { $regex: new RegExp(`^${deletedId}$`, 'i') },
+              status: { $regex: new RegExp(`^${escapedId}$`, 'i') },
             })
             .exec();
 
           if (taskCount > 0) {
-            const targetId = migrationMap.get(deletedId.toLowerCase());
+            const targetId = migrationMap.get(deletedId.trim().toLowerCase());
             if (!targetId) {
               const oldStatusName =
                 oldStatuses.find((s) => s.id === deletedId)?.name || deletedId;
@@ -1515,7 +1536,7 @@ export class HierarchyService implements OnModuleInit {
               .updateMany(
                 {
                   list: { $in: listIds },
-                  status: { $regex: new RegExp(`^${deletedId}$`, 'i') },
+                  status: { $regex: new RegExp(`^${escapedId}$`, 'i') },
                 },
                 { $set: { status: targetId } },
               )
@@ -1582,20 +1603,21 @@ export class HierarchyService implements OnModuleInit {
               `Migration target '${m.toStatusId}' is not a valid status in the new workflow`,
             );
           }
-          migrationMap.set(m.fromStatusId.toLowerCase(), target.id);
+          migrationMap.set(m.fromStatusId.trim().toLowerCase(), target.id);
         }
       }
 
       for (const deletedId of deletedStatusIds) {
+        const escapedId = escapeRegex(deletedId);
         const taskCount = await this.taskModel
           .countDocuments({
             list: list._id,
-            status: { $regex: new RegExp(`^${deletedId}$`, 'i') },
+            status: { $regex: new RegExp(`^${escapedId}$`, 'i') },
           })
           .exec();
 
         if (taskCount > 0) {
-          const targetId = migrationMap.get(deletedId.toLowerCase());
+          const targetId = migrationMap.get(deletedId.trim().toLowerCase());
           if (!targetId) {
             const oldStatusName =
               oldStatuses.find((s) => s.id === deletedId)?.name || deletedId;
@@ -1608,7 +1630,7 @@ export class HierarchyService implements OnModuleInit {
             .updateMany(
               {
                 list: list._id,
-                status: { $regex: new RegExp(`^${deletedId}$`, 'i') },
+                status: { $regex: new RegExp(`^${escapedId}$`, 'i') },
               },
               { $set: { status: targetId } },
             )
@@ -1625,17 +1647,87 @@ export class HierarchyService implements OnModuleInit {
   async resetListStatusWorkflow(
     listId: string,
     userId: string,
+    dto?: ResetStatusWorkflowDto,
   ): Promise<{ workflow: StatusWorkflow; isInherited: boolean }> {
     const { list, space, role } = await this.checkListAccess(listId, userId);
     if (role === WorkspaceRole.GUEST) {
       throw new ForbiddenException('Guests cannot reset status workflows');
     }
 
+    const spaceWorkflow = space.statusWorkflow || createDefaultStatusWorkflow();
+
+    if (list.statusWorkflow?.statuses?.length) {
+      const spaceStatusIds = new Set(
+        spaceWorkflow.statuses.map((s) => s.id.toLowerCase()),
+      );
+      const deletedStatusIds = list.statusWorkflow.statuses
+        .map((s) => s.id)
+        .filter((id) => !spaceStatusIds.has(id.toLowerCase()));
+
+      if (deletedStatusIds.length > 0) {
+        const migrationMap = new Map<string, string>();
+        if (dto?.migrations?.length) {
+          for (const m of dto.migrations) {
+            const target = spaceWorkflow.statuses.find(
+              (s) => s.id.toLowerCase() === m.toStatusId.trim().toLowerCase(),
+            );
+            if (!target) {
+              throw new BadRequestException(
+                `Migration target '${m.toStatusId}' is not a valid status in the inherited space workflow`,
+              );
+            }
+            migrationMap.set(m.fromStatusId.trim().toLowerCase(), target.id);
+          }
+        }
+
+        for (const deletedId of deletedStatusIds) {
+          const escapedId = escapeRegex(deletedId);
+          const taskCount = await this.taskModel
+            .countDocuments({
+              list: list._id,
+              status: { $regex: new RegExp(`^${escapedId}$`, 'i') },
+            })
+            .exec();
+
+          if (taskCount > 0) {
+            let targetId = migrationMap.get(deletedId.trim().toLowerCase());
+            if (!targetId) {
+              const oldItem = list.statusWorkflow.statuses.find(
+                (s) => s.id === deletedId,
+              );
+              if (
+                oldItem?.category === StatusCategory.DONE ||
+                oldItem?.category === StatusCategory.CLOSED
+              ) {
+                targetId =
+                  spaceWorkflow.defaultDoneStatusId ||
+                  spaceWorkflow.statuses[spaceWorkflow.statuses.length - 1].id;
+              } else {
+                targetId =
+                  spaceWorkflow.defaultTodoStatusId ||
+                  spaceWorkflow.statuses[0].id;
+              }
+            }
+
+            await this.taskModel
+              .updateMany(
+                {
+                  list: list._id,
+                  status: { $regex: new RegExp(`^${escapedId}$`, 'i') },
+                },
+                { $set: { status: targetId } },
+              )
+              .exec();
+          }
+        }
+      }
+    }
+
     list.statusWorkflow = undefined;
     await list.save();
 
     return {
-      workflow: space.statusWorkflow || createDefaultStatusWorkflow(),
+      workflow: spaceWorkflow,
       isInherited: true,
     };
   }
