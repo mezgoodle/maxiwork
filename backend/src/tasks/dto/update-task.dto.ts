@@ -59,4 +59,7 @@ export class UpdateTaskDto {
   )
   @IsDateString()
   dueDate?: string | null;
+
+  @ValidateIf((_, value) => value !== undefined)
+  customFieldValues?: Record<string, unknown>;
 }

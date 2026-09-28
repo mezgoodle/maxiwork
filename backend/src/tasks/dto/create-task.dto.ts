@@ -52,4 +52,7 @@ export class CreateTaskDto {
   @IsOptional()
   @IsDateString()
   dueDate?: string;
+
+  @IsOptional()
+  customFieldValues?: Record<string, unknown>;
 }

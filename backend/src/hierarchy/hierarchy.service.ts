@@ -1065,6 +1065,7 @@ export class HierarchyService implements OnModuleInit {
       subtasksCount: 0,
       completedSubtasksCount: 0,
       order: num,
+      customFieldValues: dto.customFieldValues || {},
     });
 
     const saved = await createdTask.save();
@@ -1128,6 +1129,13 @@ export class HierarchyService implements OnModuleInit {
     }
     if (dto.dueDate !== undefined) {
       task.dueDate = dto.dueDate ? new Date(dto.dueDate) : undefined;
+    }
+
+    if (dto.customFieldValues !== undefined) {
+      task.customFieldValues = {
+        ...(task.customFieldValues || {}),
+        ...dto.customFieldValues,
+      };
     }
 
     if (dto.status !== undefined) {

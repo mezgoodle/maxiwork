@@ -92,6 +92,13 @@ export class Task {
   })
   taskKey: string;
 
+  @Prop({
+    type: MongooseSchema.Types.Map,
+    of: MongooseSchema.Types.Mixed,
+    default: {},
+  })
+  customFieldValues?: Record<string, unknown>;
+
   createdAt?: Date;
   updatedAt?: Date;
 }

@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { ProjectsModule } from './projects/projects.module';
 import { TasksModule } from './tasks/tasks.module';
 import { HierarchyModule } from './hierarchy/hierarchy.module';
+import { CustomFieldsModule } from './custom-fields/custom-fields.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { HierarchyModule } from './hierarchy/hierarchy.module';
     ProjectsModule,
     TasksModule,
     HierarchyModule,
+    CustomFieldsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
