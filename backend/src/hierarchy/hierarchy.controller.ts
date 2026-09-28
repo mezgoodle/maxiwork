@@ -23,7 +23,10 @@ import { CreateFolderDto } from './dto/create-folder.dto';
 import { UpdateFolderDto } from './dto/update-folder.dto';
 import { CreateListDto } from './dto/create-list.dto';
 import { UpdateListDto } from './dto/update-list.dto';
-import { UpdateStatusWorkflowDto } from './dto/status-workflow.dto';
+import {
+  UpdateStatusWorkflowDto,
+  ResetStatusWorkflowDto,
+} from './dto/status-workflow.dto';
 import { CreateTaskDto } from '../tasks/dto/create-task.dto';
 import { CreateSubtaskDto } from '../tasks/dto/create-subtask.dto';
 import { UpdateTaskDto } from '../tasks/dto/update-task.dto';
@@ -297,11 +300,18 @@ export class HierarchyController {
   async resetListStatusWorkflow(
     @Param('listId', ParseObjectIdPipe) listId: string,
     @CurrentUser() user: AuthenticatedUser,
+    @Body() dto?: ResetStatusWorkflowDto,
   ) {
-    return this.hierarchyService.resetListStatusWorkflow(
-      listId,
-      String(user._id),
-    );
+    return dto
+      ? this.hierarchyService.resetListStatusWorkflow(
+          listId,
+          String(user._id),
+          dto,
+        )
+      : this.hierarchyService.resetListStatusWorkflow(
+          listId,
+          String(user._id),
+        );
   }
 
   // ----------------------------------------------------
