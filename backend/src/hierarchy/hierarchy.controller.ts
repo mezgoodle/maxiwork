@@ -308,10 +308,7 @@ export class HierarchyController {
           String(user._id),
           dto,
         )
-      : this.hierarchyService.resetListStatusWorkflow(
-          listId,
-          String(user._id),
-        );
+      : this.hierarchyService.resetListStatusWorkflow(listId, String(user._id));
   }
 
   // ----------------------------------------------------
