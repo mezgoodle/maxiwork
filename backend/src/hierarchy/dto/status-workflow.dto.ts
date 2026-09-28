@@ -18,6 +18,10 @@ import { StatusCategory } from '../enums/status-category.enum';
 export class CustomStatusItemDto {
   @IsOptional()
   @IsString()
+  @Matches(/^[A-Za-z0-9_-]{1,64}$/, {
+    message:
+      'Status ID must be 1-64 alphanumeric characters, underscores, or hyphens',
+  })
   id?: string;
 
   @IsString()
@@ -50,10 +54,18 @@ export class CustomStatusItemDto {
 export class StatusMigrationDto {
   @IsString()
   @IsNotEmpty({ message: 'fromStatusId is required for migration' })
+  @Matches(/^[A-Za-z0-9_-]{1,64}$/, {
+    message:
+      'fromStatusId must be 1-64 alphanumeric characters, underscores, or hyphens',
+  })
   fromStatusId: string;
 
   @IsString()
   @IsNotEmpty({ message: 'toStatusId is required for migration' })
+  @Matches(/^[A-Za-z0-9_-]{1,64}$/, {
+    message:
+      'toStatusId must be 1-64 alphanumeric characters, underscores, or hyphens',
+  })
   toStatusId: string;
 }
 
@@ -66,12 +78,28 @@ export class UpdateStatusWorkflowDto {
 
   @IsOptional()
   @IsString()
+  @Matches(/^[A-Za-z0-9_-]{1,64}$/, {
+    message:
+      'defaultTodoStatusId must be 1-64 alphanumeric characters, underscores, or hyphens',
+  })
   defaultTodoStatusId?: string;
 
   @IsOptional()
   @IsString()
+  @Matches(/^[A-Za-z0-9_-]{1,64}$/, {
+    message:
+      'defaultDoneStatusId must be 1-64 alphanumeric characters, underscores, or hyphens',
+  })
   defaultDoneStatusId?: string;
 
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => StatusMigrationDto)
+  migrations?: StatusMigrationDto[];
+}
+
+export class ResetStatusWorkflowDto {
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
