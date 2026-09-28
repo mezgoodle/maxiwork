@@ -3,19 +3,25 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Task, TaskDocument } from './schemas/task.schema';
 import { Project, ProjectDocument } from '../projects/schemas/project.schema';
+import { List, ListDocument } from '../hierarchy/schemas/list.schema';
+import { Space, SpaceDocument } from '../hierarchy/schemas/space.schema';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
 import { GetTasksQueryDto } from './dto/get-tasks-query.dto';
 import { CreateSubtaskDto } from './dto/create-subtask.dto';
 import { MoveSubtaskDto } from './dto/move-subtask.dto';
-import { TaskStatus } from './enums/task-status.enum';
 import { TaskPriority } from './enums/task-priority.enum';
+import {
+  StatusWorkflow,
+  isStatusDone,
+} from '../hierarchy/schemas/status-workflow.schema';
 
 export interface PaginatedTasksResult {
   data: TaskDocument[];
@@ -34,6 +40,12 @@ export class TasksService {
     private readonly taskModel: Model<TaskDocument>,
     @InjectModel(Project.name)
     private readonly projectModel: Model<ProjectDocument>,
+    @Optional()
+    @InjectModel(List.name)
+    private readonly listModel?: Model<ListDocument>,
+    @Optional()
+    @InjectModel(Space.name)
+    private readonly spaceModel?: Model<SpaceDocument>,
   ) {}
 
   private extractId(ref: unknown): string {
@@ -52,6 +64,33 @@ export class TasksService {
   private toObjectId(id: unknown): Types.ObjectId | string {
     const str = this.extractId(id);
     return Types.ObjectId.isValid(str) ? new Types.ObjectId(str) : str;
+  }
+
+  private async getEffectiveWorkflowForList(
+    listRef: unknown,
+  ): Promise<StatusWorkflow | undefined> {
+    if (!listRef || !this.listModel) return undefined;
+    try {
+      const listId = this.extractId(listRef);
+      if (!listId || !Types.ObjectId.isValid(listId)) return undefined;
+      const list = await this.listModel.findById(listId).lean().exec();
+      if (!list) return undefined;
+      if (list.statusWorkflow?.statuses?.length) {
+        return list.statusWorkflow;
+      }
+      if (list.spaceId && this.spaceModel) {
+        const space = await this.spaceModel
+          .findById(list.spaceId)
+          .lean()
+          .exec();
+        if (space?.statusWorkflow?.statuses?.length) {
+          return space.statusWorkflow;
+        }
+      }
+    } catch {
+      return undefined;
+    }
+    return undefined;
   }
 
   private assertAssigneeInProject(
@@ -139,8 +178,34 @@ export class TasksService {
 
     const taskKey = `${counter.prefix}-${counter.taskCounter}`;
 
+    let targetStatus = createTaskDto.status?.trim();
+    if (createTaskDto.list) {
+      const workflow = await this.getEffectiveWorkflowForList(
+        createTaskDto.list,
+      );
+      if (workflow && workflow.statuses?.length) {
+        if (targetStatus) {
+          const match = workflow.statuses.find(
+            (s) => s.id.toLowerCase() === targetStatus!.toLowerCase(),
+          );
+          if (!match) {
+            throw new BadRequestException(
+              `Status '${targetStatus}' is not valid for this list's workflow`,
+            );
+          }
+          targetStatus = match.id;
+        } else {
+          targetStatus = workflow.defaultTodoStatusId || 'todo';
+        }
+      }
+    }
+    if (!targetStatus) {
+      targetStatus = 'todo';
+    }
+
     const createdTask = new this.taskModel({
       ...createTaskDto,
+      status: targetStatus,
       project: projectId,
       reporter: userId,
       taskKey,
@@ -271,31 +336,45 @@ export class TasksService {
       task.description = updateTaskDto.description;
     }
 
-    if (
-      updateTaskDto.status !== undefined &&
-      updateTaskDto.status !== task.status
-    ) {
-      const prevStatus = task.status;
-      const newStatus = updateTaskDto.status;
-      task.status = newStatus;
-
-      if (task.parentTaskId) {
-        let inc = 0;
-        if (prevStatus !== TaskStatus.DONE && newStatus === TaskStatus.DONE) {
-          inc = 1;
-        } else if (
-          prevStatus === TaskStatus.DONE &&
-          newStatus !== TaskStatus.DONE
-        ) {
-          inc = -1;
+    if (updateTaskDto.status !== undefined) {
+      const targetList =
+        updateTaskDto.list !== undefined ? updateTaskDto.list : task.list;
+      const workflow = await this.getEffectiveWorkflowForList(targetList);
+      let targetStatus = updateTaskDto.status.trim();
+      if (workflow && workflow.statuses?.length) {
+        const match = workflow.statuses.find(
+          (s) => s.id.toLowerCase() === targetStatus.toLowerCase(),
+        );
+        if (!match) {
+          throw new BadRequestException(
+            `Status '${updateTaskDto.status}' is not valid for this task's workflow`,
+          );
         }
-        if (inc !== 0) {
-          await this.taskModel
-            .updateOne(
-              { _id: this.extractId(task.parentTaskId) },
-              { $inc: { completedSubtasksCount: inc } },
-            )
-            .exec();
+        targetStatus = match.id;
+      }
+
+      if (targetStatus !== task.status) {
+        const prevStatus = task.status;
+        const newStatus = targetStatus;
+        task.status = newStatus;
+
+        if (task.parentTaskId) {
+          const wasDone = isStatusDone(prevStatus, workflow);
+          const isNowDone = isStatusDone(newStatus, workflow);
+          let inc = 0;
+          if (!wasDone && isNowDone) {
+            inc = 1;
+          } else if (wasDone && !isNowDone) {
+            inc = -1;
+          }
+          if (inc !== 0) {
+            await this.taskModel
+              .updateOne(
+                { _id: this.extractId(task.parentTaskId) },
+                { $inc: { completedSubtasksCount: inc } },
+              )
+              .exec();
+          }
         }
       }
     }
@@ -354,19 +433,32 @@ export class TasksService {
       throw new NotFoundException('Task not found');
     }
 
+    const workflow = await this.getEffectiveWorkflowForList(task.list);
+    let targetStatus = updateTaskStatusDto.status.trim();
+    if (workflow && workflow.statuses?.length) {
+      const match = workflow.statuses.find(
+        (s) => s.id.toLowerCase() === targetStatus.toLowerCase(),
+      );
+      if (!match) {
+        throw new BadRequestException(
+          `Status '${updateTaskStatusDto.status}' is not valid for this task's workflow`,
+        );
+      }
+      targetStatus = match.id;
+    }
+
     const prevStatus = task.status;
-    const newStatus = updateTaskStatusDto.status;
+    const newStatus = targetStatus;
 
     if (prevStatus !== newStatus) {
       task.status = newStatus;
       if (task.parentTaskId) {
+        const wasDone = isStatusDone(prevStatus, workflow);
+        const isNowDone = isStatusDone(newStatus, workflow);
         let inc = 0;
-        if (prevStatus !== TaskStatus.DONE && newStatus === TaskStatus.DONE) {
+        if (!wasDone && isNowDone) {
           inc = 1;
-        } else if (
-          prevStatus === TaskStatus.DONE &&
-          newStatus !== TaskStatus.DONE
-        ) {
+        } else if (wasDone && !isNowDone) {
           inc = -1;
         }
         if (inc !== 0) {
@@ -404,7 +496,8 @@ export class TasksService {
 
     // Rollup decrement on parent if this task is a subtask
     if (task.parentTaskId) {
-      const isDone = task.status === TaskStatus.DONE;
+      const workflow = await this.getEffectiveWorkflowForList(task.list);
+      const isDone = isStatusDone(task.status, workflow);
       await this.taskModel
         .updateOne(
           { _id: this.toObjectId(task.parentTaskId) },
@@ -502,6 +595,9 @@ export class TasksService {
 
     const taskKey = `${counter.prefix}-${counter.taskCounter}`;
 
+    const workflow = await this.getEffectiveWorkflowForList(parent.list);
+    const subtaskStatus = workflow?.defaultTodoStatusId || 'todo';
+
     const order =
       createSubtaskDto.order !== undefined
         ? createSubtaskDto.order
@@ -514,7 +610,7 @@ export class TasksService {
       parentTaskId: new Types.ObjectId(parentTaskId),
       reporter: userId,
       taskKey,
-      status: TaskStatus.TODO,
+      status: subtaskStatus,
       priority: createSubtaskDto.priority || TaskPriority.MEDIUM,
       order,
       subtasksCount: 0,
@@ -645,7 +741,8 @@ export class TasksService {
         : null;
 
       if (oldParentId !== newParentId) {
-        const isDone = task.status === TaskStatus.DONE;
+        const workflow = await this.getEffectiveWorkflowForList(task.list);
+        const isDone = isStatusDone(task.status, workflow);
 
         if (newParentId !== null) {
           if (newParentId === taskId) {

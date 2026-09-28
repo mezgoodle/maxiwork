@@ -9,7 +9,6 @@ import {
   MinLength,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { TaskStatus } from '../enums/task-status.enum';
 import { TaskPriority } from '../enums/task-priority.enum';
 
 export class CreateTaskDto {
@@ -31,8 +30,8 @@ export class CreateTaskDto {
   description?: string;
 
   @IsOptional()
-  @IsEnum(TaskStatus)
-  status?: TaskStatus;
+  @IsString()
+  status?: string;
 
   @IsOptional()
   @IsEnum(TaskPriority)

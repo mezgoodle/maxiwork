@@ -8,7 +8,6 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { TaskStatus } from '../enums/task-status.enum';
 import { TaskPriority } from '../enums/task-priority.enum';
 
 export class UpdateTaskDto {
@@ -30,8 +29,8 @@ export class UpdateTaskDto {
   description?: string;
 
   @ValidateIf((_, value) => value !== undefined)
-  @IsEnum(TaskStatus)
-  status?: TaskStatus;
+  @IsString()
+  status?: string;
 
   @ValidateIf((_, value) => value !== undefined)
   @IsEnum(TaskPriority)
