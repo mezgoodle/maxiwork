@@ -11,7 +11,11 @@
     <!-- Column Header -->
     <div class="p-4 border-b border-slate-800/80 flex items-center justify-between">
       <div class="flex items-center gap-2">
-        <span class="w-2.5 h-2.5 rounded-full" :class="statusDotClass" />
+        <span
+          class="w-2.5 h-2.5 rounded-full"
+          :class="!color ? statusDotClass : ''"
+          :style="color ? { backgroundColor: color } : {}"
+        />
         <h3 class="font-bold text-sm text-slate-200">
           {{ title }}
         </h3>
@@ -63,6 +67,7 @@ interface Props {
   status: TaskStatus;
   title: string;
   tasks: Task[];
+  color?: string;
   projectId?: string;
   listId?: string;
 }

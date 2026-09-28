@@ -78,10 +78,13 @@
                   v-model="form.status"
                   class="w-full px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 capitalize"
                 >
-                  <option value="todo">To Do</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="in_review">In Review</option>
-                  <option value="done">Done</option>
+                  <option
+                    v-for="st in statusOptions"
+                    :key="st.id"
+                    :value="st.id"
+                  >
+                    {{ st.name }}
+                  </option>
                 </select>
               </div>
 
@@ -186,6 +189,7 @@
 <script lang="ts" setup>
 import { computed, reactive, ref, watch } from 'vue';
 import type { Task, TaskPriority, TaskStatus } from '../../types/task';
+import type { StatusWorkflow } from '../../types/hierarchy';
 import { useTasksStore } from '../../stores/tasks';
 import { useProjectsStore } from '../../stores/projects';
 import { useHierarchyStore } from '../../stores/hierarchy';
@@ -201,6 +205,7 @@ interface Props {
   listId?: string;
   task?: Task | null;
   defaultStatus?: TaskStatus;
+  workflow?: StatusWorkflow | null;
 }
 
 interface Emits {
@@ -210,6 +215,18 @@ interface Emits {
 
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
+
+const statusOptions = computed(() => {
+  if (props.workflow?.statuses?.length) {
+    return props.workflow.statuses;
+  }
+  return [
+    { id: 'todo', name: 'To Do' },
+    { id: 'in_progress', name: 'In Progress' },
+    { id: 'in_review', name: 'In Review' },
+    { id: 'done', name: 'Done' },
+  ];
+});
 
 const tasksStore = useTasksStore();
 const projectsStore = useProjectsStore();

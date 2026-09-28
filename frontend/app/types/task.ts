@@ -1,6 +1,6 @@
 import type { User } from './auth';
 
-export type TaskStatus = 'todo' | 'in_progress' | 'in_review' | 'done';
+export type TaskStatus = 'todo' | 'in_progress' | 'in_review' | 'done' | (string & {});
 
 export type TaskPriority = 'low' | 'medium' | 'high' | 'critical';
 
@@ -9,6 +9,7 @@ export interface Task {
   title: string;
   description?: string;
   status: TaskStatus;
+  completed?: boolean;
   priority: TaskPriority;
   startDate?: string;
   dueDate?: string;
