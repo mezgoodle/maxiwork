@@ -2,6 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Schema as MongooseSchema, Types } from 'mongoose';
 import { Space } from './space.schema';
 import { Folder } from './folder.schema';
+import { StatusWorkflow, StatusWorkflowSchema } from './status-workflow.schema';
 
 export type ListDocument = HydratedDocument<List>;
 
@@ -32,6 +33,12 @@ export class List {
 
   @Prop({ type: String, trim: true })
   color?: string;
+
+  @Prop({
+    type: StatusWorkflowSchema,
+    required: false,
+  })
+  statusWorkflow?: StatusWorkflow;
 
   createdAt?: Date;
   updatedAt?: Date;

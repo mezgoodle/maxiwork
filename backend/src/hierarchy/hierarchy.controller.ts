@@ -23,6 +23,7 @@ import { CreateFolderDto } from './dto/create-folder.dto';
 import { UpdateFolderDto } from './dto/update-folder.dto';
 import { CreateListDto } from './dto/create-list.dto';
 import { UpdateListDto } from './dto/update-list.dto';
+import { UpdateStatusWorkflowDto } from './dto/status-workflow.dto';
 import { CreateTaskDto } from '../tasks/dto/create-task.dto';
 import { CreateSubtaskDto } from '../tasks/dto/create-subtask.dto';
 import { UpdateTaskDto } from '../tasks/dto/update-task.dto';
@@ -150,6 +151,30 @@ export class HierarchyController {
     return this.hierarchyService.deleteSpace(spaceId, String(user._id));
   }
 
+  @Get('spaces/:spaceId/status-workflow')
+  async getSpaceStatusWorkflow(
+    @Param('spaceId', ParseObjectIdPipe) spaceId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.hierarchyService.getSpaceStatusWorkflow(
+      spaceId,
+      String(user._id),
+    );
+  }
+
+  @Patch('spaces/:spaceId/status-workflow')
+  async updateSpaceStatusWorkflow(
+    @Param('spaceId', ParseObjectIdPipe) spaceId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdateStatusWorkflowDto,
+  ) {
+    return this.hierarchyService.updateSpaceStatusWorkflow(
+      spaceId,
+      dto,
+      String(user._id),
+    );
+  }
+
   // ----------------------------------------------------
   // Folders
   // ----------------------------------------------------
@@ -242,6 +267,41 @@ export class HierarchyController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.hierarchyService.deleteList(listId, String(user._id));
+  }
+
+  @Get('lists/:listId/status-workflow')
+  async getListStatusWorkflow(
+    @Param('listId', ParseObjectIdPipe) listId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.hierarchyService.getListStatusWorkflow(
+      listId,
+      String(user._id),
+    );
+  }
+
+  @Patch('lists/:listId/status-workflow')
+  async updateListStatusWorkflow(
+    @Param('listId', ParseObjectIdPipe) listId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdateStatusWorkflowDto,
+  ) {
+    return this.hierarchyService.updateListStatusWorkflow(
+      listId,
+      dto,
+      String(user._id),
+    );
+  }
+
+  @Delete('lists/:listId/status-workflow')
+  async resetListStatusWorkflow(
+    @Param('listId', ParseObjectIdPipe) listId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.hierarchyService.resetListStatusWorkflow(
+      listId,
+      String(user._id),
+    );
   }
 
   // ----------------------------------------------------

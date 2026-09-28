@@ -2,7 +2,6 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Schema as MongooseSchema, Types } from 'mongoose';
 import { Project } from '../../projects/schemas/project.schema';
 import { User } from '../../users/schemas/user.schema';
-import { TaskStatus } from '../enums/task-status.enum';
 import { TaskPriority } from '../enums/task-priority.enum';
 
 export type TaskDocument = HydratedDocument<Task>;
@@ -19,12 +18,12 @@ export class Task {
 
   @Prop({
     type: String,
-    enum: Object.values(TaskStatus),
-    default: TaskStatus.TODO,
+    default: 'todo',
     required: true,
+    trim: true,
     index: true,
   })
-  status: TaskStatus;
+  status: string;
 
   @Prop({
     type: String,

@@ -9,6 +9,10 @@ import { CreateFolderDto } from './create-folder.dto';
 import { UpdateFolderDto } from './update-folder.dto';
 import { CreateListDto } from './create-list.dto';
 import { UpdateListDto } from './update-list.dto';
+import {
+  UpdateStatusWorkflowDto,
+  CustomStatusItemDto,
+} from './status-workflow.dto';
 
 describe('Hierarchy DTOs Validation', () => {
   describe('CreateWorkspaceDto', () => {
@@ -139,6 +143,62 @@ describe('Hierarchy DTOs Validation', () => {
       });
       const errors = await validate(dto);
       expect(errors.length).toBe(0);
+    });
+  });
+
+  describe('UpdateStatusWorkflowDto & CustomStatusItemDto', () => {
+    it('should validate valid status workflow dto', async () => {
+      const dto = plainToInstance(UpdateStatusWorkflowDto, {
+        statuses: [
+          {
+            name: 'To Do',
+            color: '#64748B',
+            category: 'to_do',
+            order: 0,
+          },
+          {
+            name: 'Complete',
+            color: '#10B981',
+            category: 'done',
+            order: 1,
+          },
+        ],
+        defaultTodoStatusId: 'todo',
+        defaultDoneStatusId: 'done',
+      });
+      const errors = await validate(dto);
+      expect(errors.length).toBe(0);
+    });
+
+    it('should reject workflow with empty statuses array', async () => {
+      const dto = plainToInstance(UpdateStatusWorkflowDto, {
+        statuses: [],
+      });
+      const errors = await validate(dto);
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors.some((e) => e.property === 'statuses')).toBe(true);
+    });
+
+    it('should reject invalid color hex format', async () => {
+      const dto = plainToInstance(CustomStatusItemDto, {
+        name: 'In Progress',
+        color: 'not-a-color',
+        category: 'in_progress',
+      });
+      const errors = await validate(dto);
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors.some((e) => e.property === 'color')).toBe(true);
+    });
+
+    it('should reject invalid status category', async () => {
+      const dto = plainToInstance(CustomStatusItemDto, {
+        name: 'Reviewing',
+        color: '#3B82F6',
+        category: 'invalid_cat',
+      });
+      const errors = await validate(dto);
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors.some((e) => e.property === 'category')).toBe(true);
     });
   });
 });

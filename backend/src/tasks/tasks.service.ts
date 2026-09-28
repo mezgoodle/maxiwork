@@ -14,8 +14,8 @@ import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
 import { GetTasksQueryDto } from './dto/get-tasks-query.dto';
 import { CreateSubtaskDto } from './dto/create-subtask.dto';
 import { MoveSubtaskDto } from './dto/move-subtask.dto';
-import { TaskStatus } from './enums/task-status.enum';
 import { TaskPriority } from './enums/task-priority.enum';
+import { isStatusDone } from '../hierarchy/schemas/status-workflow.schema';
 
 export interface PaginatedTasksResult {
   data: TaskDocument[];
@@ -280,13 +280,12 @@ export class TasksService {
       task.status = newStatus;
 
       if (task.parentTaskId) {
+        const wasDone = isStatusDone(prevStatus);
+        const isNowDone = isStatusDone(newStatus);
         let inc = 0;
-        if (prevStatus !== TaskStatus.DONE && newStatus === TaskStatus.DONE) {
+        if (!wasDone && isNowDone) {
           inc = 1;
-        } else if (
-          prevStatus === TaskStatus.DONE &&
-          newStatus !== TaskStatus.DONE
-        ) {
+        } else if (wasDone && !isNowDone) {
           inc = -1;
         }
         if (inc !== 0) {
@@ -360,13 +359,12 @@ export class TasksService {
     if (prevStatus !== newStatus) {
       task.status = newStatus;
       if (task.parentTaskId) {
+        const wasDone = isStatusDone(prevStatus);
+        const isNowDone = isStatusDone(newStatus);
         let inc = 0;
-        if (prevStatus !== TaskStatus.DONE && newStatus === TaskStatus.DONE) {
+        if (!wasDone && isNowDone) {
           inc = 1;
-        } else if (
-          prevStatus === TaskStatus.DONE &&
-          newStatus !== TaskStatus.DONE
-        ) {
+        } else if (wasDone && !isNowDone) {
           inc = -1;
         }
         if (inc !== 0) {
@@ -404,7 +402,7 @@ export class TasksService {
 
     // Rollup decrement on parent if this task is a subtask
     if (task.parentTaskId) {
-      const isDone = task.status === TaskStatus.DONE;
+      const isDone = isStatusDone(task.status);
       await this.taskModel
         .updateOne(
           { _id: this.toObjectId(task.parentTaskId) },
@@ -514,7 +512,7 @@ export class TasksService {
       parentTaskId: new Types.ObjectId(parentTaskId),
       reporter: userId,
       taskKey,
-      status: TaskStatus.TODO,
+      status: 'todo',
       priority: createSubtaskDto.priority || TaskPriority.MEDIUM,
       order,
       subtasksCount: 0,
@@ -645,7 +643,7 @@ export class TasksService {
         : null;
 
       if (oldParentId !== newParentId) {
-        const isDone = task.status === TaskStatus.DONE;
+        const isDone = isStatusDone(task.status);
 
         if (newParentId !== null) {
           if (newParentId === taskId) {

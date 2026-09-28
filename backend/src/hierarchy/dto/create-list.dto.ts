@@ -2,11 +2,15 @@ import {
   IsMongoId,
   IsNotEmpty,
   IsNumber,
+  IsObject,
   IsOptional,
   IsString,
   MaxLength,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+import { UpdateStatusWorkflowDto } from './status-workflow.dto';
 
 export class CreateListDto {
   @IsString()
@@ -26,4 +30,10 @@ export class CreateListDto {
   @IsOptional()
   @IsString()
   color?: string;
+
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => UpdateStatusWorkflowDto)
+  statusWorkflow?: UpdateStatusWorkflowDto;
 }
