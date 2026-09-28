@@ -78,10 +78,13 @@
           class="px-3 py-1 bg-slate-800 border border-slate-700 rounded-lg text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 capitalize cursor-pointer"
           @change="updateField({ status: ($event.target as HTMLSelectElement).value as TaskStatus })"
         >
-          <option value="todo">To Do</option>
-          <option value="in_progress">In Progress</option>
-          <option value="in_review">In Review</option>
-          <option value="done">Done</option>
+          <option
+            v-for="st in statusOptions"
+            :key="st.id"
+            :value="st.id"
+          >
+            {{ st.name }}
+          </option>
         </select>
 
         <!-- Quick Done toggle button -->
@@ -89,15 +92,15 @@
           type="button"
           class="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition cursor-pointer border"
           :class="
-            activeTask.status === 'done'
+            isTaskDone
               ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/30'
               : 'bg-slate-800 text-slate-300 border-slate-700 hover:text-emerald-400 hover:border-emerald-500/50'
           "
-          :title="activeTask.status === 'done' ? 'Reopen task (To Do)' : 'Mark task as Done'"
+          :title="isTaskDone ? 'Reopen task (To Do)' : 'Mark task as Done'"
           @click="toggleComplete"
         >
           <span class="text-sm font-bold leading-none">✓</span>
-          <span>{{ activeTask.status === 'done' ? 'Done' : 'Mark Done' }}</span>
+          <span>{{ isTaskDone ? 'Done' : 'Mark Done' }}</span>
         </button>
 
         <!-- Priority dropdown -->
@@ -243,8 +246,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, onMounted } from 'vue';
 import type { Task, TaskPriority, TaskStatus, UpdateTaskPayload } from '../../types/task';
+import type { StatusWorkflow } from '../../types/hierarchy';
 import { useApi } from '../../composables/useApi';
 import { useToast } from '../../composables/useToast';
 import { useAuthStore } from '../../stores/auth';
@@ -261,6 +265,7 @@ interface Props {
   listId?: string;
   projectId?: string;
   isDrawer?: boolean;
+  workflow?: StatusWorkflow | null;
 }
 
 interface Emits {
@@ -273,6 +278,7 @@ const props = withDefaults(defineProps<Props>(), {
   listId: '',
   projectId: '',
   isDrawer: false,
+  workflow: null,
 });
 const emit = defineEmits<Emits>();
 
@@ -492,9 +498,53 @@ async function assignToMe() {
   }
 }
 
+const effectiveWorkflow = ref<StatusWorkflow | null>(props.workflow || null);
+
+onMounted(async () => {
+  if (!effectiveWorkflow.value && props.listId) {
+    try {
+      const res = await hierarchyStore.fetchListStatusWorkflow(props.listId);
+      effectiveWorkflow.value = res.workflow;
+    } catch {
+      // Fallback
+    }
+  }
+});
+
+watch(
+  () => props.workflow,
+  (wf) => {
+    if (wf) {
+      effectiveWorkflow.value = wf;
+    }
+  },
+);
+
+const statusOptions = computed(() => {
+  if (effectiveWorkflow.value?.statuses?.length) {
+    return effectiveWorkflow.value.statuses;
+  }
+  return [
+    { id: 'todo', name: 'To Do', category: 'to_do', color: '#94a3b8' },
+    { id: 'in_progress', name: 'In Progress', category: 'in_progress', color: '#3b82f6' },
+    { id: 'in_review', name: 'In Review', category: 'in_progress', color: '#6366f1' },
+    { id: 'done', name: 'Done', category: 'done', color: '#10b981' },
+  ];
+});
+
+const isTaskDone = computed(() => {
+  if (activeTask.value.completed !== undefined) return activeTask.value.completed;
+  if (!effectiveWorkflow.value) return activeTask.value.status === 'done';
+  const match = effectiveWorkflow.value.statuses.find((s) => s.id === activeTask.value.status);
+  if (!match) return activeTask.value.status === 'done';
+  return match.category === 'done' || match.category === 'closed';
+});
+
 async function toggleComplete() {
-  const newStatus: TaskStatus = activeTask.value.status === 'done' ? 'todo' : 'done';
-  await updateField({ status: newStatus });
+  const targetStatus = isTaskDone.value
+    ? (effectiveWorkflow.value?.defaultTodoStatusId || 'todo')
+    : (effectiveWorkflow.value?.defaultDoneStatusId || 'done');
+  await updateField({ status: targetStatus as TaskStatus });
 }
 
 function handleSubtaskUpdated() {
