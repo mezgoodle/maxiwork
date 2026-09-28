@@ -156,6 +156,7 @@ export class TasksService {
       dueDate: createTaskDto.dueDate
         ? new Date(createTaskDto.dueDate)
         : undefined,
+      customFieldValues: createTaskDto.customFieldValues || {},
     });
 
     const saved = await createdTask.save();
@@ -328,6 +329,13 @@ export class TasksService {
       task.dueDate = updateTaskDto.dueDate
         ? new Date(updateTaskDto.dueDate)
         : undefined;
+    }
+
+    if (updateTaskDto.customFieldValues !== undefined) {
+      task.customFieldValues = {
+        ...(task.customFieldValues || {}),
+        ...updateTaskDto.customFieldValues,
+      };
     }
 
     const updated = await task.save();
