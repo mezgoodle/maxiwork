@@ -157,6 +157,40 @@
                 />
               </div>
             </div>
+
+            <!-- Custom Fields Section -->
+            <div
+              v-if="availableCustomFields.length > 0"
+              class="pt-4 border-t border-slate-800 space-y-3"
+            >
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  Custom Fields
+                </span>
+              </div>
+
+              <div class="space-y-3">
+                <div
+                  v-for="field in availableCustomFields"
+                  :key="field._id"
+                >
+                  <label class="block text-xs font-medium text-slate-300 mb-1">
+                    {{ field.name }}
+                    <span v-if="field.required" class="text-rose-400">*</span>
+                    <span v-if="field.inherited" class="text-[10px] text-cyan-400/80 ml-1">
+                      (Space)
+                    </span>
+                  </label>
+                  <CustomFieldInput
+                    v-model="form.customFieldValues[field._id]"
+                    :field="field"
+                  />
+                  <p v-if="field.description" class="text-[11px] text-slate-500 mt-0.5">
+                    {{ field.description }}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Actions -->
@@ -190,14 +224,17 @@
 import { computed, reactive, ref, watch } from 'vue';
 import type { Task, TaskPriority, TaskStatus } from '../../types/task';
 import type { StatusWorkflow } from '../../types/hierarchy';
+import type { EffectiveCustomField } from '../../types/custom-field';
 import { useTasksStore } from '../../stores/tasks';
 import { useProjectsStore } from '../../stores/projects';
 import { useHierarchyStore } from '../../stores/hierarchy';
+import { useCustomFieldsStore } from '../../stores/custom-fields';
 import { useAuthStore } from '../../stores/auth';
 import { useApi } from '../../composables/useApi';
 import { useToast } from '../../composables/useToast';
 import { extractApiErrorMessage } from '../../utils/error';
 import DatePickerMenu from '../ui/DatePickerMenu.vue';
+import CustomFieldInput from '../custom-fields/CustomFieldInput.vue';
 
 interface Props {
   isOpen: boolean;
@@ -231,9 +268,12 @@ const statusOptions = computed(() => {
 const tasksStore = useTasksStore();
 const projectsStore = useProjectsStore();
 const hierarchyStore = useHierarchyStore();
+const customFieldsStore = useCustomFieldsStore();
 const authStore = useAuthStore();
 const { apiFetch } = useApi();
 const { showToast } = useToast();
+
+const availableCustomFields = ref<EffectiveCustomField[]>([]);
 
 const currentUserId = computed(() => authStore.user?._id || '');
 
@@ -257,6 +297,7 @@ const form = reactive({
   assignee: '',
   startDate: '',
   dueDate: '',
+  customFieldValues: {} as Record<string, unknown>,
 });
 
 function formatDateForInput(dateStr?: string): string {
@@ -268,10 +309,22 @@ function formatDateForInput(dateStr?: string): string {
 
 watch(
   [() => props.isOpen, () => props.defaultStatus, () => props.task],
-  ([open, defaultStatus, task]) => {
+  async ([open, defaultStatus, task]) => {
     if (open) {
       errorMessage.value = '';
       titleError.value = '';
+
+      const targetListId = props.listId || (task && typeof task.list === 'string' ? task.list : undefined);
+      if (targetListId) {
+        try {
+          const fields = await customFieldsStore.fetchListFields(targetListId);
+          availableCustomFields.value = fields;
+        } catch {
+          availableCustomFields.value = [];
+        }
+      } else {
+        availableCustomFields.value = [];
+      }
 
       if (task) {
         form.title = task.title;
@@ -284,6 +337,7 @@ watch(
             : (task.assignee as string) || '';
         form.startDate = formatDateForInput(task.startDate);
         form.dueDate = formatDateForInput(task.dueDate);
+        form.customFieldValues = { ...(task.customFieldValues || {}) };
       } else {
         form.title = '';
         form.description = '';
@@ -292,6 +346,13 @@ watch(
         form.assignee = '';
         form.startDate = '';
         form.dueDate = '';
+        const initialCustomValues: Record<string, unknown> = {};
+        for (const f of availableCustomFields.value) {
+          if (f.defaultValue !== undefined && f.defaultValue !== null) {
+            initialCustomValues[f._id] = f.defaultValue;
+          }
+        }
+        form.customFieldValues = initialCustomValues;
       }
     }
   },
@@ -368,6 +429,17 @@ async function handleSubmit() {
     return;
   }
 
+  // Validate required custom fields
+  for (const field of availableCustomFields.value) {
+    if (field.required) {
+      const val = form.customFieldValues[field._id];
+      if (val === null || val === undefined || val === '') {
+        errorMessage.value = `${field.name} is required`;
+        return;
+      }
+    }
+  }
+
   loading.value = true;
   try {
     const payload = {
@@ -378,6 +450,10 @@ async function handleSubmit() {
       assignee: form.assignee || undefined,
       startDate: form.startDate ? new Date(form.startDate).toISOString() : undefined,
       dueDate: form.dueDate ? new Date(form.dueDate).toISOString() : undefined,
+      customFieldValues:
+        Object.keys(form.customFieldValues).length > 0
+          ? form.customFieldValues
+          : undefined,
     };
 
     let result: Task;

@@ -136,6 +136,25 @@
                 <span>Edit Statuses</span>
               </button>
             </div>
+
+            <!-- Custom Fields Entry -->
+            <div
+              v-if="isEditing && spaceToEdit?._id"
+              class="pt-3 border-t border-slate-800 flex items-center justify-between"
+            >
+              <div>
+                <span class="text-sm font-medium text-slate-200">Custom Fields</span>
+                <p class="text-xs text-slate-400">Manage fields inherited by all lists in this space</p>
+              </div>
+              <button
+                type="button"
+                class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-750 text-indigo-400 hover:text-indigo-300 border border-slate-700 transition cursor-pointer flex items-center gap-1.5"
+                @click="isCustomFieldsOpen = true"
+              >
+                <span>📋</span>
+                <span>Edit Fields</span>
+              </button>
+            </div>
           </div>
 
           <div class="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-slate-800">
@@ -168,6 +187,16 @@
       @close="isStatusWorkflowOpen = false"
       @saved="handleStatusWorkflowSaved"
     />
+
+    <!-- Custom Fields Modal for Space -->
+    <CustomFieldsModal
+      v-if="spaceToEdit?._id"
+      :is-open="isCustomFieldsOpen"
+      :space-id="spaceToEdit._id"
+      :entity-name="spaceToEdit.name"
+      @close="isCustomFieldsOpen = false"
+      @updated="emit('saved')"
+    />
   </Teleport>
 </template>
 
@@ -175,6 +204,7 @@
 import { ref, reactive, watch } from 'vue';
 import type { Space } from '../../types/hierarchy';
 import StatusWorkflowModal from './StatusWorkflowModal.vue';
+import CustomFieldsModal from '../custom-fields/CustomFieldsModal.vue';
 
 const props = defineProps<{
   isOpen: boolean;
@@ -214,6 +244,7 @@ const submitting = ref(false);
 const errorMessage = ref<string | null>(null);
 const isEditing = ref(false);
 const isStatusWorkflowOpen = ref(false);
+const isCustomFieldsOpen = ref(false);
 
 function handleStatusWorkflowSaved() {
   emit('saved');

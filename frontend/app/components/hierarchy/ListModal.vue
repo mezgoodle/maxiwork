@@ -103,6 +103,25 @@
                 <span>Edit Statuses</span>
               </button>
             </div>
+
+            <!-- Custom Fields Entry -->
+            <div
+              v-if="isEditing && listToEdit?.id"
+              class="pt-3 border-t border-slate-800 flex items-center justify-between"
+            >
+              <div>
+                <span class="text-sm font-medium text-slate-200">Custom Fields</span>
+                <p class="text-xs text-slate-400">Configure fields for this list and view space fields</p>
+              </div>
+              <button
+                type="button"
+                class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-750 text-indigo-400 hover:text-indigo-300 border border-slate-700 transition cursor-pointer flex items-center gap-1.5"
+                @click="isCustomFieldsOpen = true"
+              >
+                <span>📋</span>
+                <span>Edit Fields</span>
+              </button>
+            </div>
           </div>
 
           <div class="flex items-center justify-between mt-6 pt-4 border-t border-slate-800">
@@ -160,6 +179,17 @@
       @close="isStatusWorkflowOpen = false"
       @saved="handleStatusWorkflowSaved"
     />
+
+    <!-- Custom Fields Modal for List -->
+    <CustomFieldsModal
+      v-if="listToEdit?.id"
+      :is-open="isCustomFieldsOpen"
+      :space-id="spaceId"
+      :list-id="listToEdit.id"
+      :entity-name="listToEdit.name"
+      @close="isCustomFieldsOpen = false"
+      @updated="emit('saved')"
+    />
   </Teleport>
 </template>
 
@@ -168,6 +198,7 @@ import { ref, reactive, watch } from 'vue';
 import type { HierarchyTreeNodeFolder, HierarchyTreeNodeList } from '../../types/hierarchy';
 import ConfirmDialog from '../ui/ConfirmDialog.vue';
 import StatusWorkflowModal from './StatusWorkflowModal.vue';
+import CustomFieldsModal from '../custom-fields/CustomFieldsModal.vue';
 import { useToast } from '../../composables/useToast';
 import { extractApiErrorMessage } from '../../utils/error';
 
@@ -201,6 +232,7 @@ const isEditing = ref(false);
 const isConfirmDeleteDialogOpen = ref(false);
 const isDeleting = ref(false);
 const isStatusWorkflowOpen = ref(false);
+const isCustomFieldsOpen = ref(false);
 
 function handleStatusWorkflowSaved() {
   emit('saved');

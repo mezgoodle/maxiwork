@@ -23,6 +23,7 @@ export interface Task {
   completedSubtasksCount?: number;
   order?: number;
   subtasks?: Task[];
+  customFieldValues?: Record<string, unknown>;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -36,6 +37,7 @@ export interface CreateTaskPayload {
   startDate?: string;
   dueDate?: string;
   list?: string;
+  customFieldValues?: Record<string, unknown>;
 }
 
 export interface UpdateTaskPayload {
@@ -47,6 +49,7 @@ export interface UpdateTaskPayload {
   startDate?: string | null;
   dueDate?: string | null;
   list?: string | null;
+  customFieldValues?: Record<string, unknown>;
 }
 
 export interface CreateSubtaskPayload {
