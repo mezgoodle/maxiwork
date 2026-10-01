@@ -1400,6 +1400,24 @@ export class HierarchyService implements OnModuleInit {
       );
     }
 
+    const categoryRank: Record<StatusCategory, number> = {
+      [StatusCategory.TO_DO]: 1,
+      [StatusCategory.IN_PROGRESS]: 2,
+      [StatusCategory.DONE]: 3,
+      [StatusCategory.CLOSED]: 4,
+    };
+
+    statuses.sort((a, b) => {
+      const rankA = categoryRank[a.category] ?? 99;
+      const rankB = categoryRank[b.category] ?? 99;
+      if (rankA !== rankB) return rankA - rankB;
+      return (a.order ?? 0) - (b.order ?? 0);
+    });
+
+    statuses.forEach((s, idx) => {
+      s.order = idx;
+    });
+
     let defaultTodoStatusId = dto.defaultTodoStatusId?.trim();
     if (defaultTodoStatusId) {
       const target = statuses.find(

@@ -1,7 +1,7 @@
 <template>
-  <div class="flex flex-col text-slate-100 h-full">
+  <div class="flex flex-col text-slate-100 h-full min-h-0">
     <!-- Header: Navigation breadcrumbs, Key, Status, Done toggle, Fullscreen/Close -->
-    <div class="flex flex-col gap-3 pb-4 border-b border-slate-800 mb-6 shrink-0">
+    <div class="flex flex-col gap-3 pb-4 border-b border-slate-800 mb-4 shrink-0">
       <!-- Top Bar: Parent link / Breadcrumbs & Action buttons -->
       <div class="flex items-center justify-between gap-3">
         <!-- Parent Task Link / History Back -->
@@ -118,7 +118,7 @@
     </div>
 
     <!-- Scrollable Body -->
-    <div class="flex-1 overflow-y-auto space-y-6 pr-1">
+    <div class="flex-1 overflow-y-auto space-y-6 pr-1 min-h-0">
       <!-- Title Input -->
       <div>
         <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
@@ -262,7 +262,7 @@
     </div>
 
     <!-- Footer -->
-    <div class="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400 shrink-0">
+    <div class="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400 shrink-0">
       <span>Created {{ formatCreatedDate(activeTask.createdAt) }}</span>
       <button
         v-if="isDrawer"
@@ -615,9 +615,21 @@ watch(
   },
 );
 
+const categoryRank: Record<string, number> = {
+  to_do: 1,
+  in_progress: 2,
+  done: 3,
+  closed: 4,
+};
+
 const statusOptions = computed(() => {
   if (effectiveWorkflow.value?.statuses?.length) {
-    return effectiveWorkflow.value.statuses;
+    return [...effectiveWorkflow.value.statuses].sort((a, b) => {
+      const rA = a.category ? (categoryRank[a.category] || 99) : 99;
+      const rB = b.category ? (categoryRank[b.category] || 99) : 99;
+      if (rA !== rB) return rA - rB;
+      return (a.order ?? 0) - (b.order ?? 0);
+    });
   }
   return [
     { id: 'todo', name: 'To Do', category: 'to_do', color: '#94a3b8' },

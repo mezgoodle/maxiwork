@@ -12,9 +12,9 @@
 
       <!-- Modal Panel -->
       <div
-        class="relative w-full max-w-lg bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl p-6 sm:p-8 text-slate-100 z-10"
+        class="relative w-full max-w-lg bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl p-6 sm:p-8 text-slate-100 z-10 max-h-[90vh] flex flex-col overflow-hidden"
       >
-        <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-6">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-4 shrink-0">
           <h2 class="text-xl font-bold text-white">
             {{ isEditing ? 'Edit Task' : 'Create New Task' }}
           </h2>
@@ -27,15 +27,15 @@
           </button>
         </div>
 
-        <form @submit.prevent="handleSubmit">
+        <form class="flex-1 flex flex-col min-h-0" @submit.prevent="handleSubmit">
           <div
             v-if="errorMessage"
-            class="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-sm"
+            class="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-sm shrink-0"
           >
             {{ errorMessage }}
           </div>
 
-          <div class="space-y-4">
+          <div class="flex-1 overflow-y-auto pr-1 space-y-4 min-h-0">
             <!-- Title -->
             <div>
               <label class="block text-sm font-medium text-slate-300 mb-1.5">
@@ -194,7 +194,7 @@
           </div>
 
           <!-- Actions -->
-          <div class="mt-8 flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+          <div class="mt-4 flex items-center justify-end gap-3 pt-4 border-t border-slate-800 shrink-0">
             <button
               type="button"
               class="px-4 py-2 rounded-xl text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer"
@@ -253,9 +253,21 @@ interface Emits {
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
+const categoryRank: Record<string, number> = {
+  to_do: 1,
+  in_progress: 2,
+  done: 3,
+  closed: 4,
+};
+
 const statusOptions = computed(() => {
   if (props.workflow?.statuses?.length) {
-    return props.workflow.statuses;
+    return [...props.workflow.statuses].sort((a, b) => {
+      const rA = a.category ? (categoryRank[a.category] || 99) : 99;
+      const rB = b.category ? (categoryRank[b.category] || 99) : 99;
+      if (rA !== rB) return rA - rB;
+      return (a.order ?? 0) - (b.order ?? 0);
+    });
   }
   return [
     { id: 'todo', name: 'To Do' },

@@ -628,14 +628,28 @@ const currentSpace = computed<Space | null>(() => {
   };
 });
 
+const categoryRank: Record<string, number> = {
+  to_do: 1,
+  in_progress: 2,
+  done: 3,
+  closed: 4,
+};
+
 const statusOptions = computed(() => {
   if (listWorkflow.value?.statuses?.length) {
-    return listWorkflow.value.statuses.map((s) => ({
-      id: s.id,
-      name: s.name,
-      category: s.category,
-      color: s.color,
-    }));
+    return [...listWorkflow.value.statuses]
+      .sort((a, b) => {
+        const rankA = categoryRank[a.category] || 99;
+        const rankB = categoryRank[b.category] || 99;
+        if (rankA !== rankB) return rankA - rankB;
+        return (a.order ?? 0) - (b.order ?? 0);
+      })
+      .map((s) => ({
+        id: s.id,
+        name: s.name,
+        category: s.category,
+        color: s.color,
+      }));
   }
   return [
     { id: 'todo', name: 'To Do', category: 'to_do', color: '#94A3B8' },
