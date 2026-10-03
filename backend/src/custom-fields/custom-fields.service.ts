@@ -8,7 +8,11 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { HierarchyService } from '../hierarchy/hierarchy.service';
 import { WorkspaceRole } from '../hierarchy/enums/workspace-role.enum';
-import { Task, TaskDocument } from '../tasks/schemas/task.schema';
+import {
+  Task,
+  TaskDocument,
+  mergeCustomFieldValues,
+} from '../tasks/schemas/task.schema';
 import {
   CustomField,
   CustomFieldDocument,
@@ -532,15 +536,15 @@ export class CustomFieldsService {
         userId,
       );
       const sanitized = this.validateAndSanitizeValues(effectiveFields, values);
-      task.customFieldValues = {
-        ...(task.customFieldValues || {}),
-        ...sanitized,
-      };
+      task.customFieldValues = mergeCustomFieldValues(
+        task.customFieldValues,
+        sanitized,
+      );
     } else {
-      task.customFieldValues = {
-        ...(task.customFieldValues || {}),
-        ...values,
-      };
+      task.customFieldValues = mergeCustomFieldValues(
+        task.customFieldValues,
+        values,
+      );
     }
 
     await task.save();
@@ -587,10 +591,10 @@ export class CustomFieldsService {
         item.customFieldValues,
       );
 
-      task.customFieldValues = {
-        ...(task.customFieldValues || {}),
-        ...sanitized,
-      };
+      task.customFieldValues = mergeCustomFieldValues(
+        task.customFieldValues,
+        sanitized,
+      );
 
       await task.save();
 

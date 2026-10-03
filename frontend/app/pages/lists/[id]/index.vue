@@ -76,10 +76,40 @@
           </button>
         </div>
 
+        <!-- Statuses Workflow Settings -->
+        <button
+          type="button"
+          class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800/80 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700/80 transition cursor-pointer flex items-center gap-1.5"
+          title="Configure custom status workflow"
+          @click="isStatusWorkflowModalOpen = true"
+        >
+          <span>⚙️</span>
+          <span>Statuses</span>
+          <span v-if="isWorkflowInherited" class="text-[10px] text-slate-500 font-normal hidden sm:inline">(Space)</span>
+          <span v-else-if="listWorkflow" class="text-[10px] text-indigo-400 font-medium hidden sm:inline">(Custom)</span>
+        </button>
+
+        <!-- Custom Fields Settings -->
+        <button
+          type="button"
+          class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800/80 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700/80 transition cursor-pointer flex items-center gap-1.5"
+          title="Manage custom fields for this list"
+          @click="isCustomFieldsModalOpen = true"
+        >
+          <span>📋</span>
+          <span>Fields</span>
+          <span
+            v-if="effectiveFields.length > 0"
+            class="text-[10px] bg-slate-700 text-slate-300 px-1.5 py-0.2 rounded-full font-mono"
+          >
+            {{ effectiveFields.length }}
+          </span>
+        </button>
+
         <button
           type="button"
           class="px-4 py-2 rounded-xl text-sm font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition flex items-center gap-2 cursor-pointer shadow-lg shadow-indigo-600/20"
-          @click="openCreateTaskModal('todo')"
+          @click="openCreateTaskModal()"
         >
           <span>+</span>
           <span>New Task</span>
@@ -145,7 +175,7 @@
         <button
           type="button"
           class="px-4 py-2 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition cursor-pointer shadow-lg shadow-indigo-600/20"
-          @click="openCreateTaskModal('todo')"
+          @click="openCreateTaskModal()"
         >
           + Add First Task
         </button>
@@ -156,6 +186,7 @@
         <KanbanBoard
           :tasks="tasks"
           :list-id="listId"
+          :workflow="listWorkflow"
           :loading="loading"
           @task-drop="handleDrop"
           @create-task="openCreateTaskModal"
@@ -164,8 +195,36 @@
         />
       </div>
 
-      <!-- List View (Detailed Task Rows + Expandable Subtasks) -->
+      <!-- List View (Detailed Task Rows + Expandable Subtasks + Custom Field Columns) -->
       <div v-else class="space-y-2">
+        <!-- Table Column Headers Bar (Desktop) -->
+        <div
+          v-if="tasks.length > 0"
+          class="hidden lg:flex items-center justify-between px-3.5 py-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800"
+        >
+          <div class="flex items-center gap-2.5 min-w-0 flex-1">
+            <span class="w-5 shrink-0" />
+            <span class="w-6 shrink-0" />
+            <span class="w-12 shrink-0">Key</span>
+            <span>Task Title</span>
+          </div>
+          <div class="flex items-center gap-3 shrink-0">
+            <!-- Dynamic Custom Field Header Columns -->
+            <div
+              v-for="field in effectiveFields"
+              :key="field._id"
+              class="w-28 truncate text-left font-semibold text-slate-400"
+              :title="field.name"
+            >
+              {{ field.name }}
+            </div>
+            <span class="w-24 text-center">Due Date</span>
+            <span class="w-16 text-center">Priority</span>
+            <span class="w-24 text-center">Assignee</span>
+            <span class="w-28 text-center">Status</span>
+          </div>
+        </div>
+
         <div
           v-for="task in tasks"
           :key="task._id"
@@ -200,11 +259,11 @@
                 type="button"
                 class="w-6 h-6 rounded-md border flex items-center justify-center transition-colors cursor-pointer shrink-0"
                 :class="
-                  task.status === 'done'
+                  isTaskDone(task)
                     ? 'bg-emerald-500 border-emerald-400 text-slate-950 hover:bg-emerald-400 shadow-xs shadow-emerald-500/30'
                     : 'bg-slate-900 border-slate-700 text-slate-500 hover:text-emerald-400 hover:border-emerald-500/50'
                 "
-                :title="task.status === 'done' ? 'Reopen task (To Do)' : 'Mark task as Done'"
+                :title="isTaskDone(task) ? 'Reopen task' : 'Mark task as Done'"
                 @click.stop="toggleTaskDone(task)"
               >
                 <span class="text-xs font-bold leading-none">✓</span>
@@ -218,7 +277,7 @@
               <!-- Title -->
               <span
                 class="text-sm font-medium truncate transition"
-                :class="task.status === 'done' ? 'line-through text-slate-400' : 'text-slate-100 group-hover:text-indigo-300'"
+                :class="isTaskDone(task) ? 'line-through text-slate-400' : 'text-slate-100 group-hover:text-indigo-300'"
               >
                 {{ task.title }}
               </span>
@@ -243,8 +302,23 @@
               </span>
             </div>
 
-            <!-- Right: Detailed fields (Dates, Assignee, Priority, Status) -->
+            <!-- Right: Custom Fields + Detailed fields (Dates, Assignee, Priority, Status) -->
             <div class="flex items-center gap-3 shrink-0 self-end sm:self-auto" @click.stop>
+              <!-- Dynamic Custom Field Cells -->
+              <div
+                v-for="field in effectiveFields"
+                :key="field._id"
+                class="w-28 shrink-0 hidden lg:block"
+                @click.stop
+              >
+                <CustomFieldInput
+                  :model-value="task.customFieldValues?.[field._id]"
+                  :field="field"
+                  compact
+                  @change="(val) => handleInlineCustomFieldChange(task, field._id, val)"
+                />
+              </div>
+
               <!-- Due Date badge -->
               <div
                 v-if="task.dueDate"
@@ -292,10 +366,13 @@
                 class="bg-slate-900 border border-slate-700 text-xs rounded-lg px-2.5 py-1 text-slate-200 focus:outline-none capitalize cursor-pointer shrink-0"
                 @change="handleStatusChange(task._id, ($event.target as HTMLSelectElement).value as TaskStatus)"
               >
-                <option value="todo">To Do</option>
-                <option value="in_progress">In Progress</option>
-                <option value="in_review">In Review</option>
-                <option value="done">Done</option>
+                <option
+                  v-for="opt in statusOptions"
+                  :key="opt.id"
+                  :value="opt.id"
+                >
+                  {{ opt.name }}
+                </option>
               </select>
             </div>
           </div>
@@ -317,11 +394,11 @@
                   type="button"
                   class="w-5 h-5 rounded-md border flex items-center justify-center transition-colors cursor-pointer shrink-0"
                   :class="
-                    sub.status === 'done'
+                    isTaskDone(sub)
                       ? 'bg-emerald-500 border-emerald-400 text-slate-950 hover:bg-emerald-400'
                       : 'bg-slate-900 border-slate-700 text-slate-500 hover:text-emerald-400'
                   "
-                  :title="sub.status === 'done' ? 'Reopen subtask' : 'Mark subtask as Done'"
+                  :title="isTaskDone(sub) ? 'Reopen subtask' : 'Mark subtask as Done'"
                   @click.stop="toggleTaskDone(sub)"
                 >
                   <span class="text-[10px] font-bold leading-none">✓</span>
@@ -334,14 +411,29 @@
 
                 <span
                   class="text-xs font-medium truncate transition"
-                  :class="sub.status === 'done' ? 'line-through text-slate-500' : 'text-slate-200 group-hover/sub:text-indigo-300'"
+                  :class="isTaskDone(sub) ? 'line-through text-slate-500' : 'text-slate-200 group-hover/sub:text-indigo-300'"
                 >
                   {{ sub.title }}
                 </span>
               </div>
 
-              <!-- Right: Subtask Fields (Date, Priority, Assignee, Status) -->
+              <!-- Right: Subtask Custom Fields + Fields (Date, Priority, Assignee, Status) -->
               <div class="flex items-center gap-2.5 shrink-0 self-end sm:self-auto" @click.stop>
+                <!-- Subtask Dynamic Custom Field Cells -->
+                <div
+                  v-for="field in effectiveFields"
+                  :key="field._id"
+                  class="w-28 shrink-0 hidden lg:block"
+                  @click.stop
+                >
+                  <CustomFieldInput
+                    :model-value="sub.customFieldValues?.[field._id]"
+                    :field="field"
+                    compact
+                    @change="(val) => handleInlineCustomFieldChange(sub, field._id, val)"
+                  />
+                </div>
+
                 <span
                   v-if="sub.dueDate"
                   class="font-mono text-[11px] px-2 py-0.5 rounded-md bg-slate-900 border"
@@ -370,10 +462,13 @@
                   class="bg-slate-900 border border-slate-700 text-xs rounded-lg px-2 py-0.5 text-slate-200 focus:outline-none capitalize cursor-pointer shrink-0"
                   @change="handleStatusChange(sub._id, ($event.target as HTMLSelectElement).value as TaskStatus)"
                 >
-                  <option value="todo">To Do</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="in_review">In Review</option>
-                  <option value="done">Done</option>
+                  <option
+                    v-for="opt in statusOptions"
+                    :key="opt.id"
+                    :value="opt.id"
+                  >
+                    {{ opt.name }}
+                  </option>
                 </select>
               </div>
             </div>
@@ -386,6 +481,7 @@
     <TaskFormModal
       :is-open="isCreateModalOpen"
       :list-id="listId"
+      :workflow="listWorkflow"
       :default-status="modalDefaultStatus"
       @close="isCreateModalOpen = false"
       @saved="handleTaskSaved"
@@ -396,9 +492,30 @@
       :is-open="isDetailOpen"
       :list-id="listId"
       :task="selectedTask"
+      :workflow="listWorkflow"
       @close="isDetailOpen = false"
       @updated="handleTaskUpdated"
       @deleted="handleTaskDeleted"
+    />
+
+    <!-- Status Workflow Modal -->
+    <StatusWorkflowModal
+      :is-open="isStatusWorkflowModalOpen"
+      target-type="list"
+      :target-id="listId"
+      :target-name="listDetails?.name || 'List'"
+      @close="isStatusWorkflowModalOpen = false"
+      @saved="handleWorkflowSaved"
+    />
+
+    <!-- Custom Fields Modal for List -->
+    <CustomFieldsModal
+      :is-open="isCustomFieldsModalOpen"
+      :list-id="listId"
+      :space-id="currentSpace?._id"
+      :entity-name="listDetails?.name"
+      @close="isCustomFieldsModalOpen = false"
+      @updated="loadCustomFields"
     />
 
     <!-- Delete Task Confirmation Dialog -->
@@ -431,15 +548,20 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useHierarchyStore } from '../../../stores/hierarchy';
+import { useCustomFieldsStore } from '../../../stores/custom-fields';
 import { useApi } from '../../../composables/useApi';
 import { useToast } from '../../../composables/useToast';
 import { extractApiErrorMessage } from '../../../utils/error';
 import { getPriorityBadgeClass, getUserDisplayName, getUserInitials } from '../../../utils/task';
-import type { List, Space } from '../../../types/hierarchy';
+import type { List, Space, StatusWorkflow } from '../../../types/hierarchy';
 import type { Task, TaskPriority, TaskStatus } from '../../../types/task';
+import type { EffectiveCustomField } from '../../../types/custom-field';
 import KanbanBoard from '../../../components/board/KanbanBoard.vue';
 import TaskFormModal from '../../../components/task/TaskFormModal.vue';
 import TaskDetailDrawer from '../../../components/task/TaskDetailDrawer.vue';
+import StatusWorkflowModal from '../../../components/hierarchy/StatusWorkflowModal.vue';
+import CustomFieldsModal from '../../../components/custom-fields/CustomFieldsModal.vue';
+import CustomFieldInput from '../../../components/custom-fields/CustomFieldInput.vue';
 import ConfirmDialog from '../../../components/ui/ConfirmDialog.vue';
 
 definePageMeta({
@@ -450,6 +572,7 @@ const route = useRoute();
 const listId = computed(() => String(route.params.id || ''));
 
 const hierarchyStore = useHierarchyStore();
+const customFieldsStore = useCustomFieldsStore();
 const { apiFetch } = useApi();
 const { showToast } = useToast();
 
@@ -458,6 +581,11 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const listDetails = ref<List | null>(null);
 const tasks = ref<Task[]>([]);
+const listWorkflow = ref<StatusWorkflow | null>(null);
+const isWorkflowInherited = ref(false);
+const isStatusWorkflowModalOpen = ref(false);
+const isCustomFieldsModalOpen = ref(false);
+const effectiveFields = ref<EffectiveCustomField[]>([]);
 
 const showSubtasks = ref(false);
 const expandedTaskIds = ref<Set<string>>(new Set());
@@ -499,6 +627,44 @@ const currentSpace = computed<Space | null>(() => {
     updatedAt: '',
   };
 });
+
+const categoryRank: Record<string, number> = {
+  to_do: 1,
+  in_progress: 2,
+  done: 3,
+  closed: 4,
+};
+
+const statusOptions = computed(() => {
+  if (listWorkflow.value?.statuses?.length) {
+    return [...listWorkflow.value.statuses]
+      .sort((a, b) => {
+        const rankA = categoryRank[a.category] || 99;
+        const rankB = categoryRank[b.category] || 99;
+        if (rankA !== rankB) return rankA - rankB;
+        return (a.order ?? 0) - (b.order ?? 0);
+      })
+      .map((s) => ({
+        id: s.id,
+        name: s.name,
+        category: s.category,
+        color: s.color,
+      }));
+  }
+  return [
+    { id: 'todo', name: 'To Do', category: 'to_do', color: '#94A3B8' },
+    { id: 'in_progress', name: 'In Progress', category: 'in_progress', color: '#38BDF8' },
+    { id: 'in_review', name: 'In Review', category: 'in_progress', color: '#A855F7' },
+    { id: 'done', name: 'Done', category: 'done', color: '#22C55E' },
+  ];
+});
+
+function isTaskDone(task: Task): boolean {
+  if (task.completed) return true;
+  if (!listWorkflow.value) return task.status === 'done';
+  const st = listWorkflow.value.statuses.find((s) => s.id === task.status);
+  return st ? (st.category === 'done' || st.category === 'closed') : task.status === 'done';
+}
 
 function getPriorityClass(priority?: TaskPriority): string {
   return getPriorityBadgeClass(priority);
@@ -586,6 +752,15 @@ async function loadList() {
     listDetails.value = res;
 
     try {
+      const wfRes = await hierarchyStore.fetchListStatusWorkflow(listId.value);
+      listWorkflow.value = wfRes.workflow;
+      isWorkflowInherited.value = wfRes.inherited;
+    } catch {
+      listWorkflow.value = null;
+      isWorkflowInherited.value = false;
+    }
+
+    try {
       const taskRes = await apiFetch<Task[]>(
         `/lists/${listId.value}/tasks`,
         { method: 'GET' },
@@ -601,6 +776,8 @@ async function loadList() {
     } catch {
       tasks.value = [];
     }
+
+    await loadCustomFields();
   } catch (err: unknown) {
     error.value = extractApiErrorMessage(err, 'Failed to load list details');
   } finally {
@@ -608,8 +785,44 @@ async function loadList() {
   }
 }
 
+async function loadCustomFields() {
+  if (!listId.value) return;
+  try {
+    effectiveFields.value = await customFieldsStore.fetchListFields(listId.value);
+  } catch {
+    effectiveFields.value = [];
+  }
+}
+
+async function handleInlineCustomFieldChange(
+  task: Task,
+  fieldId: string,
+  val: unknown,
+) {
+  try {
+    const currentValues = { ...(task.customFieldValues || {}) };
+    let updatedValues: Record<string, unknown>;
+    if (val === null || val === undefined || val === '') {
+      const { [fieldId]: _omitted, ...rest } = currentValues;
+      updatedValues = rest;
+    } else {
+      updatedValues = { ...currentValues, [fieldId]: val };
+    }
+    task.customFieldValues = updatedValues;
+
+    await customFieldsStore.updateTaskCustomFields(task._id, { [fieldId]: val });
+    showToast('Field updated', 'success');
+  } catch (err: unknown) {
+    showToast(extractApiErrorMessage(err, 'Failed to update field'), 'error');
+  }
+}
+
+async function handleWorkflowSaved() {
+  await loadList();
+}
+
 function openCreateTaskModal(status?: TaskStatus) {
-  modalDefaultStatus.value = status || 'todo';
+  modalDefaultStatus.value = status || (listWorkflow.value?.defaultTodoStatusId as TaskStatus) || 'todo';
   isCreateModalOpen.value = true;
 }
 
@@ -659,10 +872,11 @@ async function handleQuickAdd() {
   if (!title || !listId.value) return;
 
   isQuickAdding.value = true;
+  const initialStatus = (listWorkflow.value?.defaultTodoStatusId || 'todo') as TaskStatus;
   try {
     const created = await apiFetch<Task>(`/lists/${listId.value}/tasks`, {
       method: 'POST',
-      body: { title, status: 'todo' },
+      body: { title, status: initialStatus },
     });
     tasks.value.unshift(created);
     quickTitle.value = '';
@@ -708,7 +922,13 @@ async function handleStatusChange(taskId: string, newStatus: TaskStatus) {
 }
 
 async function toggleTaskDone(task: Task) {
-  const newStatus: TaskStatus = task.status === 'done' ? 'todo' : 'done';
+  const done = isTaskDone(task);
+  let newStatus: TaskStatus;
+  if (done) {
+    newStatus = (listWorkflow.value?.defaultTodoStatusId || 'todo') as TaskStatus;
+  } else {
+    newStatus = (listWorkflow.value?.defaultDoneStatusId || 'done') as TaskStatus;
+  }
   await handleStatusChange(task._id, newStatus);
 }
 

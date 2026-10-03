@@ -12,6 +12,9 @@ import type {
   UpdateFolderPayload,
   CreateListPayload,
   UpdateListPayload,
+  StatusWorkflow,
+  UpdateStatusWorkflowPayload,
+  ListStatusWorkflowResponse,
 } from '../types/hierarchy';
 import { useApi } from '../composables/useApi';
 
@@ -391,6 +394,104 @@ export const useHierarchyStore = defineStore('hierarchy', () => {
     }
   }
 
+  async function fetchSpaceStatusWorkflow(spaceId: string): Promise<StatusWorkflow> {
+    loading.value = true;
+    error.value = null;
+    try {
+      const client = getClient();
+      return await client<StatusWorkflow>(`/spaces/${spaceId}/status-workflow`, {
+        method: 'GET',
+      });
+    } catch (err: unknown) {
+      const fetchErr = err as { data?: { message?: string }; message?: string };
+      error.value =
+        fetchErr?.data?.message || fetchErr?.message || 'Failed to fetch space status workflow';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function updateSpaceStatusWorkflow(
+    spaceId: string,
+    payload: UpdateStatusWorkflowPayload,
+  ): Promise<StatusWorkflow> {
+    loading.value = true;
+    error.value = null;
+    try {
+      const client = getClient();
+      return await client<StatusWorkflow>(`/spaces/${spaceId}/status-workflow`, {
+        method: 'PATCH',
+        body: payload,
+      });
+    } catch (err: unknown) {
+      const fetchErr = err as { data?: { message?: string }; message?: string };
+      error.value =
+        fetchErr?.data?.message || fetchErr?.message || 'Failed to update space status workflow';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function fetchListStatusWorkflow(listId: string): Promise<ListStatusWorkflowResponse> {
+    loading.value = true;
+    error.value = null;
+    try {
+      const client = getClient();
+      return await client<ListStatusWorkflowResponse>(`/lists/${listId}/status-workflow`, {
+        method: 'GET',
+      });
+    } catch (err: unknown) {
+      const fetchErr = err as { data?: { message?: string }; message?: string };
+      error.value =
+        fetchErr?.data?.message || fetchErr?.message || 'Failed to fetch list status workflow';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function updateListStatusWorkflow(
+    listId: string,
+    payload: UpdateStatusWorkflowPayload,
+  ): Promise<StatusWorkflow> {
+    loading.value = true;
+    error.value = null;
+    try {
+      const client = getClient();
+      return await client<StatusWorkflow>(`/lists/${listId}/status-workflow`, {
+        method: 'PATCH',
+        body: payload,
+      });
+    } catch (err: unknown) {
+      const fetchErr = err as { data?: { message?: string }; message?: string };
+      error.value =
+        fetchErr?.data?.message || fetchErr?.message || 'Failed to update list status workflow';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function resetListStatusWorkflow(listId: string): Promise<ListStatusWorkflowResponse> {
+    loading.value = true;
+    error.value = null;
+    try {
+      const client = getClient();
+      return await client<ListStatusWorkflowResponse>(`/lists/${listId}/status-workflow`, {
+        method: 'DELETE',
+      });
+    } catch (err: unknown) {
+      const fetchErr = err as { data?: { message?: string }; message?: string };
+      error.value =
+        fetchErr?.data?.message || fetchErr?.message || 'Failed to reset list status workflow';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
   return {
     workspaces,
     currentWorkspace,
@@ -418,5 +519,10 @@ export const useHierarchyStore = defineStore('hierarchy', () => {
     createList,
     updateList,
     deleteList,
+    fetchSpaceStatusWorkflow,
+    updateSpaceStatusWorkflow,
+    fetchListStatusWorkflow,
+    updateListStatusWorkflow,
+    resetListStatusWorkflow,
   };
 });
