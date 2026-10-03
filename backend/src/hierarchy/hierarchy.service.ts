@@ -11,8 +11,12 @@ import { Workspace, WorkspaceDocument } from './schemas/workspace.schema';
 import { Space, SpaceDocument } from './schemas/space.schema';
 import { Folder, FolderDocument } from './schemas/folder.schema';
 import { List, ListDocument } from './schemas/list.schema';
-import { Task, TaskDocument } from '../tasks/schemas/task.schema';
 import { Project, ProjectDocument } from '../projects/schemas/project.schema';
+import {
+  Task,
+  TaskDocument,
+  mergeCustomFieldValues,
+} from '../tasks/schemas/task.schema';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { WorkspaceRole } from './enums/workspace-role.enum';
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
@@ -1132,10 +1136,10 @@ export class HierarchyService implements OnModuleInit {
     }
 
     if (dto.customFieldValues !== undefined) {
-      task.customFieldValues = {
-        ...(task.customFieldValues || {}),
-        ...dto.customFieldValues,
-      };
+      task.customFieldValues = mergeCustomFieldValues(
+        task.customFieldValues,
+        dto.customFieldValues,
+      );
     }
 
     if (dto.status !== undefined) {

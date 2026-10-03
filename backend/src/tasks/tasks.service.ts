@@ -7,7 +7,11 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { Task, TaskDocument } from './schemas/task.schema';
+import {
+  Task,
+  TaskDocument,
+  mergeCustomFieldValues,
+} from './schemas/task.schema';
 import { Project, ProjectDocument } from '../projects/schemas/project.schema';
 import { List, ListDocument } from '../hierarchy/schemas/list.schema';
 import { Space, SpaceDocument } from '../hierarchy/schemas/space.schema';
@@ -412,10 +416,10 @@ export class TasksService {
     }
 
     if (updateTaskDto.customFieldValues !== undefined) {
-      task.customFieldValues = {
-        ...(task.customFieldValues || {}),
-        ...updateTaskDto.customFieldValues,
-      };
+      task.customFieldValues = mergeCustomFieldValues(
+        task.customFieldValues,
+        updateTaskDto.customFieldValues,
+      );
     }
 
     const updated = await task.save();

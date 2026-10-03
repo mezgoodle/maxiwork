@@ -113,3 +113,56 @@ TaskSchema.index({ project: 1, parentTaskId: 1 });
 TaskSchema.index({ list: 1, status: 1 });
 TaskSchema.index({ list: 1, parentTaskId: 1 });
 TaskSchema.index({ parentTaskId: 1, order: 1 });
+
+export function extractPlainCustomFieldValues(
+  values?: unknown,
+): Record<string, unknown> {
+  if (!values) {
+    return {};
+  }
+  if (values instanceof Map) {
+    const plain: Record<string, unknown> = {};
+    for (const [key, val] of values.entries()) {
+      if (typeof key === 'string' && !key.startsWith('$')) {
+        plain[key] = val;
+      }
+    }
+    return plain;
+  }
+  if (
+    typeof values === 'object' &&
+    values !== null &&
+    'toJSON' in values &&
+    typeof (values as { toJSON: () => unknown }).toJSON === 'function'
+  ) {
+    const json = (values as { toJSON: () => unknown }).toJSON();
+    if (typeof json === 'object' && json !== null) {
+      return json as Record<string, unknown>;
+    }
+  }
+  if (typeof values === 'object' && values !== null) {
+    const plain: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(values as Record<string, unknown>)) {
+      if (!k.startsWith('$')) {
+        plain[k] = v;
+      }
+    }
+    return plain;
+  }
+  return {};
+}
+
+export function mergeCustomFieldValues(
+  currentValues: unknown,
+  newValues: Record<string, unknown>,
+): Record<string, unknown> {
+  const merged = extractPlainCustomFieldValues(currentValues);
+  for (const [key, value] of Object.entries(newValues)) {
+    if (value === null || value === undefined) {
+      delete merged[key];
+    } else {
+      merged[key] = value;
+    }
+  }
+  return merged;
+}
