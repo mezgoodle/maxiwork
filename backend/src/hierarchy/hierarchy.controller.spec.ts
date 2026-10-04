@@ -26,6 +26,15 @@ describe('HierarchyController', () => {
     findOneList: jest.Mock;
     updateList: jest.Mock;
     deleteList: jest.Mock;
+    createListTask: jest.Mock;
+    findListTasks: jest.Mock;
+    updateListTask: jest.Mock;
+    deleteListTask: jest.Mock;
+    getSpaceStatusWorkflow: jest.Mock;
+    updateSpaceStatusWorkflow: jest.Mock;
+    getListStatusWorkflow: jest.Mock;
+    updateListStatusWorkflow: jest.Mock;
+    resetListStatusWorkflow: jest.Mock;
   };
 
   const mockUser = {
@@ -60,6 +69,11 @@ describe('HierarchyController', () => {
       findListTasks: jest.fn(),
       updateListTask: jest.fn(),
       deleteListTask: jest.fn(),
+      getSpaceStatusWorkflow: jest.fn(),
+      updateSpaceStatusWorkflow: jest.fn(),
+      getListStatusWorkflow: jest.fn(),
+      updateListStatusWorkflow: jest.fn(),
+      resetListStatusWorkflow: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -241,5 +255,106 @@ describe('HierarchyController', () => {
       String(mockUser._id),
     );
     expect(result).toEqual({ success: true });
+  });
+
+  describe('Status Workflow endpoints', () => {
+    const mockWorkflow = {
+      statuses: [
+        {
+          id: 'todo',
+          name: 'To Do',
+          category: 'to_do',
+          color: '#d1d5db',
+          order: 0,
+        },
+        {
+          id: 'done',
+          name: 'Done',
+          category: 'done',
+          color: '#10b981',
+          order: 1,
+        },
+      ],
+      defaultStatusId: 'todo',
+    };
+
+    it('getSpaceStatusWorkflow should forward to service', async () => {
+      mockHierarchyService.getSpaceStatusWorkflow.mockResolvedValue(
+        mockWorkflow,
+      );
+
+      const result = await controller.getSpaceStatusWorkflow(
+        'space1',
+        mockUser,
+      );
+      expect(mockHierarchyService.getSpaceStatusWorkflow).toHaveBeenCalledWith(
+        'space1',
+        String(mockUser._id),
+      );
+      expect(result).toEqual(mockWorkflow);
+    });
+
+    it('updateSpaceStatusWorkflow should forward to service', async () => {
+      const dto = { statuses: mockWorkflow.statuses, defaultStatusId: 'todo' };
+      mockHierarchyService.updateSpaceStatusWorkflow.mockResolvedValue(
+        mockWorkflow,
+      );
+
+      const result = await controller.updateSpaceStatusWorkflow(
+        'space1',
+        mockUser,
+        dto,
+      );
+      expect(
+        mockHierarchyService.updateSpaceStatusWorkflow,
+      ).toHaveBeenCalledWith('space1', dto, String(mockUser._id));
+      expect(result).toEqual(mockWorkflow);
+    });
+
+    it('getListStatusWorkflow should forward to service', async () => {
+      mockHierarchyService.getListStatusWorkflow.mockResolvedValue(
+        mockWorkflow,
+      );
+
+      const result = await controller.getListStatusWorkflow('list1', mockUser);
+      expect(mockHierarchyService.getListStatusWorkflow).toHaveBeenCalledWith(
+        'list1',
+        String(mockUser._id),
+      );
+      expect(result).toEqual(mockWorkflow);
+    });
+
+    it('updateListStatusWorkflow should forward to service', async () => {
+      const dto = { statuses: mockWorkflow.statuses, defaultStatusId: 'todo' };
+      mockHierarchyService.updateListStatusWorkflow.mockResolvedValue(
+        mockWorkflow,
+      );
+
+      const result = await controller.updateListStatusWorkflow(
+        'list1',
+        mockUser,
+        dto,
+      );
+      expect(
+        mockHierarchyService.updateListStatusWorkflow,
+      ).toHaveBeenCalledWith('list1', dto, String(mockUser._id));
+      expect(result).toEqual(mockWorkflow);
+    });
+
+    it('resetListStatusWorkflow should forward to service', async () => {
+      mockHierarchyService.resetListStatusWorkflow.mockResolvedValue(
+        mockWorkflow,
+      );
+
+      const result = await controller.resetListStatusWorkflow(
+        'list1',
+        mockUser,
+      );
+      expect(mockHierarchyService.resetListStatusWorkflow).toHaveBeenCalledWith(
+        'list1',
+        String(mockUser._id),
+      );
+      expect(result).toEqual(mockWorkflow);
+    });
   });
 });

@@ -2,6 +2,11 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Schema as MongooseSchema, Types } from 'mongoose';
 import { Workspace } from './workspace.schema';
 import { User } from '../../users/schemas/user.schema';
+import {
+  StatusWorkflow,
+  StatusWorkflowSchema,
+  createDefaultStatusWorkflow,
+} from './status-workflow.schema';
 
 export type SpaceDocument = HydratedDocument<Space>;
 
@@ -61,6 +66,12 @@ export class Space {
     }),
   })
   features: SpaceFeatures;
+
+  @Prop({
+    type: StatusWorkflowSchema,
+    default: () => createDefaultStatusWorkflow(),
+  })
+  statusWorkflow: StatusWorkflow;
 
   @Prop({ type: Number, default: 0 })
   order: number;

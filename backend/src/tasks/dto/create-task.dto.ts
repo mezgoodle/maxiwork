@@ -3,13 +3,13 @@ import {
   IsEnum,
   IsMongoId,
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
   MaxLength,
   MinLength,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { TaskStatus } from '../enums/task-status.enum';
 import { TaskPriority } from '../enums/task-priority.enum';
 
 export class CreateTaskDto {
@@ -31,8 +31,8 @@ export class CreateTaskDto {
   description?: string;
 
   @IsOptional()
-  @IsEnum(TaskStatus)
-  status?: TaskStatus;
+  @IsString()
+  status?: string;
 
   @IsOptional()
   @IsEnum(TaskPriority)
@@ -53,4 +53,8 @@ export class CreateTaskDto {
   @IsOptional()
   @IsDateString()
   dueDate?: string;
+
+  @IsOptional()
+  @IsObject()
+  customFieldValues?: Record<string, unknown>;
 }

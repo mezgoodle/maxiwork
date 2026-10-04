@@ -46,7 +46,7 @@ describe('Tasks DTOs', () => {
     it('should fail when status or priority is invalid', async () => {
       const dto = plainToInstance(CreateTaskDto, {
         title: 'Task Title',
-        status: 'invalid_status',
+        status: 12345 as unknown as string,
         priority: 'unknown_priority',
       });
       const errors = await validate(dto);
@@ -88,9 +88,9 @@ describe('Tasks DTOs', () => {
       expect(errors.length).toBe(0);
     });
 
-    it('should reject invalid status', async () => {
+    it('should reject invalid status type', async () => {
       const dto = plainToInstance(UpdateTaskDto, {
-        status: 'invalid_status',
+        status: 12345 as unknown as string,
       });
       const errors = await validate(dto);
       expect(errors.length).toBeGreaterThan(0);
@@ -106,9 +106,9 @@ describe('Tasks DTOs', () => {
       expect(errors.length).toBe(0);
     });
 
-    it('should reject invalid status', async () => {
+    it('should reject empty status', async () => {
       const dto = plainToInstance(UpdateTaskStatusDto, {
-        status: 'not_a_status',
+        status: '',
       });
       const errors = await validate(dto);
       expect(errors.length).toBeGreaterThan(0);

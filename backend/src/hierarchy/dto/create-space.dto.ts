@@ -12,6 +12,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { UpdateStatusWorkflowDto } from './status-workflow.dto';
 
 export class SpaceFeaturesDto {
   @IsOptional()
@@ -64,6 +65,12 @@ export class CreateSpaceDto {
   @ValidateNested()
   @Type(() => SpaceFeaturesDto)
   features?: SpaceFeaturesDto;
+
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => UpdateStatusWorkflowDto)
+  statusWorkflow?: UpdateStatusWorkflowDto;
 
   @IsOptional()
   @IsNumber()

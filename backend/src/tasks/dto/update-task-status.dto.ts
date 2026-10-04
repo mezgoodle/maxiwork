@@ -1,8 +1,7 @@
-import { IsEnum, IsNotEmpty } from 'class-validator';
-import { TaskStatus } from '../enums/task-status.enum';
+import { IsNotEmpty, IsString } from 'class-validator';
 
 export class UpdateTaskStatusDto {
-  @IsNotEmpty()
-  @IsEnum(TaskStatus)
-  status: TaskStatus;
+  @IsNotEmpty({ message: 'Status is required' })
+  @IsString({ message: 'Status must be a string' })
+  status: string;
 }

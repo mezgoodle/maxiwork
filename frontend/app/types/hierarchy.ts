@@ -51,6 +51,7 @@ export interface Space {
   isPrivate: boolean;
   order: number;
   features: SpaceFeatures;
+  statusWorkflow?: StatusWorkflow | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -72,6 +73,7 @@ export interface List {
   name: string;
   order: number;
   color?: string;
+  statusWorkflow?: StatusWorkflow | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -179,4 +181,52 @@ export interface UpdateListPayload {
   folderId?: string | null;
   order?: number;
   color?: string;
+}
+
+export type StatusCategory = 'to_do' | 'in_progress' | 'done' | 'closed';
+
+export const STATUS_CATEGORY_RANK: Record<StatusCategory, number> = {
+  to_do: 1,
+  in_progress: 2,
+  done: 3,
+  closed: 4,
+};
+
+export interface CustomStatusItem {
+  id: string;
+  name: string;
+  color: string;
+  category: StatusCategory;
+  order: number;
+  isDefault?: boolean;
+}
+
+export interface StatusWorkflow {
+  statuses: CustomStatusItem[];
+  defaultTodoStatusId: string;
+  defaultDoneStatusId: string;
+}
+
+export interface StatusMigration {
+  fromStatusId: string;
+  toStatusId: string;
+}
+
+export interface UpdateStatusWorkflowPayload {
+  statuses: Array<{
+    id?: string;
+    name: string;
+    color?: string;
+    category: StatusCategory;
+    order?: number;
+    isDefault?: boolean;
+  }>;
+  defaultTodoStatusId?: string;
+  defaultDoneStatusId?: string;
+  migrations?: StatusMigration[];
+}
+
+export interface ListStatusWorkflowResponse {
+  workflow: StatusWorkflow;
+  isInherited: boolean;
 }
