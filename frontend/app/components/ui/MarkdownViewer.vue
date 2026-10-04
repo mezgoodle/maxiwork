@@ -44,15 +44,24 @@ const renderedHtml = computed(() => {
 });
 
 function handleClick(event: MouseEvent) {
-  if (!props.interactiveChecklists || !viewerRef.value || !props.content) return;
-
   const target = event.target as HTMLElement | null;
-  if (!target) return;
+  if (!target || !viewerRef.value) return;
+
+  // Prevent link clicks from bubbling up to parent click-to-edit handlers
+  if (target.tagName === 'A' || target.closest('a')) {
+    event.stopPropagation();
+    return;
+  }
+
+  if (!props.interactiveChecklists || !props.content) return;
 
   // Check if click was on or directly adjacent to a task list checkbox
-  const checkbox = target.tagName === 'INPUT' && (target as HTMLInputElement).type === 'checkbox'
-    ? (target as HTMLInputElement)
-    : target.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+  let checkbox: HTMLInputElement | null = null;
+  if (target.tagName === 'INPUT' && (target as HTMLInputElement).type === 'checkbox') {
+    checkbox = target as HTMLInputElement;
+  } else if (target.tagName === 'LI') {
+    checkbox = target.querySelector(':scope > input[type="checkbox"]') as HTMLInputElement | null;
+  }
 
   if (checkbox) {
     const allCheckboxes = Array.from(viewerRef.value.querySelectorAll('input[type="checkbox"]'));

@@ -63,6 +63,8 @@
                 v-model="form.description"
                 placeholder="Provide task details or acceptance criteria in Markdown..."
                 :min-rows="3"
+                :maxlength="5000"
+                @submit="handleSubmit"
               />
             </div>
 

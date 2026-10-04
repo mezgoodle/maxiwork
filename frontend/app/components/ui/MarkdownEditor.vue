@@ -114,6 +114,7 @@
         :value="modelValue"
         :placeholder="placeholder"
         :rows="minRows"
+        :maxlength="maxlength"
         class="w-full bg-transparent text-sm text-slate-200 placeholder-slate-500 focus:outline-none transition leading-relaxed resize-y font-normal"
         @input="handleInput"
         @keydown="handleKeydown"
@@ -142,7 +143,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue';
+import { ref, onMounted, nextTick, watch } from 'vue';
 import MarkdownViewer from './MarkdownViewer.vue';
 
 interface Props {
@@ -150,6 +151,7 @@ interface Props {
   placeholder?: string;
   minRows?: number;
   maxRows?: number;
+  maxlength?: number;
 }
 
 interface Emits {
@@ -162,6 +164,7 @@ const props = withDefaults(defineProps<Props>(), {
   placeholder: 'Write description in Markdown...',
   minRows: 4,
   maxRows: 16,
+  maxlength: undefined,
 });
 
 const emit = defineEmits<Emits>();
@@ -179,8 +182,19 @@ function adjustHeight() {
   const textarea = textareaRef.value;
   if (!textarea) return;
   textarea.style.height = 'auto';
-  textarea.style.height = `${Math.max(textarea.scrollHeight, props.minRows * 24)}px`;
+  const minHeight = props.minRows * 24;
+  const maxHeight = props.maxRows * 24;
+  textarea.style.height = `${Math.min(Math.max(textarea.scrollHeight, minHeight), maxHeight)}px`;
 }
+
+watch(
+  () => props.modelValue,
+  () => {
+    nextTick(() => {
+      adjustHeight();
+    });
+  },
+);
 
 onMounted(() => {
   adjustHeight();
