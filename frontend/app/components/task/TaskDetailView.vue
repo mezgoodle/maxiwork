@@ -580,7 +580,7 @@ async function navigateToParent() {
   }
 }
 
-async function updateField(payload: UpdateTaskPayload) {
+async function updateField(payload: UpdateTaskPayload): Promise<boolean> {
   try {
     let updated: Task;
     if (props.listId) {
@@ -598,14 +598,16 @@ async function updateField(payload: UpdateTaskPayload) {
         payload,
       );
     } else {
-      return;
+      return false;
     }
     activeTask.value = updated;
     syncInputs(updated);
     emit('updated', updated);
     showToast('Task updated', 'success');
+    return true;
   } catch (err: unknown) {
     showToast(extractApiErrorMessage(err, 'Failed to update task'), 'error');
+    return false;
   }
 }
 
@@ -631,8 +633,14 @@ function cancelDescriptionEdit() {
 }
 
 async function handleInteractiveChecklistToggle(updatedMarkdown: string) {
+  const previousDescription = activeTask.value.description;
+  activeTask.value.description = updatedMarkdown;
   editableDescription.value = updatedMarkdown;
-  await updateField({ description: updatedMarkdown });
+  const success = await updateField({ description: updatedMarkdown });
+  if (!success) {
+    activeTask.value.description = previousDescription;
+    editableDescription.value = previousDescription || '';
+  }
 }
 
 async function saveDescription() {

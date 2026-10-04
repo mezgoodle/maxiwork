@@ -58,7 +58,7 @@ describe('markdown utility', () => {
     });
 
     it('sanitizes malicious script tags and inline event handlers', () => {
-      const malicious = '<script>alert("xss")</script>Hello <img src=x onerror=alert(1)>';
+      const malicious = '<script>alert("xss")</script>Hello <img src=x onerror=alert(1)> <img/src="x"/onerror=alert(2)>';
       const html = renderMarkdown(malicious);
 
       expect(html).not.toContain('<script>');
@@ -67,11 +67,14 @@ describe('markdown utility', () => {
       expect(html).toContain('Hello');
     });
 
-    it('neutralizes javascript: URLs in links', () => {
-      const malicious = '[Click me](javascript:alert("xss"))';
+    it('neutralizes javascript, vbscript, and data URLs in links (quoted or unquoted)', () => {
+      const malicious = '[Click me](javascript:alert("xss")) and <a href=javascript:alert(1)>unquoted</a> and <a href="data:text/html,<script>alert(1)</script>">data link</a>';
       const html = renderMarkdown(malicious);
 
       expect(html).not.toContain('href="javascript:');
+      expect(html).not.toContain('href=javascript:');
+      expect(html).not.toContain('href="data:');
+      expect(html).toContain('href="#"');
     });
 
     it('handles nested lists and complex markdown structures', () => {
