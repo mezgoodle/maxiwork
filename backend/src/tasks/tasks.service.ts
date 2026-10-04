@@ -7,7 +7,11 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { Task, TaskDocument } from './schemas/task.schema';
+import {
+  Task,
+  TaskDocument,
+  mergeCustomFieldValues,
+} from './schemas/task.schema';
 import { Project, ProjectDocument } from '../projects/schemas/project.schema';
 import { List, ListDocument } from '../hierarchy/schemas/list.schema';
 import { Space, SpaceDocument } from '../hierarchy/schemas/space.schema';
@@ -221,6 +225,7 @@ export class TasksService {
       dueDate: createTaskDto.dueDate
         ? new Date(createTaskDto.dueDate)
         : undefined,
+      customFieldValues: createTaskDto.customFieldValues || {},
     });
 
     const saved = await createdTask.save();
@@ -408,6 +413,13 @@ export class TasksService {
       task.dueDate = updateTaskDto.dueDate
         ? new Date(updateTaskDto.dueDate)
         : undefined;
+    }
+
+    if (updateTaskDto.customFieldValues !== undefined) {
+      task.customFieldValues = mergeCustomFieldValues(
+        task.customFieldValues,
+        updateTaskDto.customFieldValues,
+      );
     }
 
     const updated = await task.save();

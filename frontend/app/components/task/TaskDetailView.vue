@@ -1,7 +1,7 @@
 <template>
-  <div class="flex flex-col text-slate-100 h-full">
+  <div class="flex flex-col text-slate-100 h-full min-h-0">
     <!-- Header: Navigation breadcrumbs, Key, Status, Done toggle, Fullscreen/Close -->
-    <div class="flex flex-col gap-3 pb-4 border-b border-slate-800 mb-6 shrink-0">
+    <div class="flex flex-col gap-3 pb-4 border-b border-slate-800 mb-4 shrink-0">
       <!-- Top Bar: Parent link / Breadcrumbs & Action buttons -->
       <div class="flex items-center justify-between gap-3">
         <!-- Parent Task Link / History Back -->
@@ -118,7 +118,7 @@
     </div>
 
     <!-- Scrollable Body -->
-    <div class="flex-1 overflow-y-auto space-y-6 pr-1">
+    <div class="flex-1 overflow-y-auto space-y-6 pr-1 min-h-0">
       <!-- Title Input -->
       <div>
         <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
@@ -207,6 +207,48 @@
         </div>
       </div>
 
+      <!-- Custom Fields Section -->
+      <div
+        v-if="effectiveCustomFields.length > 0"
+        class="bg-slate-800/40 border border-slate-800 rounded-xl p-4 space-y-3"
+      >
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+            Custom Fields
+          </span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div
+            v-for="field in effectiveCustomFields"
+            :key="field._id"
+            class="space-y-1.5"
+          >
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-medium text-slate-300 truncate flex items-center gap-1">
+                <span>{{ field.name }}</span>
+                <span v-if="field.required" class="text-rose-400">*</span>
+              </label>
+              <span
+                v-if="field.inherited"
+                class="text-[10px] text-cyan-400/80 bg-cyan-500/10 px-1.5 py-0.5 rounded"
+              >
+                Space
+              </span>
+            </div>
+
+            <CustomFieldInput
+              :model-value="activeTask.customFieldValues?.[field._id]"
+              :field="field"
+              @change="(val) => handleCustomFieldSave(field._id, val)"
+            />
+            <p v-if="field.description" class="text-[11px] text-slate-500 truncate">
+              {{ field.description }}
+            </p>
+          </div>
+        </div>
+      </div>
+
       <!-- Unified Subtasks Section (Clicking any subtask navigates to it!) -->
       <div class="pt-2">
         <SubtaskList
@@ -220,7 +262,7 @@
     </div>
 
     <!-- Footer -->
-    <div class="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400 shrink-0">
+    <div class="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400 shrink-0">
       <span>Created {{ formatCreatedDate(activeTask.createdAt) }}</span>
       <button
         v-if="isDrawer"
@@ -249,16 +291,19 @@
 import { computed, ref, watch, onMounted } from 'vue';
 import type { Task, TaskPriority, TaskStatus, UpdateTaskPayload } from '../../types/task';
 import type { StatusWorkflow } from '../../types/hierarchy';
+import type { EffectiveCustomField } from '../../types/custom-field';
 import { useApi } from '../../composables/useApi';
 import { useToast } from '../../composables/useToast';
 import { useAuthStore } from '../../stores/auth';
 import { useHierarchyStore } from '../../stores/hierarchy';
 import { useProjectsStore } from '../../stores/projects';
 import { useTasksStore } from '../../stores/tasks';
+import { useCustomFieldsStore } from '../../stores/custom-fields';
 import { extractApiErrorMessage } from '../../utils/error';
 import DatePickerMenu from '../ui/DatePickerMenu.vue';
 import ConfirmDialog from '../ui/ConfirmDialog.vue';
 import SubtaskList from './SubtaskList.vue';
+import CustomFieldInput from '../custom-fields/CustomFieldInput.vue';
 
 interface Props {
   initialTask: Task;
@@ -288,9 +333,59 @@ const authStore = useAuthStore();
 const hierarchyStore = useHierarchyStore();
 const projectsStore = useProjectsStore();
 const tasksStore = useTasksStore();
+const customFieldsStore = useCustomFieldsStore();
 
 const activeTask = ref<Task>({ ...props.initialTask });
 const history = ref<Task[]>([]);
+const effectiveCustomFields = ref<EffectiveCustomField[]>([]);
+
+watch(
+  () => [props.listId, activeTask.value.list],
+  async () => {
+    const targetListId =
+      props.listId ||
+      (activeTask.value.list ? String(activeTask.value.list) : '');
+    if (targetListId) {
+      try {
+        effectiveCustomFields.value =
+          await customFieldsStore.fetchListFields(targetListId);
+      } catch {
+        effectiveCustomFields.value = [];
+      }
+    } else {
+      effectiveCustomFields.value = [];
+    }
+  },
+  { immediate: true },
+);
+
+async function handleCustomFieldSave(fieldId: string, val: unknown) {
+  try {
+    const currentValues = { ...(activeTask.value.customFieldValues || {}) };
+    let newValues: Record<string, unknown>;
+    if (val === null || val === undefined || val === '') {
+      const { [fieldId]: _omitted, ...rest } = currentValues;
+      newValues = rest;
+    } else {
+      newValues = { ...currentValues, [fieldId]: val };
+    }
+
+    const updated = await customFieldsStore.updateTaskCustomFields(
+      activeTask.value._id,
+      { [fieldId]: val },
+    );
+    activeTask.value.customFieldValues = {
+      ...(updated.customFieldValues || newValues),
+    };
+    emit('updated', activeTask.value);
+    showToast('Custom field updated', 'success');
+  } catch (err: unknown) {
+    showToast(
+      extractApiErrorMessage(err, 'Failed to update custom field'),
+      'error',
+    );
+  }
+}
 
 const editableTitle = ref('');
 const editableDescription = ref('');
@@ -520,9 +615,21 @@ watch(
   },
 );
 
+const categoryRank: Record<string, number> = {
+  to_do: 1,
+  in_progress: 2,
+  done: 3,
+  closed: 4,
+};
+
 const statusOptions = computed(() => {
   if (effectiveWorkflow.value?.statuses?.length) {
-    return effectiveWorkflow.value.statuses;
+    return [...effectiveWorkflow.value.statuses].sort((a, b) => {
+      const rA = a.category ? (categoryRank[a.category] || 99) : 99;
+      const rB = b.category ? (categoryRank[b.category] || 99) : 99;
+      if (rA !== rB) return rA - rB;
+      return (a.order ?? 0) - (b.order ?? 0);
+    });
   }
   return [
     { id: 'todo', name: 'To Do', category: 'to_do', color: '#94a3b8' },

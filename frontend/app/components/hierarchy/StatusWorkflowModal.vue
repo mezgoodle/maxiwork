@@ -526,10 +526,29 @@ const categoryDefinitions = [
   },
 ];
 
+const categoryRank: Record<StatusCategory, number> = {
+  to_do: 1,
+  in_progress: 2,
+  done: 3,
+  closed: 4,
+};
+
+function sortLocalStatuses() {
+  localStatuses.value.sort((a, b) => {
+    const rA = categoryRank[a.category] || 99;
+    const rB = categoryRank[b.category] || 99;
+    if (rA !== rB) return rA - rB;
+    return (a.order ?? 0) - (b.order ?? 0);
+  });
+  localStatuses.value.forEach((s, idx) => {
+    s.order = idx;
+  });
+}
+
 function getStatusesForCategory(category: StatusCategory): CustomStatusItem[] {
   return localStatuses.value
     .filter((s) => s.category === category)
-    .sort((a, b) => a.order - b.order);
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 }
 
 const availableMigrationTargets = computed(() => {
@@ -576,6 +595,7 @@ function applyWorkflowToLocal(workflow: StatusWorkflow) {
     ...s,
     order: s.order !== undefined ? s.order : idx,
   }));
+  sortLocalStatuses();
   defaultTodoStatusId.value = workflow.defaultTodoStatusId || 'todo';
   defaultDoneStatusId.value = workflow.defaultDoneStatusId || 'done';
 }
@@ -607,17 +627,19 @@ function saveNewStatus(category: StatusCategory) {
   const existingWithId = localStatuses.value.find((s) => s.id === id);
   const finalId = existingWithId ? `${id}_${Date.now().toString().slice(-4)}` : id;
 
-  const maxOrder = localStatuses.value.reduce((acc, s) => Math.max(acc, s.order || 0), -1);
+  const categoryStatuses = localStatuses.value.filter((s) => s.category === category);
+  const maxCategoryOrder = categoryStatuses.reduce((acc, s) => Math.max(acc, s.order ?? 0), -1);
 
   const newStatus: CustomStatusItem = {
     id: finalId,
     name,
     color: newStatusColor.value,
     category,
-    order: maxOrder + 1,
+    order: maxCategoryOrder + 1,
   };
 
   localStatuses.value.push(newStatus);
+  sortLocalStatuses();
   cancelAddStatus();
 }
 
@@ -662,6 +684,10 @@ function changeStatusCategory(statusId: string, newCategory: StatusCategory) {
   if (!target) return;
 
   target.category = newCategory;
+  const categoryStatuses = localStatuses.value.filter((s) => s.category === newCategory && s.id !== statusId);
+  const maxCategoryOrder = categoryStatuses.reduce((acc, s) => Math.max(acc, s.order ?? 0), -1);
+  target.order = maxCategoryOrder + 1;
+  sortLocalStatuses();
 
   // Adjust defaults if necessary
   if (defaultTodoStatusId.value === statusId && newCategory !== 'to_do') {
@@ -694,6 +720,7 @@ function moveStatus(statusId: string, direction: 'up' | 'down') {
   const tempOrder = target.order;
   target.order = other.order;
   other.order = tempOrder;
+  sortLocalStatuses();
 }
 
 function promptDeleteStatus(status: CustomStatusItem) {
@@ -759,6 +786,7 @@ async function handleSaveWorkflow() {
   saving.value = true;
 
   try {
+    sortLocalStatuses();
     const payload = {
       statuses: localStatuses.value.map((s, idx) => ({
         id: s.id,

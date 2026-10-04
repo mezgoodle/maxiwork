@@ -74,9 +74,22 @@ const defaultColumns = [
   { id: 'done', name: 'Done', color: '#10b981' },
 ];
 
+const categoryRank: Record<string, number> = {
+  to_do: 1,
+  in_progress: 2,
+  done: 3,
+  closed: 4,
+};
+
 const columnDefinitions = computed(() => {
   if (props.workflow?.statuses?.length) {
-    return props.workflow.statuses.map((s) => ({
+    const sorted = [...props.workflow.statuses].sort((a, b) => {
+      const rA = a.category ? (categoryRank[a.category] || 99) : 99;
+      const rB = b.category ? (categoryRank[b.category] || 99) : 99;
+      if (rA !== rB) return rA - rB;
+      return (a.order ?? 0) - (b.order ?? 0);
+    });
+    return sorted.map((s) => ({
       id: s.id,
       name: s.name,
       color: s.color,
