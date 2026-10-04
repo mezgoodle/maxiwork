@@ -1,13 +1,14 @@
 <template>
   <!-- eslint-disable vue/no-v-html -->
   <div
-      v-if="renderedHtml"
-      ref="viewerRef"
-      class="markdown-viewer text-sm text-slate-200 leading-relaxed overflow-x-auto"
-      @click="handleClick"
-      v-html="renderedHtml"
-    />
-  <div v-else class="text-sm text-slate-500 italic">
+    v-if="renderedHtml"
+    ref="viewerRef"
+    class="markdown-viewer leading-relaxed"
+    :class="compact ? 'markdown-compact text-xs text-slate-400' : 'text-sm text-slate-200 overflow-x-auto'"
+    @click="handleClick"
+    v-html="renderedHtml"
+  />
+  <div v-else-if="!compact" class="text-sm text-slate-500 italic">
     {{ emptyPlaceholder }}
   </div>
 </template>
@@ -20,6 +21,7 @@ interface Props {
   content?: string | null;
   interactiveChecklists?: boolean;
   emptyPlaceholder?: string;
+  compact?: boolean;
 }
 
 interface Emits {
@@ -30,6 +32,7 @@ const props = withDefaults(defineProps<Props>(), {
   content: '',
   interactiveChecklists: true,
   emptyPlaceholder: 'No description provided',
+  compact: false,
 });
 
 const emit = defineEmits<Emits>();
@@ -220,5 +223,91 @@ function handleClick(event: MouseEvent) {
 .markdown-viewer :deep(hr) {
   border-color: #334155;
   margin: 0.75rem 0;
+}
+
+/* Compact mode (for task cards and preview snippets) */
+.markdown-viewer.markdown-compact :deep(h1),
+.markdown-viewer.markdown-compact :deep(h2),
+.markdown-viewer.markdown-compact :deep(h3),
+.markdown-viewer.markdown-compact :deep(h4),
+.markdown-viewer.markdown-compact :deep(h5),
+.markdown-viewer.markdown-compact :deep(h6) {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #f1f5f9;
+  margin: 0;
+  display: inline;
+  margin-right: 0.35rem;
+}
+
+.markdown-viewer.markdown-compact :deep(p) {
+  margin: 0;
+  display: inline;
+  margin-right: 0.35rem;
+}
+
+.markdown-viewer.markdown-compact :deep(ul),
+.markdown-viewer.markdown-compact :deep(ol) {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: inline;
+}
+
+.markdown-viewer.markdown-compact :deep(li) {
+  display: inline;
+  margin: 0;
+  margin-right: 0.35rem;
+}
+
+.markdown-viewer.markdown-compact :deep(li)::before {
+  content: "• ";
+  color: #64748b;
+}
+
+.markdown-viewer.markdown-compact :deep(li:has(input[type="checkbox"]))::before {
+  content: "";
+}
+
+.markdown-viewer.markdown-compact :deep(input[type="checkbox"]) {
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-right: 0.25rem;
+  pointer-events: none;
+}
+
+.markdown-viewer.markdown-compact :deep(blockquote) {
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  display: inline;
+  font-style: italic;
+  margin-right: 0.35rem;
+}
+
+.markdown-viewer.markdown-compact :deep(pre) {
+  border: none;
+  background: rgba(15, 23, 42, 0.6);
+  padding: 0.05rem 0.25rem;
+  margin: 0;
+  display: inline;
+  border-radius: 0.25rem;
+}
+
+.markdown-viewer.markdown-compact :deep(code) {
+  font-size: 0.7rem;
+  padding: 0.05rem 0.25rem;
+}
+
+.markdown-viewer.markdown-compact :deep(a) {
+  color: inherit;
+  text-decoration: underline;
+  pointer-events: none;
+}
+
+.markdown-viewer.markdown-compact :deep(table) {
+  display: inline;
+  margin: 0;
 }
 </style>

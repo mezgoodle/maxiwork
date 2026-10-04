@@ -29,12 +29,16 @@
       {{ task.title }}
     </div>
 
-    <p
+    <div
       v-if="task.description"
-      class="text-xs text-slate-400 line-clamp-2 mb-3"
+      class="text-xs text-slate-400 line-clamp-2 mb-3 break-words overflow-hidden"
     >
-      {{ task.description }}
-    </p>
+      <MarkdownViewer
+        :content="task.description"
+        :interactive-checklists="false"
+        compact
+      />
+    </div>
 
     <!-- Due Date & Assignee row -->
     <div class="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-700/50 mt-auto">
@@ -81,6 +85,7 @@
 import { computed, ref } from 'vue';
 import type { Task } from '../../types/task';
 import { getPriorityBadgeClass, getUserDisplayName, getUserInitials } from '../../utils/task';
+import MarkdownViewer from '../ui/MarkdownViewer.vue';
 
 interface Props {
   task: Task;

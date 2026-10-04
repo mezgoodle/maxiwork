@@ -287,7 +287,7 @@
                 v-if="task.description"
                 class="text-xs text-slate-500 truncate max-w-xs hidden lg:inline"
               >
-                — {{ task.description }}
+                — <MarkdownViewer :content="task.description" :interactive-checklists="false" compact class="inline" />
               </span>
 
               <!-- Subtasks pill -->
@@ -563,6 +563,7 @@ import StatusWorkflowModal from '../../../components/hierarchy/StatusWorkflowMod
 import CustomFieldsModal from '../../../components/custom-fields/CustomFieldsModal.vue';
 import CustomFieldInput from '../../../components/custom-fields/CustomFieldInput.vue';
 import ConfirmDialog from '../../../components/ui/ConfirmDialog.vue';
+import MarkdownViewer from '../../../components/ui/MarkdownViewer.vue';
 
 definePageMeta({
   middleware: ['auth'],
@@ -576,7 +577,7 @@ const customFieldsStore = useCustomFieldsStore();
 const { apiFetch } = useApi();
 const { showToast } = useToast();
 
-const activeView = ref<'board' | 'list'>('board');
+const activeView = ref<'board' | 'list'>('list');
 const loading = ref(false);
 const error = ref<string | null>(null);
 const listDetails = ref<List | null>(null);
