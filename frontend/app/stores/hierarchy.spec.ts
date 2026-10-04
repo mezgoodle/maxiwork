@@ -177,4 +177,131 @@ describe('useHierarchyStore', () => {
 
     await expect(store.deleteList('list-123')).resolves.not.toThrow();
   });
+
+  it('fetchSpaceStatusWorkflow calls GET /spaces/:spaceId/status-workflow', async () => {
+    const store = useHierarchyStore();
+    const mockWorkflow = {
+      defaultTodoStatusId: 'todo',
+      defaultDoneStatusId: 'done',
+      statuses: [
+        { id: 'todo', name: 'To Do', category: 'to_do', color: '#94A3B8', order: 0 },
+        { id: 'done', name: 'Done', category: 'done', color: '#22C55E', order: 1 },
+      ],
+    };
+
+    global.$fetch = vi.fn().mockImplementation((url: string, opts?: { method?: string }) => {
+      if (url.includes('/spaces/sp-1/status-workflow') && opts?.method === 'GET') {
+        return Promise.resolve(mockWorkflow);
+      }
+      return Promise.resolve({});
+    });
+
+    const res = await store.fetchSpaceStatusWorkflow('sp-1');
+    expect(res).toEqual(mockWorkflow);
+  });
+
+  it('updateSpaceStatusWorkflow calls PATCH /spaces/:spaceId/status-workflow with payload', async () => {
+    const store = useHierarchyStore();
+    const payload = {
+      defaultTodoStatusId: 'backlog',
+      defaultDoneStatusId: 'completed',
+      statuses: [
+        { id: 'backlog', name: 'Backlog', category: 'to_do' as const, color: '#94A3B8', order: 0 },
+        { id: 'completed', name: 'Completed', category: 'done' as const, color: '#22C55E', order: 1 },
+      ],
+    };
+
+    let capturedBody: unknown = null;
+    global.$fetch = vi.fn().mockImplementation((url: string, opts?: { method?: string; body?: unknown }) => {
+      if (url.includes('/spaces/sp-1/status-workflow') && opts?.method === 'PATCH') {
+        capturedBody = opts.body;
+        return Promise.resolve(payload);
+      }
+      return Promise.resolve({});
+    });
+
+    const res = await store.updateSpaceStatusWorkflow('sp-1', payload);
+    expect(res).toEqual(payload);
+    expect(capturedBody).toEqual(payload);
+  });
+
+  it('fetchListStatusWorkflow calls GET /lists/:listId/status-workflow', async () => {
+    const store = useHierarchyStore();
+    const mockResponse = {
+      workflow: {
+        defaultTodoStatusId: 'todo',
+        defaultDoneStatusId: 'done',
+        statuses: [
+          { id: 'todo', name: 'To Do', category: 'to_do' as const, color: '#94A3B8', order: 0 },
+          { id: 'done', name: 'Done', category: 'done' as const, color: '#22C55E', order: 1 },
+        ],
+      },
+      inherited: true,
+    };
+
+    global.$fetch = vi.fn().mockImplementation((url: string, opts?: { method?: string }) => {
+      if (url.includes('/lists/list-1/status-workflow') && opts?.method === 'GET') {
+        return Promise.resolve(mockResponse);
+      }
+      return Promise.resolve({});
+    });
+
+    const res = await store.fetchListStatusWorkflow('list-1');
+    expect(res.inherited).toBe(true);
+    expect(res.workflow.statuses).toHaveLength(2);
+  });
+
+  it('updateListStatusWorkflow calls PATCH /lists/:listId/status-workflow with payload and migrations', async () => {
+    const store = useHierarchyStore();
+    const payload = {
+      defaultTodoStatusId: 'todo',
+      defaultDoneStatusId: 'finished',
+      statuses: [
+        { id: 'todo', name: 'To Do', category: 'to_do' as const, color: '#94A3B8', order: 0 },
+        { id: 'finished', name: 'Finished', category: 'done' as const, color: '#10B981', order: 1 },
+      ],
+      migrations: [{ oldStatusId: 'done', newStatusId: 'finished' }],
+    };
+
+    let capturedBody: unknown = null;
+    global.$fetch = vi.fn().mockImplementation((url: string, opts?: { method?: string; body?: unknown }) => {
+      if (url.includes('/lists/list-1/status-workflow') && opts?.method === 'PATCH') {
+        capturedBody = opts.body;
+        return Promise.resolve(payload);
+      }
+      return Promise.resolve({});
+    });
+
+    const res = await store.updateListStatusWorkflow('list-1', payload);
+    expect(res).toEqual(payload);
+    expect(capturedBody).toEqual(payload);
+  });
+
+  it('resetListStatusWorkflow calls DELETE /lists/:listId/status-workflow', async () => {
+    const store = useHierarchyStore();
+    const mockWorkflowResponse = {
+      workflow: {
+        defaultTodoStatusId: 'todo',
+        defaultDoneStatusId: 'done',
+        statuses: [
+          { id: 'todo', name: 'To Do', category: 'to_do' as const, color: '#94A3B8', order: 0 },
+          { id: 'done', name: 'Done', category: 'done' as const, color: '#22C55E', order: 1 },
+        ],
+      },
+      inherited: true,
+    };
+
+    let resetCalled = false;
+    global.$fetch = vi.fn().mockImplementation((url: string, opts?: { method?: string }) => {
+      if (url.includes('/lists/list-1/status-workflow') && opts?.method === 'DELETE') {
+        resetCalled = true;
+        return Promise.resolve(mockWorkflowResponse);
+      }
+      return Promise.resolve({});
+    });
+
+    const res = await store.resetListStatusWorkflow('list-1');
+    expect(resetCalled).toBe(true);
+    expect(res).toEqual(mockWorkflowResponse);
+  });
 });
