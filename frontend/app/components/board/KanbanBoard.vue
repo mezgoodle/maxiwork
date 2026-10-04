@@ -21,45 +21,12 @@
       class="flex gap-6 overflow-x-auto pb-6 items-start scrollbar-thin scrollbar-thumb-slate-700"
     >
       <KanbanColumn
-        status="todo"
-        title="To Do"
-        :tasks="groupedTasks.todo"
-        :project-id="projectId"
-        :list-id="listId"
-        @task-drop="handleTaskDrop"
-        @create-task="(status) => emit('create-task', status)"
-        @task-click="(task) => emit('task-click', task)"
-        @delete-task="(taskId) => emit('delete-task', taskId)"
-      />
-
-      <KanbanColumn
-        status="in_progress"
-        title="In Progress"
-        :tasks="groupedTasks.in_progress"
-        :project-id="projectId"
-        :list-id="listId"
-        @task-drop="handleTaskDrop"
-        @create-task="(status) => emit('create-task', status)"
-        @task-click="(task) => emit('task-click', task)"
-        @delete-task="(taskId) => emit('delete-task', taskId)"
-      />
-
-      <KanbanColumn
-        status="in_review"
-        title="In Review"
-        :tasks="groupedTasks.in_review"
-        :project-id="projectId"
-        :list-id="listId"
-        @task-drop="handleTaskDrop"
-        @create-task="(status) => emit('create-task', status)"
-        @task-click="(task) => emit('task-click', task)"
-        @delete-task="(taskId) => emit('delete-task', taskId)"
-      />
-
-      <KanbanColumn
-        status="done"
-        title="Done"
-        :tasks="groupedTasks.done"
+        v-for="col in columnDefinitions"
+        :key="col.id"
+        :status="col.id"
+        :title="col.name"
+        :color="col.color"
+        :tasks="groupedTasks[col.id] || []"
         :project-id="projectId"
         :list-id="listId"
         @task-drop="handleTaskDrop"
@@ -74,6 +41,7 @@
 <script lang="ts" setup>
 import { computed } from 'vue';
 import type { Task, TaskStatus } from '../../types/task';
+import type { StatusWorkflow } from '../../types/hierarchy';
 import { useTasksStore } from '../../stores/tasks';
 import { useToast } from '../../composables/useToast';
 import KanbanColumn from './KanbanColumn.vue';
@@ -83,6 +51,7 @@ interface Props {
   projectId?: string;
   listId?: string;
   loading?: boolean;
+  workflow?: StatusWorkflow | null;
 }
 
 interface Emits {
@@ -98,6 +67,37 @@ const emit = defineEmits<Emits>();
 const tasksStore = useTasksStore();
 const { showToast } = useToast();
 
+const defaultColumns = [
+  { id: 'todo', name: 'To Do', color: '#94a3b8' },
+  { id: 'in_progress', name: 'In Progress', color: '#3b82f6' },
+  { id: 'in_review', name: 'In Review', color: '#6366f1' },
+  { id: 'done', name: 'Done', color: '#10b981' },
+];
+
+const categoryRank: Record<string, number> = {
+  to_do: 1,
+  in_progress: 2,
+  done: 3,
+  closed: 4,
+};
+
+const columnDefinitions = computed(() => {
+  if (props.workflow?.statuses?.length) {
+    const sorted = [...props.workflow.statuses].sort((a, b) => {
+      const rA = a.category ? (categoryRank[a.category] || 99) : 99;
+      const rB = b.category ? (categoryRank[b.category] || 99) : 99;
+      if (rA !== rB) return rA - rB;
+      return (a.order ?? 0) - (b.order ?? 0);
+    });
+    return sorted.map((s) => ({
+      id: s.id,
+      name: s.name,
+      color: s.color,
+    }));
+  }
+  return defaultColumns;
+});
+
 const allTasks = computed<Task[]>(() => {
   return props.tasks !== undefined ? props.tasks : tasksStore.tasks;
 });
@@ -107,17 +107,21 @@ const isLoading = computed(() => {
 });
 
 const groupedTasks = computed(() => {
-  const map: Record<TaskStatus, Task[]> = {
-    todo: [],
-    in_progress: [],
-    in_review: [],
-    done: [],
-  };
+  const map: Record<string, Task[]> = {};
+  for (const col of columnDefinitions.value) {
+    map[col.id] = [];
+  }
+  const defaultColId = columnDefinitions.value[0]?.id || 'todo';
+
   for (const t of allTasks.value) {
-    if (map[t.status]) {
-      map[t.status].push(t);
+    const statusKey = t.status || defaultColId;
+    if (map[statusKey]) {
+      map[statusKey].push(t);
     } else {
-      map.todo.push(t);
+      if (!map[defaultColId]) {
+        map[defaultColId] = [];
+      }
+      map[defaultColId].push(t);
     }
   }
   return map;

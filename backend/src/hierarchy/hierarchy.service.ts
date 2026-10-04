@@ -11,8 +11,12 @@ import { Workspace, WorkspaceDocument } from './schemas/workspace.schema';
 import { Space, SpaceDocument } from './schemas/space.schema';
 import { Folder, FolderDocument } from './schemas/folder.schema';
 import { List, ListDocument } from './schemas/list.schema';
-import { Task, TaskDocument } from '../tasks/schemas/task.schema';
 import { Project, ProjectDocument } from '../projects/schemas/project.schema';
+import {
+  Task,
+  TaskDocument,
+  mergeCustomFieldValues,
+} from '../tasks/schemas/task.schema';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { WorkspaceRole } from './enums/workspace-role.enum';
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
@@ -1132,10 +1136,10 @@ export class HierarchyService implements OnModuleInit {
     }
 
     if (dto.customFieldValues !== undefined) {
-      task.customFieldValues = {
-        ...(task.customFieldValues || {}),
-        ...dto.customFieldValues,
-      };
+      task.customFieldValues = mergeCustomFieldValues(
+        task.customFieldValues,
+        dto.customFieldValues,
+      );
     }
 
     if (dto.status !== undefined) {
@@ -1399,6 +1403,24 @@ export class HierarchyService implements OnModuleInit {
         'Status workflow must have at least one status in the "done" or "closed" category',
       );
     }
+
+    const categoryRank: Record<StatusCategory, number> = {
+      [StatusCategory.TO_DO]: 1,
+      [StatusCategory.IN_PROGRESS]: 2,
+      [StatusCategory.DONE]: 3,
+      [StatusCategory.CLOSED]: 4,
+    };
+
+    statuses.sort((a, b) => {
+      const rankA = categoryRank[a.category] ?? 99;
+      const rankB = categoryRank[b.category] ?? 99;
+      if (rankA !== rankB) return rankA - rankB;
+      return (a.order ?? 0) - (b.order ?? 0);
+    });
+
+    statuses.forEach((s, idx) => {
+      s.order = idx;
+    });
 
     let defaultTodoStatusId = dto.defaultTodoStatusId?.trim();
     if (defaultTodoStatusId) {

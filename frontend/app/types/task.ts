@@ -1,6 +1,6 @@
 import type { User } from './auth';
 
-export type TaskStatus = 'todo' | 'in_progress' | 'in_review' | 'done';
+export type TaskStatus = 'todo' | 'in_progress' | 'in_review' | 'done' | (string & {});
 
 export type TaskPriority = 'low' | 'medium' | 'high' | 'critical';
 
@@ -9,6 +9,7 @@ export interface Task {
   title: string;
   description?: string;
   status: TaskStatus;
+  completed?: boolean;
   priority: TaskPriority;
   startDate?: string;
   dueDate?: string;
@@ -22,6 +23,7 @@ export interface Task {
   completedSubtasksCount?: number;
   order?: number;
   subtasks?: Task[];
+  customFieldValues?: Record<string, unknown>;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -35,6 +37,7 @@ export interface CreateTaskPayload {
   startDate?: string;
   dueDate?: string;
   list?: string;
+  customFieldValues?: Record<string, unknown>;
 }
 
 export interface UpdateTaskPayload {
@@ -46,6 +49,7 @@ export interface UpdateTaskPayload {
   startDate?: string | null;
   dueDate?: string | null;
   list?: string | null;
+  customFieldValues?: Record<string, unknown>;
 }
 
 export interface CreateSubtaskPayload {

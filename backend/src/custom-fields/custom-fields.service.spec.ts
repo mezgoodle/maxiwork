@@ -376,5 +376,82 @@ describe('CustomFieldsService', () => {
       expect(mockTask.customFieldValues[mockFieldId]).toBe(8);
       expect(mockTask.save).toHaveBeenCalled();
     });
+
+    it('correctly merges when customFieldValues is a Map instance and removes null keys', async () => {
+      const initialMap = new Map<string, unknown>([
+        ['existing_field', 42],
+        ['to_delete_field', 'abc'],
+      ]);
+      const mockTask: any = {
+        _id: new Types.ObjectId(mockTaskId),
+        list: new Types.ObjectId(mockListId),
+        customFieldValues: initialMap,
+        save: jest.fn().mockResolvedValue(this),
+      };
+
+      taskModel.findById
+        .mockReturnValueOnce({
+          exec: jest.fn().mockResolvedValue(mockTask),
+        })
+        .mockReturnValueOnce({
+          populate: jest.fn().mockReturnValue({
+            populate: jest.fn().mockReturnValue({
+              populate: jest.fn().mockReturnValue({
+                exec: jest.fn().mockResolvedValue(mockTask),
+              }),
+            }),
+          }),
+        });
+
+      jest.spyOn(service, 'getListEffectiveCustomFields').mockResolvedValue([
+        {
+          id: 'existing_field',
+          name: 'Existing',
+          type: CustomFieldType.NUMBER,
+          options: [],
+          required: false,
+          entityType: 'list',
+          entityId: mockListId,
+          order: 0,
+          inherited: false,
+        },
+        {
+          id: 'to_delete_field',
+          name: 'To Delete',
+          type: CustomFieldType.TEXT,
+          options: [],
+          required: false,
+          entityType: 'list',
+          entityId: mockListId,
+          order: 1,
+          inherited: false,
+        },
+        {
+          id: mockFieldId,
+          name: 'Estimation',
+          type: CustomFieldType.NUMBER,
+          options: [],
+          required: false,
+          entityType: 'list',
+          entityId: mockListId,
+          order: 2,
+          inherited: false,
+        },
+      ]);
+
+      await service.setTaskCustomFields(
+        mockTaskId,
+        {
+          [mockFieldId]: 13,
+          to_delete_field: null,
+        },
+        mockUserId,
+      );
+
+      expect(mockTask.customFieldValues[mockFieldId]).toBe(13);
+      expect(mockTask.customFieldValues.existing_field).toBe(42);
+      expect(mockTask.customFieldValues.to_delete_field).toBeUndefined();
+      expect(mockTask.save).toHaveBeenCalled();
+    });
   });
 });

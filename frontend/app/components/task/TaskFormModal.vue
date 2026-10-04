@@ -12,9 +12,9 @@
 
       <!-- Modal Panel -->
       <div
-        class="relative w-full max-w-lg bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl p-6 sm:p-8 text-slate-100 z-10"
+        class="relative w-full max-w-lg bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl p-6 sm:p-8 text-slate-100 z-10 max-h-[90vh] flex flex-col overflow-hidden"
       >
-        <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-6">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-4 shrink-0">
           <h2 class="text-xl font-bold text-white">
             {{ isEditing ? 'Edit Task' : 'Create New Task' }}
           </h2>
@@ -27,15 +27,15 @@
           </button>
         </div>
 
-        <form @submit.prevent="handleSubmit">
+        <form class="flex-1 flex flex-col min-h-0" @submit.prevent="handleSubmit">
           <div
             v-if="errorMessage"
-            class="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-sm"
+            class="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-sm shrink-0"
           >
             {{ errorMessage }}
           </div>
 
-          <div class="space-y-4">
+          <div class="flex-1 overflow-y-auto pr-1 space-y-4 min-h-0">
             <!-- Title -->
             <div>
               <label class="block text-sm font-medium text-slate-300 mb-1.5">
@@ -78,10 +78,13 @@
                   v-model="form.status"
                   class="w-full px-3 py-2 bg-slate-800/80 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 capitalize"
                 >
-                  <option value="todo">To Do</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="in_review">In Review</option>
-                  <option value="done">Done</option>
+                  <option
+                    v-for="st in statusOptions"
+                    :key="st.id"
+                    :value="st.id"
+                  >
+                    {{ st.name }}
+                  </option>
                 </select>
               </div>
 
@@ -154,10 +157,44 @@
                 />
               </div>
             </div>
+
+            <!-- Custom Fields Section -->
+            <div
+              v-if="availableCustomFields.length > 0"
+              class="pt-4 border-t border-slate-800 space-y-3"
+            >
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  Custom Fields
+                </span>
+              </div>
+
+              <div class="space-y-3">
+                <div
+                  v-for="field in availableCustomFields"
+                  :key="field._id"
+                >
+                  <label class="block text-xs font-medium text-slate-300 mb-1">
+                    {{ field.name }}
+                    <span v-if="field.required" class="text-rose-400">*</span>
+                    <span v-if="field.inherited" class="text-[10px] text-cyan-400/80 ml-1">
+                      (Space)
+                    </span>
+                  </label>
+                  <CustomFieldInput
+                    v-model="form.customFieldValues[field._id]"
+                    :field="field"
+                  />
+                  <p v-if="field.description" class="text-[11px] text-slate-500 mt-0.5">
+                    {{ field.description }}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Actions -->
-          <div class="mt-8 flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+          <div class="mt-4 flex items-center justify-end gap-3 pt-4 border-t border-slate-800 shrink-0">
             <button
               type="button"
               class="px-4 py-2 rounded-xl text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer"
@@ -186,14 +223,18 @@
 <script lang="ts" setup>
 import { computed, reactive, ref, watch } from 'vue';
 import type { Task, TaskPriority, TaskStatus } from '../../types/task';
+import type { StatusWorkflow } from '../../types/hierarchy';
+import type { EffectiveCustomField } from '../../types/custom-field';
 import { useTasksStore } from '../../stores/tasks';
 import { useProjectsStore } from '../../stores/projects';
 import { useHierarchyStore } from '../../stores/hierarchy';
+import { useCustomFieldsStore } from '../../stores/custom-fields';
 import { useAuthStore } from '../../stores/auth';
 import { useApi } from '../../composables/useApi';
 import { useToast } from '../../composables/useToast';
 import { extractApiErrorMessage } from '../../utils/error';
 import DatePickerMenu from '../ui/DatePickerMenu.vue';
+import CustomFieldInput from '../custom-fields/CustomFieldInput.vue';
 
 interface Props {
   isOpen: boolean;
@@ -201,6 +242,7 @@ interface Props {
   listId?: string;
   task?: Task | null;
   defaultStatus?: TaskStatus;
+  workflow?: StatusWorkflow | null;
 }
 
 interface Emits {
@@ -211,12 +253,39 @@ interface Emits {
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
+const categoryRank: Record<string, number> = {
+  to_do: 1,
+  in_progress: 2,
+  done: 3,
+  closed: 4,
+};
+
+const statusOptions = computed(() => {
+  if (props.workflow?.statuses?.length) {
+    return [...props.workflow.statuses].sort((a, b) => {
+      const rA = a.category ? (categoryRank[a.category] || 99) : 99;
+      const rB = b.category ? (categoryRank[b.category] || 99) : 99;
+      if (rA !== rB) return rA - rB;
+      return (a.order ?? 0) - (b.order ?? 0);
+    });
+  }
+  return [
+    { id: 'todo', name: 'To Do' },
+    { id: 'in_progress', name: 'In Progress' },
+    { id: 'in_review', name: 'In Review' },
+    { id: 'done', name: 'Done' },
+  ];
+});
+
 const tasksStore = useTasksStore();
 const projectsStore = useProjectsStore();
 const hierarchyStore = useHierarchyStore();
+const customFieldsStore = useCustomFieldsStore();
 const authStore = useAuthStore();
 const { apiFetch } = useApi();
 const { showToast } = useToast();
+
+const availableCustomFields = ref<EffectiveCustomField[]>([]);
 
 const currentUserId = computed(() => authStore.user?._id || '');
 
@@ -240,6 +309,7 @@ const form = reactive({
   assignee: '',
   startDate: '',
   dueDate: '',
+  customFieldValues: {} as Record<string, unknown>,
 });
 
 function formatDateForInput(dateStr?: string): string {
@@ -251,10 +321,22 @@ function formatDateForInput(dateStr?: string): string {
 
 watch(
   [() => props.isOpen, () => props.defaultStatus, () => props.task],
-  ([open, defaultStatus, task]) => {
+  async ([open, defaultStatus, task]) => {
     if (open) {
       errorMessage.value = '';
       titleError.value = '';
+
+      const targetListId = props.listId || (task && typeof task.list === 'string' ? task.list : undefined);
+      if (targetListId) {
+        try {
+          const fields = await customFieldsStore.fetchListFields(targetListId);
+          availableCustomFields.value = fields;
+        } catch {
+          availableCustomFields.value = [];
+        }
+      } else {
+        availableCustomFields.value = [];
+      }
 
       if (task) {
         form.title = task.title;
@@ -267,6 +349,7 @@ watch(
             : (task.assignee as string) || '';
         form.startDate = formatDateForInput(task.startDate);
         form.dueDate = formatDateForInput(task.dueDate);
+        form.customFieldValues = { ...(task.customFieldValues || {}) };
       } else {
         form.title = '';
         form.description = '';
@@ -275,6 +358,13 @@ watch(
         form.assignee = '';
         form.startDate = '';
         form.dueDate = '';
+        const initialCustomValues: Record<string, unknown> = {};
+        for (const f of availableCustomFields.value) {
+          if (f.defaultValue !== undefined && f.defaultValue !== null) {
+            initialCustomValues[f._id] = f.defaultValue;
+          }
+        }
+        form.customFieldValues = initialCustomValues;
       }
     }
   },
@@ -351,6 +441,17 @@ async function handleSubmit() {
     return;
   }
 
+  // Validate required custom fields
+  for (const field of availableCustomFields.value) {
+    if (field.required) {
+      const val = form.customFieldValues[field._id];
+      if (val === null || val === undefined || val === '') {
+        errorMessage.value = `${field.name} is required`;
+        return;
+      }
+    }
+  }
+
   loading.value = true;
   try {
     const payload = {
@@ -361,6 +462,10 @@ async function handleSubmit() {
       assignee: form.assignee || undefined,
       startDate: form.startDate ? new Date(form.startDate).toISOString() : undefined,
       dueDate: form.dueDate ? new Date(form.dueDate).toISOString() : undefined,
+      customFieldValues:
+        Object.keys(form.customFieldValues).length > 0
+          ? form.customFieldValues
+          : undefined,
     };
 
     let result: Task;

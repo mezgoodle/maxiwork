@@ -12,12 +12,14 @@
 
       <!-- Drawer / Modal Container -->
       <div
-        class="relative w-full max-w-2xl bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl p-6 sm:p-8 text-slate-100 z-10 max-h-[90vh] flex flex-col"
+        class="relative w-full max-w-2xl bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl p-6 sm:p-8 text-slate-100 z-10 max-h-[90vh] flex flex-col overflow-hidden"
       >
         <TaskDetailView
+          class="min-h-0 flex-1"
           :initial-task="task"
           :list-id="listId"
           :project-id="projectId"
+          :workflow="workflow"
           :is-drawer="true"
           @close="emit('close')"
           @updated="(updated) => emit('updated', updated)"
@@ -29,6 +31,7 @@
 </template>
 
 <script setup lang="ts">
+import type { StatusWorkflow } from '../../types/hierarchy';
 import type { Task } from '../../types/task';
 import TaskDetailView from './TaskDetailView.vue';
 
@@ -37,6 +40,7 @@ interface Props {
   listId?: string;
   projectId?: string;
   task: Task | null;
+  workflow?: StatusWorkflow | null;
 }
 
 interface Emits {
