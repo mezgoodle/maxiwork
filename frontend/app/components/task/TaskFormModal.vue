@@ -59,12 +59,10 @@
               <label class="block text-sm font-medium text-slate-300 mb-1.5">
                 Description
               </label>
-              <textarea
+              <MarkdownEditor
                 v-model="form.description"
-                rows="3"
-                maxlength="5000"
-                placeholder="Provide task details or acceptance criteria..."
-                class="w-full px-4 py-2 bg-slate-800/80 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 text-sm transition"
+                placeholder="Provide task details or acceptance criteria in Markdown..."
+                :min-rows="3"
               />
             </div>
 
@@ -235,6 +233,7 @@ import { useToast } from '../../composables/useToast';
 import { extractApiErrorMessage } from '../../utils/error';
 import DatePickerMenu from '../ui/DatePickerMenu.vue';
 import CustomFieldInput from '../custom-fields/CustomFieldInput.vue';
+import MarkdownEditor from '../ui/MarkdownEditor.vue';
 
 interface Props {
   isOpen: boolean;

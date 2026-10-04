@@ -135,17 +135,52 @@
       </div>
 
       <!-- Description -->
-      <div>
-        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
+      <div class="space-y-1.5">
+        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">
           Description
         </label>
-        <textarea
-          v-model="editableDescription"
-          rows="3"
-          placeholder="Add more details to this task..."
-          class="w-full text-sm bg-slate-800/60 border border-slate-700/80 rounded-xl p-3 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition leading-relaxed resize-y"
-          @blur="saveDescription"
-        />
+
+        <!-- View Mode -->
+        <div
+          v-if="!isEditingDescription"
+          class="w-full min-h-[64px] bg-slate-800/40 hover:bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5 transition cursor-pointer group"
+          title="Click to edit description"
+          @click="startEditingDescription"
+        >
+          <MarkdownViewer
+            :content="activeTask.description"
+            :interactive-checklists="true"
+            empty-placeholder="Add a detailed description to this task..."
+            @update:content="handleInteractiveChecklistToggle"
+          />
+        </div>
+
+        <!-- Edit Mode -->
+        <div v-else class="space-y-2">
+          <MarkdownEditor
+            v-model="editableDescription"
+            :min-rows="4"
+            placeholder="Add more details in Markdown..."
+            @submit="saveDescription"
+            @cancel="cancelDescriptionEdit"
+          />
+          <div class="flex items-center justify-end gap-2 pt-1">
+            <button
+              type="button"
+              class="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              @click="cancelDescriptionEdit"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition shadow-xs cursor-pointer"
+              @click="saveDescription"
+            >
+              Save
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- Assignee & Dates Grid -->
@@ -304,6 +339,8 @@ import DatePickerMenu from '../ui/DatePickerMenu.vue';
 import ConfirmDialog from '../ui/ConfirmDialog.vue';
 import SubtaskList from './SubtaskList.vue';
 import CustomFieldInput from '../custom-fields/CustomFieldInput.vue';
+import MarkdownViewer from '../ui/MarkdownViewer.vue';
+import MarkdownEditor from '../ui/MarkdownEditor.vue';
 
 interface Props {
   initialTask: Task;
@@ -389,6 +426,7 @@ async function handleCustomFieldSave(fieldId: string, val: unknown) {
 
 const editableTitle = ref('');
 const editableDescription = ref('');
+const isEditingDescription = ref(false);
 const isDeleteDialogOpen = ref(false);
 
 const currentUserId = computed(() => authStore.user?._id || '');
@@ -486,6 +524,7 @@ function formatCreatedDate(dateStr?: string): string {
 function syncInputs(task: Task) {
   editableTitle.value = task.title || '';
   editableDescription.value = task.description || '';
+  isEditingDescription.value = false;
 }
 
 watch(
@@ -581,8 +620,24 @@ async function saveTitle() {
   await updateField({ title: trimmed });
 }
 
+function startEditingDescription() {
+  editableDescription.value = activeTask.value.description || '';
+  isEditingDescription.value = true;
+}
+
+function cancelDescriptionEdit() {
+  editableDescription.value = activeTask.value.description || '';
+  isEditingDescription.value = false;
+}
+
+async function handleInteractiveChecklistToggle(updatedMarkdown: string) {
+  editableDescription.value = updatedMarkdown;
+  await updateField({ description: updatedMarkdown });
+}
+
 async function saveDescription() {
   const trimmed = editableDescription.value.trim();
+  isEditingDescription.value = false;
   if (trimmed === (activeTask.value.description || '').trim()) return;
   await updateField({ description: trimmed });
 }
