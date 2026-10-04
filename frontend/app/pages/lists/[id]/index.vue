@@ -553,7 +553,7 @@ import { useApi } from '../../../composables/useApi';
 import { useToast } from '../../../composables/useToast';
 import { extractApiErrorMessage } from '../../../utils/error';
 import { getPriorityBadgeClass, getUserDisplayName, getUserInitials } from '../../../utils/task';
-import type { List, Space, StatusWorkflow } from '../../../types/hierarchy';
+import { type List, type Space, type StatusWorkflow, STATUS_CATEGORY_RANK } from '../../../types/hierarchy';
 import type { Task, TaskPriority, TaskStatus } from '../../../types/task';
 import type { EffectiveCustomField } from '../../../types/custom-field';
 import KanbanBoard from '../../../components/board/KanbanBoard.vue';
@@ -628,19 +628,12 @@ const currentSpace = computed<Space | null>(() => {
   };
 });
 
-const categoryRank: Record<string, number> = {
-  to_do: 1,
-  in_progress: 2,
-  done: 3,
-  closed: 4,
-};
-
 const statusOptions = computed(() => {
   if (listWorkflow.value?.statuses?.length) {
     return [...listWorkflow.value.statuses]
       .sort((a, b) => {
-        const rankA = categoryRank[a.category] || 99;
-        const rankB = categoryRank[b.category] || 99;
+        const rankA = STATUS_CATEGORY_RANK[a.category] || 99;
+        const rankB = STATUS_CATEGORY_RANK[b.category] || 99;
         if (rankA !== rankB) return rankA - rankB;
         return (a.order ?? 0) - (b.order ?? 0);
       })
@@ -659,11 +652,17 @@ const statusOptions = computed(() => {
   ];
 });
 
+function isStatusDoneOrClosed(status?: TaskStatus): boolean {
+  if (!status) return false;
+  if (status === 'done') return true;
+  if (!listWorkflow.value) return false;
+  const st = listWorkflow.value.statuses.find((s) => s.id === status);
+  return st ? (st.category === 'done' || st.category === 'closed') : false;
+}
+
 function isTaskDone(task: Task): boolean {
   if (task.completed) return true;
-  if (!listWorkflow.value) return task.status === 'done';
-  const st = listWorkflow.value.statuses.find((s) => s.id === task.status);
-  return st ? (st.category === 'done' || st.category === 'closed') : task.status === 'done';
+  return isStatusDoneOrClosed(task.status);
 }
 
 function getPriorityClass(priority?: TaskPriority): string {
@@ -682,7 +681,7 @@ function formatDate(dateStr?: string): string {
 
 function getDateBadgeClass(dueDate?: string, status?: TaskStatus): string {
   if (!dueDate) return 'text-slate-400 border-slate-700/60';
-  if (status === 'done') return 'text-slate-400 border-slate-700/60';
+  if (isStatusDoneOrClosed(status)) return 'text-slate-400 border-slate-700/60';
   const due = new Date(dueDate).getTime();
   const now = Date.now();
   if (due < now) {

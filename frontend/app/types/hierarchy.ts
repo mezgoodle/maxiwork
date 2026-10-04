@@ -185,6 +185,13 @@ export interface UpdateListPayload {
 
 export type StatusCategory = 'to_do' | 'in_progress' | 'done' | 'closed';
 
+export const STATUS_CATEGORY_RANK: Record<StatusCategory, number> = {
+  to_do: 1,
+  in_progress: 2,
+  done: 3,
+  closed: 4,
+};
+
 export interface CustomStatusItem {
   id: string;
   name: string;

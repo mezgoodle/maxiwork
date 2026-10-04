@@ -290,7 +290,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted } from 'vue';
 import type { Task, TaskPriority, TaskStatus, UpdateTaskPayload } from '../../types/task';
-import type { StatusWorkflow } from '../../types/hierarchy';
+import { type StatusWorkflow, STATUS_CATEGORY_RANK } from '../../types/hierarchy';
 import type { EffectiveCustomField } from '../../types/custom-field';
 import { useApi } from '../../composables/useApi';
 import { useToast } from '../../composables/useToast';
@@ -615,18 +615,11 @@ watch(
   },
 );
 
-const categoryRank: Record<string, number> = {
-  to_do: 1,
-  in_progress: 2,
-  done: 3,
-  closed: 4,
-};
-
 const statusOptions = computed(() => {
   if (effectiveWorkflow.value?.statuses?.length) {
     return [...effectiveWorkflow.value.statuses].sort((a, b) => {
-      const rA = a.category ? (categoryRank[a.category] || 99) : 99;
-      const rB = b.category ? (categoryRank[b.category] || 99) : 99;
+      const rA = a.category ? (STATUS_CATEGORY_RANK[a.category] || 99) : 99;
+      const rB = b.category ? (STATUS_CATEGORY_RANK[b.category] || 99) : 99;
       if (rA !== rB) return rA - rB;
       return (a.order ?? 0) - (b.order ?? 0);
     });

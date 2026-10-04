@@ -93,7 +93,7 @@
                     <!-- Type Badge -->
                     <span
                       class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full"
-                      :class="getTypeBadgeClass(field.type)"
+                      :class="getCustomFieldBadgeClass(field.type)"
                     >
                       {{ field.type }}
                     </span>
@@ -328,6 +328,7 @@ import type {
 } from '../../types/custom-field';
 import { useCustomFieldsStore } from '../../stores/custom-fields';
 import { useToast } from '../../composables/useToast';
+import { getCustomFieldBadgeClass } from '../../utils/custom-field';
 import ConfirmDialog from '../ui/ConfirmDialog.vue';
 
 interface Props {
@@ -523,23 +524,6 @@ async function handleConfirmDelete() {
     );
   } finally {
     fieldToDelete.value = null;
-  }
-}
-
-function getTypeBadgeClass(type: CustomFieldType): string {
-  switch (type) {
-    case 'text':
-      return 'bg-blue-500/10 text-blue-300 border border-blue-500/20';
-    case 'number':
-      return 'bg-purple-500/10 text-purple-300 border border-purple-500/20';
-    case 'date':
-      return 'bg-amber-500/10 text-amber-300 border border-amber-500/20';
-    case 'dropdown':
-      return 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20';
-    case 'checkbox':
-      return 'bg-rose-500/10 text-rose-300 border border-rose-500/20';
-    default:
-      return 'bg-slate-700 text-slate-300';
   }
 }
 </script>

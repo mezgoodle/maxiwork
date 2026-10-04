@@ -223,7 +223,7 @@
 <script lang="ts" setup>
 import { computed, reactive, ref, watch } from 'vue';
 import type { Task, TaskPriority, TaskStatus } from '../../types/task';
-import type { StatusWorkflow } from '../../types/hierarchy';
+import { type StatusWorkflow, STATUS_CATEGORY_RANK } from '../../types/hierarchy';
 import type { EffectiveCustomField } from '../../types/custom-field';
 import { useTasksStore } from '../../stores/tasks';
 import { useProjectsStore } from '../../stores/projects';
@@ -253,18 +253,11 @@ interface Emits {
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
-const categoryRank: Record<string, number> = {
-  to_do: 1,
-  in_progress: 2,
-  done: 3,
-  closed: 4,
-};
-
 const statusOptions = computed(() => {
   if (props.workflow?.statuses?.length) {
     return [...props.workflow.statuses].sort((a, b) => {
-      const rA = a.category ? (categoryRank[a.category] || 99) : 99;
-      const rB = b.category ? (categoryRank[b.category] || 99) : 99;
+      const rA = a.category ? (STATUS_CATEGORY_RANK[a.category] || 99) : 99;
+      const rB = b.category ? (STATUS_CATEGORY_RANK[b.category] || 99) : 99;
       if (rA !== rB) return rA - rB;
       return (a.order ?? 0) - (b.order ?? 0);
     });

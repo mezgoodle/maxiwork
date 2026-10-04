@@ -429,11 +429,12 @@ import { ref, watch, computed } from 'vue';
 import { useHierarchyStore } from '../../stores/hierarchy';
 import { useToast } from '../../composables/useToast';
 import { extractApiErrorMessage } from '../../utils/error';
-import type {
-  CustomStatusItem,
-  StatusCategory,
-  StatusWorkflow,
-  StatusMigration,
+import {
+  type CustomStatusItem,
+  type StatusCategory,
+  type StatusWorkflow,
+  type StatusMigration,
+  STATUS_CATEGORY_RANK,
 } from '../../types/hierarchy';
 import ConfirmDialog from '../ui/ConfirmDialog.vue';
 
@@ -526,17 +527,10 @@ const categoryDefinitions = [
   },
 ];
 
-const categoryRank: Record<StatusCategory, number> = {
-  to_do: 1,
-  in_progress: 2,
-  done: 3,
-  closed: 4,
-};
-
 function sortLocalStatuses() {
   localStatuses.value.sort((a, b) => {
-    const rA = categoryRank[a.category] || 99;
-    const rB = categoryRank[b.category] || 99;
+    const rA = STATUS_CATEGORY_RANK[a.category] || 99;
+    const rB = STATUS_CATEGORY_RANK[b.category] || 99;
     if (rA !== rB) return rA - rB;
     return (a.order ?? 0) - (b.order ?? 0);
   });

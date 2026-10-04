@@ -41,7 +41,7 @@
 <script lang="ts" setup>
 import { computed } from 'vue';
 import type { Task, TaskStatus } from '../../types/task';
-import type { StatusWorkflow } from '../../types/hierarchy';
+import { type StatusWorkflow, STATUS_CATEGORY_RANK } from '../../types/hierarchy';
 import { useTasksStore } from '../../stores/tasks';
 import { useToast } from '../../composables/useToast';
 import KanbanColumn from './KanbanColumn.vue';
@@ -74,18 +74,11 @@ const defaultColumns = [
   { id: 'done', name: 'Done', color: '#10b981' },
 ];
 
-const categoryRank: Record<string, number> = {
-  to_do: 1,
-  in_progress: 2,
-  done: 3,
-  closed: 4,
-};
-
 const columnDefinitions = computed(() => {
   if (props.workflow?.statuses?.length) {
     const sorted = [...props.workflow.statuses].sort((a, b) => {
-      const rA = a.category ? (categoryRank[a.category] || 99) : 99;
-      const rB = b.category ? (categoryRank[b.category] || 99) : 99;
+      const rA = a.category ? (STATUS_CATEGORY_RANK[a.category] || 99) : 99;
+      const rB = b.category ? (STATUS_CATEGORY_RANK[b.category] || 99) : 99;
       if (rA !== rB) return rA - rB;
       return (a.order ?? 0) - (b.order ?? 0);
     });
