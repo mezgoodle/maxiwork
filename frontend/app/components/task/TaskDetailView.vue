@@ -136,19 +136,9 @@
 
       <!-- Description -->
       <div class="space-y-1.5">
-        <div class="flex items-center justify-between">
-          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">
-            Description
-          </label>
-          <button
-            v-if="!isEditingDescription"
-            type="button"
-            class="text-xs text-indigo-400 hover:text-indigo-300 transition cursor-pointer flex items-center gap-1 font-medium hover:underline"
-            @click="startEditingDescription"
-          >
-            <span>✏️ Edit</span>
-          </button>
-        </div>
+        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">
+          Description
+        </label>
 
         <!-- View Mode -->
         <div
