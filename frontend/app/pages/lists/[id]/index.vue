@@ -754,7 +754,7 @@ async function loadList() {
     try {
       const wfRes = await hierarchyStore.fetchListStatusWorkflow(listId.value);
       listWorkflow.value = wfRes.workflow;
-      isWorkflowInherited.value = wfRes.inherited;
+      isWorkflowInherited.value = wfRes.isInherited;
     } catch {
       listWorkflow.value = null;
       isWorkflowInherited.value = false;
@@ -799,20 +799,21 @@ async function handleInlineCustomFieldChange(
   fieldId: string,
   val: unknown,
 ) {
+  const originalValues = { ...(task.customFieldValues || {}) };
   try {
-    const currentValues = { ...(task.customFieldValues || {}) };
     let updatedValues: Record<string, unknown>;
     if (val === null || val === undefined || val === '') {
-      const { [fieldId]: _omitted, ...rest } = currentValues;
+      const { [fieldId]: _omitted, ...rest } = originalValues;
       updatedValues = rest;
     } else {
-      updatedValues = { ...currentValues, [fieldId]: val };
+      updatedValues = { ...originalValues, [fieldId]: val };
     }
     task.customFieldValues = updatedValues;
 
     await customFieldsStore.updateTaskCustomFields(task._id, { [fieldId]: val });
     showToast('Field updated', 'success');
   } catch (err: unknown) {
+    task.customFieldValues = originalValues;
     showToast(extractApiErrorMessage(err, 'Failed to update field'), 'error');
   }
 }

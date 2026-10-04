@@ -236,7 +236,7 @@ describe('useHierarchyStore', () => {
           { id: 'done', name: 'Done', category: 'done' as const, color: '#22C55E', order: 1 },
         ],
       },
-      inherited: true,
+      isInherited: true,
     };
 
     global.$fetch = vi.fn().mockImplementation((url: string, opts?: { method?: string }) => {
@@ -247,7 +247,7 @@ describe('useHierarchyStore', () => {
     });
 
     const res = await store.fetchListStatusWorkflow('list-1');
-    expect(res.inherited).toBe(true);
+    expect(res.isInherited).toBe(true);
     expect(res.workflow.statuses).toHaveLength(2);
   });
 
@@ -260,7 +260,7 @@ describe('useHierarchyStore', () => {
         { id: 'todo', name: 'To Do', category: 'to_do' as const, color: '#94A3B8', order: 0 },
         { id: 'finished', name: 'Finished', category: 'done' as const, color: '#10B981', order: 1 },
       ],
-      migrations: [{ oldStatusId: 'done', newStatusId: 'finished' }],
+      migrations: [{ fromStatusId: 'done', toStatusId: 'finished' }],
     };
 
     let capturedBody: unknown = null;
@@ -288,7 +288,7 @@ describe('useHierarchyStore', () => {
           { id: 'done', name: 'Done', category: 'done' as const, color: '#22C55E', order: 1 },
         ],
       },
-      inherited: true,
+      isInherited: true,
     };
 
     let resetCalled = false;

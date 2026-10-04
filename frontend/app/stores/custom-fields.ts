@@ -83,7 +83,11 @@ export const useCustomFieldsStore = defineStore('customFields', () => {
     error.value = null;
     try {
       const client = getClient();
-      const data = await client<EffectiveCustomField[]>(`/lists/${listId}/custom-fields`);
+      const raw = await client<Array<EffectiveCustomField & { id?: string }>>(`/lists/${listId}/custom-fields`);
+      const data: EffectiveCustomField[] = (raw || []).map((f) => ({
+        ...f,
+        _id: f._id || f.id || '',
+      }));
       listFields.value = {
         ...listFields.value,
         [listId]: data,
@@ -222,10 +226,14 @@ export const useCustomFieldsStore = defineStore('customFields', () => {
     error.value = null;
     try {
       const client = getClient();
-      return await client<Task[]>(`/lists/${listId}/tasks/custom-fields/batch`, {
-        method: 'PATCH',
-        body: { updates },
-      });
+      const res = await client<{ updatedCount: number; tasks: Task[] }>(
+        `/lists/${listId}/tasks/custom-fields/batch`,
+        {
+          method: 'PATCH',
+          body: { updates },
+        },
+      );
+      return res.tasks || [];
     } catch (err: unknown) {
       const msg = extractApiErrorMessage(err);
       error.value = msg;

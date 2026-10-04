@@ -453,5 +453,25 @@ describe('CustomFieldsService', () => {
       expect(mockTask.customFieldValues.to_delete_field).toBeUndefined();
       expect(mockTask.save).toHaveBeenCalled();
     });
+
+    it('throws BadRequestException if task does not belong to expectedListId', async () => {
+      const mockTask: any = {
+        _id: new Types.ObjectId(mockTaskId),
+        list: new Types.ObjectId('64b8f0000000000000000099'),
+        customFieldValues: {},
+      };
+      taskModel.findById.mockReturnValueOnce({
+        exec: jest.fn().mockResolvedValue(mockTask),
+      });
+
+      await expect(
+        service.setTaskCustomFields(
+          mockTaskId,
+          { [mockFieldId]: 5 },
+          mockUserId,
+          mockListId,
+        ),
+      ).rejects.toThrow('Task does not belong to the specified list');
+    });
   });
 });

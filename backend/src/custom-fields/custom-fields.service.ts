@@ -38,6 +38,10 @@ export interface EffectiveCustomFieldItem {
   updatedAt?: Date;
 }
 
+function escapeRegex(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 @Injectable()
 export class CustomFieldsService {
   constructor(
@@ -79,7 +83,7 @@ export class CustomFieldsService {
       .findOne({
         entityType: 'space',
         entityId: space._id,
-        name: { $regex: new RegExp(`^${trimmedName}$`, 'i') },
+        name: { $regex: new RegExp(`^${escapeRegex(trimmedName)}$`, 'i') },
       })
       .exec();
 
@@ -157,7 +161,7 @@ export class CustomFieldsService {
           { entityType: 'list', entityId: list._id },
           { entityType: 'space', entityId: space._id },
         ],
-        name: { $regex: new RegExp(`^${trimmedName}$`, 'i') },
+        name: { $regex: new RegExp(`^${escapeRegex(trimmedName)}$`, 'i') },
       })
       .exec();
 
@@ -317,7 +321,7 @@ export class CustomFieldsService {
           _id: { $ne: field._id },
           entityType: field.entityType,
           entityId: field.entityId,
-          name: { $regex: new RegExp(`^${trimmed}$`, 'i') },
+          name: { $regex: new RegExp(`^${escapeRegex(trimmed)}$`, 'i') },
         })
         .exec();
       if (duplicate) {
@@ -524,10 +528,20 @@ export class CustomFieldsService {
     taskId: string,
     values: Record<string, unknown>,
     userId: string,
+    expectedListId?: string,
   ): Promise<TaskDocument> {
     const task = await this.taskModel.findById(taskId).exec();
     if (!task) {
       throw new NotFoundException('Task not found');
+    }
+
+    if (
+      expectedListId &&
+      (!task.list || String(task.list) !== expectedListId)
+    ) {
+      throw new BadRequestException(
+        'Task does not belong to the specified list',
+      );
     }
 
     if (task.list) {

@@ -147,6 +147,7 @@ export class CustomFieldsController {
 
   @Patch('lists/:listId/tasks/:taskId/custom-fields')
   async setListTaskCustomFields(
+    @Param('listId', ParseObjectIdPipe) listId: string,
     @Param('taskId', ParseObjectIdPipe) taskId: string,
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: SetTaskCustomFieldsDto,
@@ -155,6 +156,7 @@ export class CustomFieldsController {
       taskId,
       dto.customFieldValues,
       String(user._id),
+      listId,
     );
   }
 

@@ -164,6 +164,26 @@ describe('CustomFieldsController', () => {
     );
   });
 
+  it('setListTaskCustomFields should delegate to service with listId', async () => {
+    const dto = { customFieldValues: { [mockFieldId]: 'val' } };
+    const res = await controller.setListTaskCustomFields(
+      mockListId,
+      mockTaskId,
+      mockUser,
+      dto,
+    );
+    expect(res).toEqual({
+      id: mockTaskId,
+      customFieldValues: { [mockFieldId]: 'val' },
+    });
+    expect(mockCustomFieldsService.setTaskCustomFields).toHaveBeenCalledWith(
+      mockTaskId,
+      dto.customFieldValues,
+      mockUser._id,
+      mockListId,
+    );
+  });
+
   it('batchUpdateTaskCustomFields should delegate to service', async () => {
     const dto = {
       updates: [

@@ -2,6 +2,7 @@ import {
   IsDateString,
   IsEnum,
   IsMongoId,
+  IsObject,
   IsString,
   MaxLength,
   MinLength,
@@ -61,5 +62,6 @@ export class UpdateTaskDto {
   dueDate?: string | null;
 
   @ValidateIf((_, value) => value !== undefined)
+  @IsObject()
   customFieldValues?: Record<string, unknown>;
 }

@@ -3,6 +3,7 @@ import {
   IsEnum,
   IsMongoId,
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
   MaxLength,
@@ -54,5 +55,6 @@ export class CreateTaskDto {
   dueDate?: string;
 
   @IsOptional()
+  @IsObject()
   customFieldValues?: Record<string, unknown>;
 }

@@ -155,7 +155,7 @@ describe('useCustomFieldsStore', () => {
   it('batchUpdateListCustomFields calls PATCH /lists/:listId/tasks/custom-fields/batch', async () => {
     const store = useCustomFieldsStore();
     const mockTasks = [{ _id: 't-1', title: 'Task 1' }];
-    global.$fetch = vi.fn().mockResolvedValue(mockTasks);
+    global.$fetch = vi.fn().mockResolvedValue({ updatedCount: 1, tasks: mockTasks });
 
     const res = await store.batchUpdateListCustomFields('l-1', [
       { taskId: 't-1', customFieldValues: { 'cf-1': 10 } },
