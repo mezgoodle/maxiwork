@@ -39,43 +39,6 @@
 
       <!-- Action Buttons -->
       <div class="flex items-center gap-3">
-        <!-- Subtasks Toggle (in List View) -->
-        <button
-          v-if="activeView === 'list'"
-          type="button"
-          class="px-3 py-1.5 rounded-xl text-xs font-semibold border transition cursor-pointer flex items-center gap-1.5"
-          :class="
-            showSubtasks
-              ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40 shadow-xs'
-              : 'bg-slate-800/80 text-slate-400 border-slate-700/80 hover:text-white'
-          "
-          :title="showSubtasks ? 'Hide subtasks in list' : 'Show subtasks under parent tasks'"
-          @click="toggleShowSubtasks"
-        >
-          <span>↳</span>
-          <span>{{ showSubtasks ? 'Subtasks: Shown' : 'Show Subtasks' }}</span>
-        </button>
-
-        <!-- View Toggle -->
-        <div class="flex items-center bg-slate-800/80 border border-slate-700/80 rounded-xl p-1 text-xs font-medium text-slate-300">
-          <button
-            type="button"
-            class="px-3 py-1 rounded-lg transition cursor-pointer"
-            :class="activeView === 'board' ? 'bg-indigo-600 text-white shadow-sm' : 'hover:text-white'"
-            @click="activeView = 'board'"
-          >
-            Board
-          </button>
-          <button
-            type="button"
-            class="px-3 py-1 rounded-lg transition cursor-pointer"
-            :class="activeView === 'list' ? 'bg-indigo-600 text-white shadow-sm' : 'hover:text-white'"
-            @click="activeView = 'list'"
-          >
-            List
-          </button>
-        </div>
-
         <!-- Statuses Workflow Settings -->
         <button
           type="button"
@@ -132,6 +95,33 @@
       </button>
     </div>
 
+    <!-- Unified View Switcher & Filter Toolbar -->
+    <div class="mb-4">
+      <ViewToolbar
+        :workflow="listWorkflow"
+        :users="listUsers"
+      >
+        <template #actions>
+          <!-- Subtasks Toggle (in List View) -->
+          <button
+            v-if="viewStore.activeView === 'list'"
+            type="button"
+            class="px-3 py-1.5 rounded-xl text-xs font-semibold border transition cursor-pointer flex items-center gap-1.5"
+            :class="
+              showSubtasks
+                ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40 shadow-xs'
+                : 'bg-slate-800/80 text-slate-400 border-slate-700/80 hover:text-white'
+            "
+            :title="showSubtasks ? 'Hide subtasks in list' : 'Show subtasks under parent tasks'"
+            @click="toggleShowSubtasks"
+          >
+            <span>↳</span>
+            <span class="hidden sm:inline">{{ showSubtasks ? 'Subtasks: Shown' : 'Show Subtasks' }}</span>
+          </button>
+        </template>
+      </ViewToolbar>
+    </div>
+
     <!-- Quick Inline Add Task -->
     <div class="mb-6">
       <form
@@ -156,13 +146,13 @@
       </form>
     </div>
 
-    <!-- Content Area: Board or List View -->
+    <!-- Content Area: Board, Calendar, or List View -->
     <div v-if="loading" class="flex-1 flex items-center justify-center py-16">
       <div class="text-slate-400 text-sm animate-pulse">Loading list items...</div>
     </div>
 
     <div v-else class="flex-1 flex flex-col">
-      <!-- Empty state when no tasks -->
+      <!-- Empty state when no tasks in this list -->
       <div
         v-if="tasks.length === 0"
         class="flex-1 flex flex-col items-center justify-center py-16 border-2 border-dashed border-slate-800 rounded-2xl p-8 text-center"
@@ -181,10 +171,29 @@
         </button>
       </div>
 
+      <!-- Empty state when tasks exist but none match filters -->
+      <div
+        v-else-if="filteredTasks.length === 0"
+        class="flex-1 flex flex-col items-center justify-center py-16 border-2 border-dashed border-slate-800/80 rounded-2xl p-8 text-center"
+      >
+        <span class="text-3xl mb-2">🔍</span>
+        <h3 class="text-base font-bold text-white mb-1">No tasks match your filters</h3>
+        <p class="text-xs text-slate-400 mb-4 max-w-sm">
+          Try adjusting your search query, priority, or status filters.
+        </p>
+        <button
+          type="button"
+          class="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 transition cursor-pointer"
+          @click="viewStore.resetFilters"
+        >
+          Reset Filters
+        </button>
+      </div>
+
       <!-- Board View (Unified KanbanBoard Component) -->
-      <div v-else-if="activeView === 'board'" class="flex-1">
+      <div v-else-if="viewStore.activeView === 'board'" class="flex-1">
         <KanbanBoard
-          :tasks="tasks"
+          :tasks="filteredTasks"
           :list-id="listId"
           :workflow="listWorkflow"
           :loading="loading"
@@ -195,11 +204,16 @@
         />
       </div>
 
+      <!-- Calendar View Placeholder (Phase 1) -->
+      <div v-else-if="viewStore.activeView === 'calendar'" class="flex-1 flex flex-col">
+        <CalendarPlaceholder @switch-view="viewStore.setActiveView" />
+      </div>
+
       <!-- List View (Detailed Task Rows + Expandable Subtasks + Custom Field Columns) -->
       <div v-else class="space-y-2">
         <!-- Table Column Headers Bar (Desktop) -->
         <div
-          v-if="tasks.length > 0"
+          v-if="filteredTasks.length > 0"
           class="hidden lg:flex items-center justify-between px-3.5 py-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800"
         >
           <div class="flex items-center gap-2.5 min-w-0 flex-1">
@@ -226,7 +240,7 @@
         </div>
 
         <div
-          v-for="task in tasks"
+          v-for="task in filteredTasks"
           :key="task._id"
           class="space-y-1"
         >
@@ -546,9 +560,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useHierarchyStore } from '../../../stores/hierarchy';
 import { useCustomFieldsStore } from '../../../stores/custom-fields';
+import { useViewStore } from '../../../stores/view';
 import { useApi } from '../../../composables/useApi';
 import { useToast } from '../../../composables/useToast';
 import { extractApiErrorMessage } from '../../../utils/error';
@@ -557,6 +572,8 @@ import { type List, type Space, type StatusWorkflow, STATUS_CATEGORY_RANK } from
 import type { Task, TaskPriority, TaskStatus } from '../../../types/task';
 import type { EffectiveCustomField } from '../../../types/custom-field';
 import KanbanBoard from '../../../components/board/KanbanBoard.vue';
+import ViewToolbar from '../../../components/views/ViewToolbar.vue';
+import CalendarPlaceholder from '../../../components/views/CalendarPlaceholder.vue';
 import TaskFormModal from '../../../components/task/TaskFormModal.vue';
 import TaskDetailDrawer from '../../../components/task/TaskDetailDrawer.vue';
 import StatusWorkflowModal from '../../../components/hierarchy/StatusWorkflowModal.vue';
@@ -570,14 +587,15 @@ definePageMeta({
 });
 
 const route = useRoute();
+const router = useRouter();
 const listId = computed(() => String(route.params.id || ''));
 
 const hierarchyStore = useHierarchyStore();
 const customFieldsStore = useCustomFieldsStore();
+const viewStore = useViewStore();
 const { apiFetch } = useApi();
 const { showToast } = useToast();
 
-const activeView = ref<'board' | 'list'>('list');
 const loading = ref(false);
 const error = ref<string | null>(null);
 const listDetails = ref<List | null>(null);
@@ -587,6 +605,75 @@ const isWorkflowInherited = ref(false);
 const isStatusWorkflowModalOpen = ref(false);
 const isCustomFieldsModalOpen = ref(false);
 const effectiveFields = ref<EffectiveCustomField[]>([]);
+
+let isSyncingFromRoute = false;
+
+onMounted(() => {
+  isSyncingFromRoute = true;
+  viewStore.syncFromQuery(route.query);
+  isSyncingFromRoute = false;
+});
+
+watch(
+  () => route.query,
+  (newQuery) => {
+    isSyncingFromRoute = true;
+    viewStore.syncFromQuery(newQuery);
+    isSyncingFromRoute = false;
+  },
+  { deep: true },
+);
+
+watch(
+  [
+    () => viewStore.activeView,
+    () => viewStore.filters.search,
+    () => viewStore.filters.statuses,
+    () => viewStore.filters.priorities,
+    () => viewStore.filters.assigneeId,
+    () => viewStore.filters.dueDate,
+    () => viewStore.sort.field,
+    () => viewStore.sort.direction,
+    () => viewStore.groupBy,
+  ],
+  () => {
+    if (isSyncingFromRoute) return;
+    const nextQuery = viewStore.toQuery();
+    const currentKeys = Object.keys(route.query);
+    const nextKeys = Object.keys(nextQuery);
+    const isDifferent =
+      currentKeys.length !== nextKeys.length ||
+      nextKeys.some((k) => String(route.query[k] ?? '') !== String(nextQuery[k] ?? ''));
+
+    if (isDifferent) {
+      router.replace({ query: nextQuery });
+    }
+  },
+  { deep: true },
+);
+
+const filteredTasks = computed(() => {
+  return viewStore.filterAndSortTasks(tasks.value, listWorkflow.value);
+});
+
+const listUsers = computed(() => {
+  const map = new Map<
+    string,
+    { _id: string; firstName?: string; lastName?: string; email: string; avatarUrl?: string }
+  >();
+  for (const t of tasks.value) {
+    if (t.assignee && typeof t.assignee === 'object') {
+      map.set(t.assignee._id, {
+        _id: t.assignee._id,
+        firstName: t.assignee.firstName,
+        lastName: t.assignee.lastName,
+        email: t.assignee.email,
+        avatarUrl: t.assignee.avatarUrl,
+      });
+    }
+  }
+  return Array.from(map.values());
+});
 
 const showSubtasks = ref(false);
 const expandedTaskIds = ref<Set<string>>(new Set());
