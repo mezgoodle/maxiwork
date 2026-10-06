@@ -130,6 +130,23 @@ describe('useViewStore', () => {
     expect(store.filters.dueDate).toBe('this_week');
     expect(store.sort).toEqual({ field: 'title', direction: 'asc' });
     expect(store.groupBy).toBe('assignee');
+
+    // Test resetting missing query keys when navigating back to empty query
+    store.syncFromQuery({});
+    expect(store.activeView).toBe('list');
+    expect(store.filters.search).toBe('');
+    expect(store.filters.statuses).toEqual([]);
+    expect(store.filters.priorities).toEqual([]);
+    expect(store.filters.assigneeId).toBeNull();
+    expect(store.filters.dueDate).toBe('all');
+    expect(store.sort).toEqual({ field: 'createdAt', direction: 'desc' });
+    expect(store.groupBy).toBe('status');
+  });
+
+  it('preserves trailing spaces in search query serialization', () => {
+    const store = useViewStore();
+    store.setSearch('hello ');
+    expect(store.toQuery()).toEqual({ q: 'hello ' });
   });
 
   describe('filterAndSortTasks', () => {

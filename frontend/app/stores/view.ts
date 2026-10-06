@@ -128,6 +128,11 @@ export const useViewStore = defineStore('view', () => {
   }
 
   function syncFromQuery(query: Record<string, unknown>) {
+    activeView.value = 'list';
+    resetFilters();
+    sort.value = { field: 'createdAt', direction: 'desc' };
+    groupBy.value = 'status';
+
     if (typeof query.view === 'string' && VALID_VIEWS.includes(query.view as ViewType)) {
       activeView.value = query.view as ViewType;
     }
@@ -188,7 +193,7 @@ export const useViewStore = defineStore('view', () => {
 
     const trimmedSearch = filters.value.search.trim();
     if (trimmedSearch) {
-      q.q = trimmedSearch;
+      q.q = filters.value.search;
     }
 
     if (filters.value.statuses.length > 0) {
