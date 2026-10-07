@@ -64,8 +64,13 @@
         </div>
       </div>
 
-      <!-- Group Content (when expanded) -->
-      <div v-if="!isGroupCollapsed(group.id)" class="space-y-1.5 pt-1">
+      <!-- Group Content (collapsible with smooth animation) -->
+      <div
+        class="grid transition-[grid-template-rows] duration-200 ease-out"
+        :class="isGroupCollapsed(group.id) ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]'"
+      >
+        <div class="overflow-hidden">
+          <div class="space-y-1.5 pt-1">
         <!-- Table Column Headers Bar (Desktop) -->
         <div
           v-if="group.tasks.length > 0"
@@ -103,7 +108,8 @@
         >
           <!-- Parent Task Row -->
           <div
-            class="p-3 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 hover:border-slate-500/80 rounded-xl transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs group/row"
+            class="p-3 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 hover:border-slate-500/80 rounded-xl transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs group/row cursor-pointer"
+            @click="$emit('task-click', task)"
           >
             <!-- Left Section: Subtask Arrow + Done Checkbox + Key + Title (Inline Editable) -->
             <div class="flex items-center gap-2.5 min-w-0 flex-1">
@@ -204,20 +210,14 @@
               </div>
 
               <!-- Inline Due Date Picker -->
-              <div class="relative w-24 shrink-0 flex items-center justify-center" @click.stop>
-                <input
-                  type="date"
-                  :value="formatInputDate(task.dueDate)"
-                  class="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10"
-                  title="Change due date"
-                  @change="(e) => handleDateChange(task, (e.target as HTMLInputElement).value)"
-                >
-                <span
-                  class="font-mono text-[11px] px-2 py-0.5 rounded-md border w-full text-center truncate pointer-events-none"
-                  :class="getDateBadgeClass(task.dueDate, task.status)"
-                >
-                  {{ task.dueDate ? `📅 ${formatDisplayDate(task.dueDate)}` : '📅 No date' }}
-                </span>
+              <div class="w-28 shrink-0" @click.stop>
+                <DatePickerMenu
+                  :model-value="formatInputDate(task.dueDate)"
+                  placeholder="📅 No date"
+                  compact
+                  :is-overdue="isDateOverdue(task.dueDate, task.status)"
+                  @update:model-value="(val) => handleDateChange(task, val)"
+                />
               </div>
 
               <!-- Inline Priority Dropdown -->
@@ -293,7 +293,8 @@
             <div
               v-for="sub in subtasksMap[task._id]"
               :key="sub._id"
-              class="p-2.5 bg-slate-900/70 hover:bg-slate-850 border border-slate-800/80 hover:border-slate-700 rounded-xl transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs group/sub"
+              class="p-2.5 bg-slate-900/70 hover:bg-slate-850 border border-slate-800/80 hover:border-slate-700 rounded-xl transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs group/sub cursor-pointer"
+              @click="$emit('task-click', sub)"
             >
               <!-- Subtask Left Section -->
               <div class="flex items-center gap-2.5 min-w-0 flex-1">
@@ -372,20 +373,14 @@
                 </div>
 
                 <!-- Subtask Due Date -->
-                <div class="relative w-24 shrink-0 flex items-center justify-center" @click.stop>
-                  <input
-                    type="date"
-                    :value="formatInputDate(sub.dueDate)"
-                    class="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10"
-                    title="Change due date"
-                    @change="(e) => handleDateChange(sub, (e.target as HTMLInputElement).value)"
-                  >
-                  <span
-                    class="font-mono text-[11px] px-2 py-0.5 rounded-md border w-full text-center truncate pointer-events-none"
-                    :class="getDateBadgeClass(sub.dueDate, sub.status)"
-                  >
-                    {{ sub.dueDate ? `📅 ${formatDisplayDate(sub.dueDate)}` : '📅 No date' }}
-                  </span>
+                <div class="w-24 shrink-0" @click.stop>
+                  <DatePickerMenu
+                    :model-value="formatInputDate(sub.dueDate)"
+                    placeholder="📅 No date"
+                    compact
+                    :is-overdue="isDateOverdue(sub.dueDate, sub.status)"
+                    @update:model-value="(val) => handleDateChange(sub, val)"
+                  />
                 </div>
 
                 <!-- Subtask Priority -->
@@ -458,6 +453,8 @@
               Add
             </button>
           </form>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -479,6 +476,7 @@ import {
   type TableGroup,
 } from '../../utils/table-view';
 import CustomFieldInput from '../custom-fields/CustomFieldInput.vue';
+import DatePickerMenu from '../ui/DatePickerMenu.vue';
 
 interface Props {
   tasks: Task[];
@@ -639,16 +637,6 @@ function getPriorityClass(priority?: TaskPriority): string {
   return getPriorityBadgeClass(priority);
 }
 
-function formatDisplayDate(dateStr?: string): string {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return '';
-  return d.toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-  });
-}
-
 function formatInputDate(dateStr?: string): string {
   if (!dateStr) return '';
   const d = new Date(dateStr);
@@ -656,14 +644,10 @@ function formatInputDate(dateStr?: string): string {
   return d.toISOString().split('T')[0];
 }
 
-function getDateBadgeClass(dueDate?: string, status?: TaskStatus): string {
-  if (!dueDate) return 'text-slate-500 border-slate-700/60 bg-slate-900/60';
-  if (isTaskDone({ status } as Task)) return 'text-slate-400 border-slate-700/60 bg-slate-900/60';
+function isDateOverdue(dueDate?: string, status?: TaskStatus): boolean {
+  if (!dueDate) return false;
+  if (isTaskDone({ status } as Task)) return false;
   const due = new Date(dueDate).getTime();
-  const now = Date.now();
-  if (due < now) {
-    return 'text-rose-400 border-rose-500/40 bg-rose-500/10 font-semibold';
-  }
-  return 'text-slate-300 border-slate-700/60 bg-slate-900/60';
+  return !isNaN(due) && due < Date.now();
 }
 </script>

@@ -2,18 +2,18 @@
   <div ref="containerRef" class="relative w-full">
     <!-- Trigger Button -->
     <div
-      class="w-full px-3 py-2 bg-slate-800/80 border rounded-xl text-sm flex items-center justify-between transition cursor-pointer select-none"
+      class="w-full flex items-center justify-between transition cursor-pointer select-none"
       :class="[
-        isOpen
-          ? 'border-emerald-500 ring-2 ring-emerald-500/40 text-white'
-          : 'border-slate-700 hover:border-slate-600 text-slate-200',
+        compact
+          ? 'px-2 py-0.5 rounded-md text-[11px] font-mono border ' + (isOverdue ? 'text-rose-400 bg-rose-500/10 border-rose-500/40 hover:bg-rose-500/20' : (modelValue ? 'text-slate-200 bg-slate-900/80 border-slate-700/80 hover:border-slate-600' : 'text-slate-400 bg-slate-900/40 border-slate-800 hover:border-slate-700'))
+          : 'px-3 py-2 bg-slate-800/80 border rounded-xl text-sm ' + (isOpen ? 'border-emerald-500 ring-2 ring-emerald-500/40 text-white' : 'border-slate-700 hover:border-slate-600 text-slate-200'),
         disabled ? 'opacity-50 pointer-events-none' : '',
       ]"
       @click="toggleDropdown"
     >
-      <div class="flex items-center gap-2 overflow-hidden truncate">
-        <span class="text-slate-400 shrink-0">📅</span>
-        <span v-if="modelValue" class="font-medium text-white truncate">
+      <div class="flex items-center gap-1.5 overflow-hidden truncate">
+        <span class="text-slate-400 shrink-0 text-xs">📅</span>
+        <span v-if="modelValue" class="font-medium truncate" :class="compact ? '' : 'text-white'">
           {{ formattedDisplayDate }}
         </span>
         <span v-else class="text-slate-500 truncate">
@@ -21,7 +21,7 @@
         </span>
       </div>
 
-      <div class="flex items-center gap-1.5 shrink-0 ml-2">
+      <div class="flex items-center gap-1 shrink-0 ml-1">
         <button
           v-if="modelValue && !disabled"
           type="button"
@@ -31,7 +31,11 @@
         >
           ✕
         </button>
-        <span class="text-xs text-slate-400 transition-transform duration-200" :class="{ 'rotate-180': isOpen }">
+        <span
+          v-if="!compact"
+          class="text-xs text-slate-400 transition-transform duration-200"
+          :class="{ 'rotate-180': isOpen }"
+        >
           ▼
         </span>
       </div>
@@ -40,7 +44,8 @@
     <!-- Dropdown Menu -->
     <div
       v-if="isOpen"
-      class="absolute left-0 top-full mt-1.5 w-64 sm:w-72 bg-slate-900 border border-slate-700/90 rounded-2xl shadow-2xl p-3 z-50 backdrop-blur-md"
+      class="absolute top-full mt-1.5 w-64 sm:w-72 bg-slate-900 border border-slate-700/90 rounded-2xl shadow-2xl p-3 z-50 backdrop-blur-md"
+      :class="compact ? 'right-0' : 'left-0'"
     >
       <!-- Quick Options -->
       <div class="mb-3">
@@ -122,6 +127,8 @@ interface Props {
   placeholder?: string;
   minDate?: string;
   disabled?: boolean;
+  compact?: boolean;
+  isOverdue?: boolean;
 }
 
 interface Emits {
@@ -133,6 +140,8 @@ const props = withDefaults(defineProps<Props>(), {
   placeholder: 'Select date',
   minDate: undefined,
   disabled: false,
+  compact: false,
+  isOverdue: false,
 });
 
 const emit = defineEmits<Emits>();

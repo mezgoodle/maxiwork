@@ -281,6 +281,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useHierarchyStore } from '../../../stores/hierarchy';
 import { useCustomFieldsStore } from '../../../stores/custom-fields';
 import { useViewStore } from '../../../stores/view';
+import { useAuthStore } from '../../../stores/auth';
 import { useApi } from '../../../composables/useApi';
 import { useToast } from '../../../composables/useToast';
 import { extractApiErrorMessage } from '../../../utils/error';
@@ -308,6 +309,7 @@ const listId = computed(() => String(route.params.id || ''));
 const hierarchyStore = useHierarchyStore();
 const customFieldsStore = useCustomFieldsStore();
 const viewStore = useViewStore();
+const authStore = useAuthStore();
 const { apiFetch } = useApi();
 const { showToast } = useToast();
 
@@ -376,17 +378,51 @@ const listUsers = computed(() => {
     string,
     { _id: string; firstName?: string; lastName?: string; email: string; avatarUrl?: string }
   >();
+
+  // 1. Current logged-in user
+  if (authStore.user?._id) {
+    map.set(authStore.user._id, {
+      _id: authStore.user._id,
+      firstName: authStore.user.firstName,
+      lastName: authStore.user.lastName,
+      email: authStore.user.email,
+      avatarUrl: authStore.user.avatarUrl,
+    });
+  }
+
+  // 2. Current workspace members
+  const ws = hierarchyStore.currentWorkspace;
+  if (ws && Array.isArray(ws.members)) {
+    for (const m of ws.members) {
+      const u =
+        typeof m.user === 'object' && m.user
+          ? (m.user as { _id?: string; firstName?: string; lastName?: string; email?: string; avatarUrl?: string })
+          : null;
+      if (u && u._id) {
+        map.set(u._id, {
+          _id: u._id,
+          firstName: u.firstName,
+          lastName: u.lastName,
+          email: u.email || '',
+          avatarUrl: u.avatarUrl,
+        });
+      }
+    }
+  }
+
+  // 3. Existing task assignees
   for (const t of tasks.value) {
-    if (t.assignee && typeof t.assignee === 'object') {
+    if (t.assignee && typeof t.assignee === 'object' && t.assignee._id) {
       map.set(t.assignee._id, {
         _id: t.assignee._id,
         firstName: t.assignee.firstName,
         lastName: t.assignee.lastName,
-        email: t.assignee.email,
+        email: t.assignee.email || '',
         avatarUrl: t.assignee.avatarUrl,
       });
     }
   }
+
   return Array.from(map.values());
 });
 
