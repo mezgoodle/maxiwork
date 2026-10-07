@@ -122,30 +122,6 @@
       </ViewToolbar>
     </div>
 
-    <!-- Quick Inline Add Task -->
-    <div class="mb-6">
-      <form
-        class="flex items-center gap-2 bg-slate-900/60 border border-slate-800 rounded-2xl p-2 sm:p-2.5"
-        @submit.prevent="handleQuickAdd"
-      >
-        <span class="pl-3 text-slate-500 text-sm font-bold">+</span>
-        <input
-          v-model="quickTitle"
-          type="text"
-          placeholder="Add a new task to this list... (press Enter)"
-          class="flex-1 bg-transparent border-none text-sm text-slate-100 placeholder-slate-500 focus:outline-none px-2"
-          :disabled="isQuickAdding"
-        >
-        <button
-          type="submit"
-          :disabled="!quickTitle.trim() || isQuickAdding"
-          class="px-4 py-1.5 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition cursor-pointer disabled:opacity-40"
-        >
-          {{ isQuickAdding ? 'Adding...' : 'Add Task' }}
-        </button>
-      </form>
-    </div>
-
     <!-- Content Area: Board, Calendar, or List View -->
     <div v-if="loading" class="flex-1 flex items-center justify-center py-16">
       <div class="text-slate-400 text-sm animate-pulse">Loading list items...</div>
@@ -209,285 +185,26 @@
         <CalendarPlaceholder @switch-view="viewStore.setActiveView" />
       </div>
 
-      <!-- List View (Detailed Task Rows + Expandable Subtasks + Custom Field Columns) -->
-      <div v-else class="space-y-2">
-        <!-- Table Column Headers Bar (Desktop) -->
-        <div
-          v-if="filteredTasks.length > 0"
-          class="hidden lg:flex items-center justify-between px-3.5 py-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800"
-        >
-          <div class="flex items-center gap-2.5 min-w-0 flex-1">
-            <span class="w-5 shrink-0" />
-            <span class="w-6 shrink-0" />
-            <span class="w-12 shrink-0">Key</span>
-            <span>Task Title</span>
-          </div>
-          <div class="flex items-center gap-3 shrink-0">
-            <!-- Dynamic Custom Field Header Columns -->
-            <div
-              v-for="field in effectiveFields"
-              :key="field._id"
-              class="w-28 truncate text-left font-semibold text-slate-400"
-              :title="field.name"
-            >
-              {{ field.name }}
-            </div>
-            <span class="w-24 text-center">Due Date</span>
-            <span class="w-16 text-center">Priority</span>
-            <span class="w-24 text-center">Assignee</span>
-            <span class="w-28 text-center">Status</span>
-          </div>
-        </div>
-
-        <div
-          v-for="task in filteredTasks"
-          :key="task._id"
-          class="space-y-1"
-        >
-          <!-- Parent Task Row -->
-          <div
-            class="p-3.5 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 hover:border-slate-500/80 rounded-xl transition flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 cursor-pointer shadow-sm group"
-            @click="openTaskDetail(task)"
-          >
-            <!-- Left: Expand Arrow + Done Checkbox + Key + Title + Subtasks count -->
-            <div class="flex items-center gap-2.5 min-w-0 flex-1">
-              <!-- Expand / Collapse arrow button for subtasks -->
-              <button
-                v-if="task.subtasksCount && task.subtasksCount > 0"
-                type="button"
-                class="w-5 h-5 rounded flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700/60 transition cursor-pointer shrink-0 text-xs"
-                :title="isTaskExpanded(task._id) ? 'Collapse subtasks' : 'Expand subtasks'"
-                @click.stop="toggleTaskExpand(task._id)"
-              >
-                <span
-                  class="transition-transform duration-200"
-                  :class="isTaskExpanded(task._id) ? 'rotate-90' : ''"
-                >
-                  ▶
-                </span>
-              </button>
-              <div v-else class="w-5 shrink-0" />
-
-              <!-- Quick Done toggle button -->
-              <button
-                type="button"
-                class="w-6 h-6 rounded-md border flex items-center justify-center transition-colors cursor-pointer shrink-0"
-                :class="
-                  isTaskDone(task)
-                    ? 'bg-emerald-500 border-emerald-400 text-slate-950 hover:bg-emerald-400 shadow-xs shadow-emerald-500/30'
-                    : 'bg-slate-900 border-slate-700 text-slate-500 hover:text-emerald-400 hover:border-emerald-500/50'
-                "
-                :title="isTaskDone(task) ? 'Reopen task' : 'Mark task as Done'"
-                @click.stop="toggleTaskDone(task)"
-              >
-                <span class="text-xs font-bold leading-none">✓</span>
-              </button>
-
-              <!-- Key Badge -->
-              <span class="text-xs font-mono font-bold text-indigo-400 shrink-0">
-                {{ task.taskKey || 'TASK' }}
-              </span>
-
-              <!-- Title -->
-              <span
-                class="text-sm font-medium truncate transition"
-                :class="isTaskDone(task) ? 'line-through text-slate-400' : 'text-slate-100 group-hover:text-indigo-300'"
-              >
-                {{ task.title }}
-              </span>
-
-              <!-- Description snippet if present -->
-              <span
-                v-if="task.description"
-                class="text-xs text-slate-500 truncate max-w-xs hidden lg:inline"
-              >
-                — <MarkdownViewer :content="task.description" :interactive-checklists="false" compact class="inline" />
-              </span>
-
-              <!-- Subtasks pill -->
-              <span
-                v-if="task.subtasksCount && task.subtasksCount > 0"
-                class="text-xs font-mono px-2 py-0.5 rounded-md bg-slate-900/60 border border-slate-700/60 shrink-0 hidden sm:inline cursor-pointer hover:border-indigo-500/50"
-                :class="task.completedSubtasksCount === task.subtasksCount ? 'text-emerald-400 border-emerald-500/30' : 'text-slate-400'"
-                title="Click to toggle subtasks"
-                @click.stop="toggleTaskExpand(task._id)"
-              >
-                ↳ {{ task.completedSubtasksCount || 0 }}/{{ task.subtasksCount }}
-              </span>
-            </div>
-
-            <!-- Right: Custom Fields + Detailed fields (Dates, Assignee, Priority, Status) -->
-            <div class="flex items-center gap-3 shrink-0 self-end sm:self-auto" @click.stop>
-              <!-- Dynamic Custom Field Cells -->
-              <div
-                v-for="field in effectiveFields"
-                :key="field._id"
-                class="w-28 shrink-0 hidden lg:block"
-                @click.stop
-              >
-                <CustomFieldInput
-                  :model-value="task.customFieldValues?.[field._id]"
-                  :field="field"
-                  compact
-                  @change="(val) => handleInlineCustomFieldChange(task, field._id, val)"
-                />
-              </div>
-
-              <!-- Due Date badge -->
-              <div
-                v-if="task.dueDate"
-                class="flex items-center gap-1 font-mono text-xs px-2.5 py-1 rounded-lg bg-slate-900/70 border shrink-0"
-                :class="getDateBadgeClass(task.dueDate, task.status)"
-                :title="`Due date: ${formatDate(task.dueDate)}`"
-              >
-                <span>📅</span>
-                <span>{{ formatDate(task.dueDate) }}</span>
-              </div>
-
-              <!-- Priority badge -->
-              <span
-                class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full shrink-0"
-                :class="getPriorityClass(task.priority)"
-              >
-                {{ task.priority || 'medium' }}
-              </span>
-
-              <!-- Assignee avatar + name -->
-              <div
-                v-if="task.assignee"
-                class="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-900/60 border border-slate-700/60 shrink-0"
-                :title="getUserDisplayName(task.assignee)"
-              >
-                <span
-                  class="w-5 h-5 rounded-full bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 flex items-center justify-center text-[10px] font-bold"
-                >
-                  {{ getUserInitials(task.assignee) }}
-                </span>
-                <span class="text-xs text-slate-300 max-w-[120px] truncate hidden md:inline">
-                  {{ getUserDisplayName(task.assignee) }}
-                </span>
-              </div>
-              <div
-                v-else
-                class="text-xs text-slate-500 italic shrink-0 hidden sm:inline px-1"
-              >
-                Unassigned
-              </div>
-
-              <!-- Status selector -->
-              <select
-                :value="task.status"
-                class="bg-slate-900 border border-slate-700 text-xs rounded-lg px-2.5 py-1 text-slate-200 focus:outline-none capitalize cursor-pointer shrink-0"
-                @change="handleStatusChange(task._id, ($event.target as HTMLSelectElement).value as TaskStatus)"
-              >
-                <option
-                  v-for="opt in statusOptions"
-                  :key="opt.id"
-                  :value="opt.id"
-                >
-                  {{ opt.name }}
-                </option>
-              </select>
-            </div>
-          </div>
-
-          <!-- Indented Subtasks Section under Parent Task -->
-          <div
-            v-if="isTaskExpanded(task._id) && subtasksMap[task._id]?.length"
-            class="pl-7 sm:pl-10 space-y-1.5 pt-0.5 pb-1"
-          >
-            <div
-              v-for="sub in subtasksMap[task._id]"
-              :key="sub._id"
-              class="p-2.5 bg-slate-900/70 hover:bg-slate-850 border border-slate-800/80 hover:border-slate-700 rounded-xl transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer group/sub shadow-xs"
-              @click="openTaskDetail(sub)"
-            >
-              <!-- Left: Checkbox + Subtask Key + Title -->
-              <div class="flex items-center gap-2.5 min-w-0 flex-1">
-                <button
-                  type="button"
-                  class="w-5 h-5 rounded-md border flex items-center justify-center transition-colors cursor-pointer shrink-0"
-                  :class="
-                    isTaskDone(sub)
-                      ? 'bg-emerald-500 border-emerald-400 text-slate-950 hover:bg-emerald-400'
-                      : 'bg-slate-900 border-slate-700 text-slate-500 hover:text-emerald-400'
-                  "
-                  :title="isTaskDone(sub) ? 'Reopen subtask' : 'Mark subtask as Done'"
-                  @click.stop="toggleTaskDone(sub)"
-                >
-                  <span class="text-[10px] font-bold leading-none">✓</span>
-                </button>
-
-                <span class="text-slate-500 font-mono text-xs font-semibold shrink-0">↳</span>
-                <span class="text-[11px] font-mono font-bold text-slate-400 shrink-0">
-                  {{ sub.taskKey }}
-                </span>
-
-                <span
-                  class="text-xs font-medium truncate transition"
-                  :class="isTaskDone(sub) ? 'line-through text-slate-500' : 'text-slate-200 group-hover/sub:text-indigo-300'"
-                >
-                  {{ sub.title }}
-                </span>
-              </div>
-
-              <!-- Right: Subtask Custom Fields + Fields (Date, Priority, Assignee, Status) -->
-              <div class="flex items-center gap-2.5 shrink-0 self-end sm:self-auto" @click.stop>
-                <!-- Subtask Dynamic Custom Field Cells -->
-                <div
-                  v-for="field in effectiveFields"
-                  :key="field._id"
-                  class="w-28 shrink-0 hidden lg:block"
-                  @click.stop
-                >
-                  <CustomFieldInput
-                    :model-value="sub.customFieldValues?.[field._id]"
-                    :field="field"
-                    compact
-                    @change="(val) => handleInlineCustomFieldChange(sub, field._id, val)"
-                  />
-                </div>
-
-                <span
-                  v-if="sub.dueDate"
-                  class="font-mono text-[11px] px-2 py-0.5 rounded-md bg-slate-900 border"
-                  :class="getDateBadgeClass(sub.dueDate, sub.status)"
-                >
-                  📅 {{ formatDate(sub.dueDate) }}
-                </span>
-
-                <span
-                  class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full shrink-0"
-                  :class="getPriorityClass(sub.priority)"
-                >
-                  {{ sub.priority || 'medium' }}
-                </span>
-
-                <span
-                  v-if="sub.assignee"
-                  class="w-5 h-5 rounded-full bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 flex items-center justify-center text-[10px] font-bold"
-                  :title="getUserDisplayName(sub.assignee)"
-                >
-                  {{ getUserInitials(sub.assignee) }}
-                </span>
-
-                <select
-                  :value="sub.status"
-                  class="bg-slate-900 border border-slate-700 text-xs rounded-lg px-2 py-0.5 text-slate-200 focus:outline-none capitalize cursor-pointer shrink-0"
-                  @change="handleStatusChange(sub._id, ($event.target as HTMLSelectElement).value as TaskStatus)"
-                >
-                  <option
-                    v-for="opt in statusOptions"
-                    :key="opt.id"
-                    :value="opt.id"
-                  >
-                    {{ opt.name }}
-                  </option>
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
+      <!-- List View (Interactive ClickUp-Style Table View) -->
+      <div v-else class="flex-1">
+        <ListTableView
+          :tasks="filteredTasks"
+          :workflow="listWorkflow"
+          :users="listUsers"
+          :effective-fields="effectiveFields"
+          :show-subtasks="showSubtasks"
+          :subtasks-map="subtasksMap"
+          :expanded-task-ids="expandedTaskIds"
+          :loading-subtasks-map="loadingSubtasksMap"
+          :group-by="viewStore.groupBy"
+          @task-click="openTaskDetail"
+          @task-update="handleInlineTaskUpdate"
+          @task-create="handleGroupTaskCreate"
+          @task-delete="promptDeleteTask"
+          @toggle-expand="toggleTaskExpand"
+          @toggle-done="toggleTaskDone"
+          @custom-field-change="handleInlineCustomFieldChange"
+        />
       </div>
     </div>
 
@@ -564,23 +281,22 @@ import { useRoute, useRouter } from 'vue-router';
 import { useHierarchyStore } from '../../../stores/hierarchy';
 import { useCustomFieldsStore } from '../../../stores/custom-fields';
 import { useViewStore } from '../../../stores/view';
+import { useAuthStore } from '../../../stores/auth';
 import { useApi } from '../../../composables/useApi';
 import { useToast } from '../../../composables/useToast';
 import { extractApiErrorMessage } from '../../../utils/error';
-import { getPriorityBadgeClass, getUserDisplayName, getUserInitials } from '../../../utils/task';
-import { type List, type Space, type StatusWorkflow, STATUS_CATEGORY_RANK } from '../../../types/hierarchy';
-import type { Task, TaskPriority, TaskStatus } from '../../../types/task';
+import type { List, Space, StatusWorkflow } from '../../../types/hierarchy';
+import type { Task, TaskStatus, CreateTaskPayload, UpdateTaskPayload } from '../../../types/task';
 import type { EffectiveCustomField } from '../../../types/custom-field';
 import KanbanBoard from '../../../components/board/KanbanBoard.vue';
 import ViewToolbar from '../../../components/views/ViewToolbar.vue';
 import CalendarPlaceholder from '../../../components/views/CalendarPlaceholder.vue';
+import ListTableView from '../../../components/views/ListTableView.vue';
 import TaskFormModal from '../../../components/task/TaskFormModal.vue';
 import TaskDetailDrawer from '../../../components/task/TaskDetailDrawer.vue';
 import StatusWorkflowModal from '../../../components/hierarchy/StatusWorkflowModal.vue';
 import CustomFieldsModal from '../../../components/custom-fields/CustomFieldsModal.vue';
-import CustomFieldInput from '../../../components/custom-fields/CustomFieldInput.vue';
 import ConfirmDialog from '../../../components/ui/ConfirmDialog.vue';
-import MarkdownViewer from '../../../components/ui/MarkdownViewer.vue';
 
 definePageMeta({
   middleware: ['auth'],
@@ -593,6 +309,7 @@ const listId = computed(() => String(route.params.id || ''));
 const hierarchyStore = useHierarchyStore();
 const customFieldsStore = useCustomFieldsStore();
 const viewStore = useViewStore();
+const authStore = useAuthStore();
 const { apiFetch } = useApi();
 const { showToast } = useToast();
 
@@ -661,17 +378,51 @@ const listUsers = computed(() => {
     string,
     { _id: string; firstName?: string; lastName?: string; email: string; avatarUrl?: string }
   >();
+
+  // 1. Current logged-in user
+  if (authStore.user?._id) {
+    map.set(authStore.user._id, {
+      _id: authStore.user._id,
+      firstName: authStore.user.firstName,
+      lastName: authStore.user.lastName,
+      email: authStore.user.email,
+      avatarUrl: authStore.user.avatarUrl,
+    });
+  }
+
+  // 2. Current workspace members
+  const ws = hierarchyStore.currentWorkspace;
+  if (ws && Array.isArray(ws.members)) {
+    for (const m of ws.members) {
+      const u =
+        typeof m.user === 'object' && m.user
+          ? (m.user as { _id?: string; firstName?: string; lastName?: string; email?: string; avatarUrl?: string })
+          : null;
+      if (u && u._id) {
+        map.set(u._id, {
+          _id: u._id,
+          firstName: u.firstName,
+          lastName: u.lastName,
+          email: u.email || '',
+          avatarUrl: u.avatarUrl,
+        });
+      }
+    }
+  }
+
+  // 3. Existing task assignees
   for (const t of tasks.value) {
-    if (t.assignee && typeof t.assignee === 'object') {
+    if (t.assignee && typeof t.assignee === 'object' && t.assignee._id) {
       map.set(t.assignee._id, {
         _id: t.assignee._id,
         firstName: t.assignee.firstName,
         lastName: t.assignee.lastName,
-        email: t.assignee.email,
+        email: t.assignee.email || '',
         avatarUrl: t.assignee.avatarUrl,
       });
     }
   }
+
   return Array.from(map.values());
 });
 
@@ -694,9 +445,6 @@ const isConfirmDeleteListOpen = ref(false);
 const listToDelete = ref<{ id: string; name: string } | null>(null);
 const isDeletingList = ref(false);
 
-const quickTitle = ref('');
-const isQuickAdding = ref(false);
-
 const currentSpace = computed<Space | null>(() => {
   if (!listDetails.value) return null;
   const sp = hierarchyStore.tree.find((s) => s.id === listDetails.value?.spaceId);
@@ -716,30 +464,6 @@ const currentSpace = computed<Space | null>(() => {
   };
 });
 
-const statusOptions = computed(() => {
-  if (listWorkflow.value?.statuses?.length) {
-    return [...listWorkflow.value.statuses]
-      .sort((a, b) => {
-        const rankA = STATUS_CATEGORY_RANK[a.category] || 99;
-        const rankB = STATUS_CATEGORY_RANK[b.category] || 99;
-        if (rankA !== rankB) return rankA - rankB;
-        return (a.order ?? 0) - (b.order ?? 0);
-      })
-      .map((s) => ({
-        id: s.id,
-        name: s.name,
-        category: s.category,
-        color: s.color,
-      }));
-  }
-  return [
-    { id: 'todo', name: 'To Do', category: 'to_do', color: '#94A3B8' },
-    { id: 'in_progress', name: 'In Progress', category: 'in_progress', color: '#38BDF8' },
-    { id: 'in_review', name: 'In Review', category: 'in_progress', color: '#A855F7' },
-    { id: 'done', name: 'Done', category: 'done', color: '#22C55E' },
-  ];
-});
-
 function isStatusDoneOrClosed(status?: TaskStatus): boolean {
   if (!status) return false;
   if (status === 'done') return true;
@@ -751,35 +475,6 @@ function isStatusDoneOrClosed(status?: TaskStatus): boolean {
 function isTaskDone(task: Task): boolean {
   if (task.completed) return true;
   return isStatusDoneOrClosed(task.status);
-}
-
-function getPriorityClass(priority?: TaskPriority): string {
-  return getPriorityBadgeClass(priority);
-}
-
-function formatDate(dateStr?: string): string {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return '';
-  return d.toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-  });
-}
-
-function getDateBadgeClass(dueDate?: string, status?: TaskStatus): string {
-  if (!dueDate) return 'text-slate-400 border-slate-700/60';
-  if (isStatusDoneOrClosed(status)) return 'text-slate-400 border-slate-700/60';
-  const due = new Date(dueDate).getTime();
-  const now = Date.now();
-  if (due < now) {
-    return 'text-rose-400 border-rose-500/40 bg-rose-500/10 font-semibold';
-  }
-  return 'text-slate-300 border-slate-700/60';
-}
-
-function isTaskExpanded(taskId: string): boolean {
-  return expandedTaskIds.value.has(taskId);
 }
 
 async function loadSubtasksForTask(taskId: string) {
@@ -955,24 +650,55 @@ function handleTaskDeleted(taskId: string) {
   }
 }
 
-async function handleQuickAdd() {
-  const title = quickTitle.value.trim();
-  if (!title || !listId.value) return;
+async function handleInlineTaskUpdate(taskId: string, payload: UpdateTaskPayload) {
+  let targetTask = tasks.value.find((t) => t._id === taskId);
 
-  isQuickAdding.value = true;
-  const initialStatus = (listWorkflow.value?.defaultTodoStatusId || 'todo') as TaskStatus;
+  if (!targetTask) {
+    for (const list of Object.values(subtasksMap.value)) {
+      const found = list.find((s) => s._id === taskId);
+      if (found) {
+        targetTask = found;
+        break;
+      }
+    }
+  }
+
+  if (!targetTask) return;
+
+  const previousSnapshot = { ...targetTask };
+  Object.assign(targetTask, payload);
+
+  try {
+    const updated = await apiFetch<Task>(`/lists/${listId.value}/tasks/${taskId}`, {
+      method: 'PATCH',
+      body: payload,
+    });
+    handleTaskUpdated(updated);
+  } catch (err: unknown) {
+    Object.assign(targetTask, previousSnapshot);
+    showToast(extractApiErrorMessage(err, 'Failed to update task'), 'error');
+  }
+}
+
+async function handleGroupTaskCreate(payload: CreateTaskPayload) {
+  if (!listId.value || !payload.title?.trim()) return;
+
+  const defaultStatus = (listWorkflow.value?.defaultTodoStatusId || 'todo') as TaskStatus;
+  const taskPayload = {
+    ...payload,
+    title: payload.title.trim(),
+    status: payload.status || defaultStatus,
+  };
+
   try {
     const created = await apiFetch<Task>(`/lists/${listId.value}/tasks`, {
       method: 'POST',
-      body: { title, status: initialStatus },
+      body: taskPayload,
     });
-    tasks.value.unshift(created);
-    quickTitle.value = '';
+    handleTaskSaved(created);
     showToast(`Created task ${created.taskKey}`, 'success');
   } catch (err: unknown) {
-    showToast(extractApiErrorMessage(err, 'Failed to add task'), 'error');
-  } finally {
-    isQuickAdding.value = false;
+    showToast(extractApiErrorMessage(err, 'Failed to create task'), 'error');
   }
 }
 
@@ -1020,8 +746,13 @@ async function toggleTaskDone(task: Task) {
   await handleStatusChange(task._id, newStatus);
 }
 
-function promptDeleteTask(taskId: string) {
-  const target = tasks.value.find((t) => t._id === taskId);
+function promptDeleteTask(taskOrId: Task | string) {
+  if (typeof taskOrId === 'object' && taskOrId !== null) {
+    taskToDelete.value = taskOrId;
+    isConfirmDeleteDialogOpen.value = true;
+    return;
+  }
+  const target = tasks.value.find((t) => t._id === taskOrId);
   if (target) {
     taskToDelete.value = target;
     isConfirmDeleteDialogOpen.value = true;
