@@ -168,7 +168,7 @@
                   type="text"
                   class="w-full bg-slate-900 border border-indigo-500 rounded-lg px-2 py-0.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-400 font-medium"
                   @click.stop
-                  @keydown.enter.prevent="saveInlineTitle(task)"
+                  @keydown.enter="(e) => handleInlineTitleEnter(e, task)"
                   @keydown.esc.prevent="cancelInlineTitle"
                   @blur="saveInlineTitle(task)"
                 >
@@ -347,7 +347,7 @@
                     type="text"
                     class="w-full bg-slate-900 border border-indigo-500 rounded-lg px-2 py-0.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-400 font-medium"
                     @click.stop
-                    @keydown.enter.prevent="saveInlineTitle(sub)"
+                    @keydown.enter="(e) => handleInlineTitleEnter(e, sub)"
                     @keydown.esc.prevent="cancelInlineTitle"
                     @blur="saveInlineTitle(sub)"
                   >
@@ -578,6 +578,12 @@ function startInlineTitleEdit(task: Task) {
 function cancelInlineTitle() {
   editingTaskId.value = null;
   editingTitleText.value = '';
+}
+
+function handleInlineTitleEnter(e: KeyboardEvent, task: Task) {
+  if (e.isComposing || e.keyCode === 229) return;
+  e.preventDefault();
+  saveInlineTitle(task);
 }
 
 function saveInlineTitle(task: Task) {
