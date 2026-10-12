@@ -4,6 +4,7 @@ import {
   getStatusBadgeStyle,
   getUserLabel,
   getAssigneeId,
+  collectAssignableUsers,
   computeTableGroups,
   type UserOption,
 } from './table-view';
@@ -202,6 +203,26 @@ describe('table-view utility', () => {
       expect(groups[0].name).toBe('All Tasks');
       expect(groups[0].tasks).toHaveLength(4);
       expect(groups[0].prefillPayload).toEqual({});
+    });
+  });
+
+  describe('collectAssignableUsers', () => {
+    it('merges and deduplicates users from props, currentUser, workspace owner/members, and tasks', () => {
+      const result = collectAssignableUsers({
+        users: [{ _id: 'u-1', firstName: 'Alice', lastName: 'Smith', email: 'alice@example.com' }],
+        currentUser: { _id: 'u-me', firstName: 'Maksym', lastName: 'Zavalniuk', email: 'maksym@example.com' },
+        workspace: {
+          owner: { _id: 'u-me', firstName: 'Maksym', lastName: 'Zavalniuk', email: 'maksym@example.com' },
+          members: [
+            { user: { _id: 'u-3', firstName: 'Charlie', lastName: 'Brown', email: 'charlie@example.com' } },
+          ],
+        },
+        tasks: mockTasks,
+      });
+
+      expect(result.map((u) => u._id)).toEqual(['u-1', 'u-me', 'u-3']);
+      expect(result[1].firstName).toBe('Maksym');
+      expect(result[2].firstName).toBe('Charlie');
     });
   });
 });

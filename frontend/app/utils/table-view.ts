@@ -74,6 +74,66 @@ export function getAssigneeId(assignee: unknown): string {
   return '';
 }
 
+export function collectAssignableUsers(options: {
+  users?: UserOption[];
+  currentUser?: unknown;
+  workspace?: {
+    owner?: unknown;
+    members?: Array<{ user?: unknown }>;
+  } | null;
+  tasks?: Task[];
+}): UserOption[] {
+  const map = new Map<string, UserOption>();
+
+  const addRawUser = (raw: unknown) => {
+    if (!raw || typeof raw !== 'object') return;
+    const obj = raw as {
+      _id?: string;
+      id?: string;
+      firstName?: string;
+      lastName?: string;
+      email?: string;
+      avatarUrl?: string;
+    };
+    const uid = obj._id || obj.id;
+    if (!uid || map.has(String(uid))) return;
+    map.set(String(uid), {
+      _id: String(uid),
+      firstName: obj.firstName,
+      lastName: obj.lastName,
+      email: obj.email || '',
+      avatarUrl: obj.avatarUrl,
+    });
+  };
+
+  if (options.users) {
+    for (const u of options.users) {
+      addRawUser(u);
+    }
+  }
+
+  if (options.currentUser) {
+    addRawUser(options.currentUser);
+  }
+
+  if (options.workspace) {
+    addRawUser(options.workspace.owner);
+    if (Array.isArray(options.workspace.members)) {
+      for (const m of options.workspace.members) {
+        addRawUser(m?.user);
+      }
+    }
+  }
+
+  if (options.tasks) {
+    for (const t of options.tasks) {
+      addRawUser(t.assignee);
+    }
+  }
+
+  return Array.from(map.values());
+}
+
 export function computeTableGroups(
   tasks: Task[],
   groupBy: GroupByOption = 'status',

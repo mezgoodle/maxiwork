@@ -92,7 +92,7 @@
             >
               {{ field.name }}
             </div>
-            <span class="w-24 text-center">Due Date</span>
+            <span class="w-28 text-center">Due Date</span>
             <span class="w-20 text-center">Priority</span>
             <span class="w-24 text-center">Assignee</span>
             <span class="w-28 text-center">Status</span>
@@ -213,7 +213,7 @@
               <div class="w-28 shrink-0" @click.stop>
                 <DatePickerMenu
                   :model-value="formatInputDate(task.dueDate)"
-                  placeholder="📅 No date"
+                  placeholder="No date"
                   compact
                   :is-overdue="isDateOverdue(task.dueDate, task.status)"
                   @update:model-value="(val) => handleDateChange(task, val)"
@@ -373,10 +373,10 @@
                 </div>
 
                 <!-- Subtask Due Date -->
-                <div class="w-24 shrink-0" @click.stop>
+                <div class="w-28 shrink-0" @click.stop>
                   <DatePickerMenu
                     :model-value="formatInputDate(sub.dueDate)"
-                    placeholder="📅 No date"
+                    placeholder="No date"
                     compact
                     :is-overdue="isDateOverdue(sub.dueDate, sub.status)"
                     @update:model-value="(val) => handleDateChange(sub, val)"
@@ -395,6 +395,25 @@
                     <option value="high" class="bg-slate-900 text-orange-400">High</option>
                     <option value="medium" class="bg-slate-900 text-yellow-400">Medium</option>
                     <option value="low" class="bg-slate-900 text-blue-400">Low</option>
+                  </select>
+                </div>
+
+                <!-- Subtask Assignee -->
+                <div class="relative w-24 shrink-0" @click.stop>
+                  <select
+                    :value="getAssigneeId(sub.assignee)"
+                    class="w-full text-xs bg-slate-900/80 border border-slate-700/80 rounded-lg px-1.5 py-1 text-slate-200 cursor-pointer focus:outline-none truncate"
+                    @change="(e) => handleAssigneeChange(sub, (e.target as HTMLSelectElement).value)"
+                  >
+                    <option value="" class="bg-slate-900 text-slate-400">Unassigned</option>
+                    <option
+                      v-for="user in availableUsers"
+                      :key="user._id"
+                      :value="user._id"
+                      class="bg-slate-900 text-white"
+                    >
+                      {{ getUserLabel(user) }}
+                    </option>
                   </select>
                 </div>
 
@@ -467,11 +486,16 @@ import type { Task, TaskPriority, TaskStatus, CreateTaskPayload, UpdateTaskPaylo
 import type { StatusWorkflow } from '../../types/hierarchy';
 import type { EffectiveCustomField } from '../../types/custom-field';
 import type { GroupByOption } from '../../types/view';
+import { useAuthStore } from '../../stores/auth';
+import { useHierarchyStore } from '../../stores/hierarchy';
 import { getPriorityBadgeClass } from '../../utils/task';
 import {
   computeTableGroups,
   getStatusOptions,
   getStatusBadgeStyle as getStatusBadgeStyleHelper,
+  getAssigneeId,
+  getUserLabel,
+  collectAssignableUsers,
   type UserOption,
   type TableGroup,
 } from '../../utils/table-view';
@@ -508,6 +532,19 @@ const emit = defineEmits<{
   (e: 'toggle-expand', taskId: string): void;
   (e: 'custom-field-change', task: Task, fieldId: string, val: unknown): void;
 }>();
+
+const authStore = useAuthStore();
+const hierarchyStore = useHierarchyStore();
+
+// Available Assignable Users (props + auth user + workspace members + task assignees)
+const availableUsers = computed<UserOption[]>(() => {
+  return collectAssignableUsers({
+    users: props.users,
+    currentUser: authStore.user,
+    workspace: hierarchyStore.currentWorkspace,
+    tasks: props.tasks,
+  });
+});
 
 // Group Collapse State
 const collapsedGroups = ref<Set<string>>(new Set());
@@ -617,7 +654,7 @@ function getStatusBadgeStyle(status?: TaskStatus) {
 
 // Groups Calculation
 const groups = computed<TableGroup[]>(() => {
-  return computeTableGroups(props.tasks, props.groupBy, props.workflow, props.users);
+  return computeTableGroups(props.tasks, props.groupBy, props.workflow, availableUsers.value);
 });
 
 // Utilities
