@@ -134,6 +134,17 @@ export function collectAssignableUsers(options: {
   return Array.from(map.values());
 }
 
+export function isTaskCompleted(
+  task: Pick<Task, 'status' | 'completed'>,
+  workflow?: StatusWorkflow | null,
+): boolean {
+  if (task.completed) return true;
+  if (task.status === 'done') return true;
+  if (!workflow?.statuses) return false;
+  const st = workflow.statuses.find((s) => s.id === task.status);
+  return st ? st.category === 'done' || st.category === 'closed' : false;
+}
+
 export function computeTableGroups(
   tasks: Task[],
   groupBy: GroupByOption = 'status',
@@ -152,7 +163,7 @@ export function computeTableGroups(
     }));
 
     const knownIds = new Set(statusOpts.map((s) => s.id));
-    const otherTasks = tasks.filter((t) => !knownIds.has(t.status));
+    const otherTasks = tasks.filter((t) => !knownIds.has(t.status || 'todo'));
     if (otherTasks.length > 0) {
       list.push({
         id: 'other',
@@ -186,6 +197,7 @@ export function computeTableGroups(
   // 3. Group By Assignee
   if (groupBy === 'assignee') {
     const list: TableGroup[] = [];
+    const knownUserIds = new Set(users.map((u) => u._id));
 
     // Assigned Users
     for (const u of users) {
@@ -199,8 +211,11 @@ export function computeTableGroups(
       });
     }
 
-    // Unassigned Group
-    const unassignedTasks = tasks.filter((t) => !t.assignee);
+    // Unassigned Group (includes tasks with no assignee or an unresolvable assignee ID)
+    const unassignedTasks = tasks.filter((t) => {
+      const aId = getAssigneeId(t.assignee);
+      return !aId || !knownUserIds.has(aId);
+    });
     list.push({
       id: 'unassigned',
       name: 'Unassigned',

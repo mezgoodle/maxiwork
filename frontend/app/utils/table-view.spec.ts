@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   getStatusOptions,
   getStatusBadgeStyle,
+  isTaskCompleted,
   getUserLabel,
   getAssigneeId,
   collectAssignableUsers,
@@ -109,6 +110,16 @@ describe('table-view utility', () => {
     });
   });
 
+  describe('isTaskCompleted', () => {
+    it('treats task as completed when completed flag is true or status is done/closed', () => {
+      expect(isTaskCompleted({ status: 'todo', completed: true }, null)).toBe(true);
+      expect(isTaskCompleted({ status: 'done', completed: false }, null)).toBe(true);
+      expect(isTaskCompleted({ status: 'todo', completed: false }, null)).toBe(false);
+      expect(isTaskCompleted({ status: 'closed', completed: false }, customWorkflow)).toBe(true);
+      expect(isTaskCompleted({ status: 'qa_testing', completed: false }, customWorkflow)).toBe(false);
+    });
+  });
+
   describe('getUserLabel', () => {
     it('formats full name when firstName and lastName are present', () => {
       expect(getUserLabel({ _id: '1', firstName: 'John', lastName: 'Doe', email: 'j@d.com' })).toBe('John Doe');
@@ -152,6 +163,22 @@ describe('table-view utility', () => {
       expect(otherGroup?.tasks[0]._id).toBe('t-4');
     });
 
+    it('does not duplicate tasks with empty status into Other when todo is a known status', () => {
+      const taskWithoutStatus: Task = {
+        _id: 't-empty-status',
+        title: 'Task without status',
+        status: '',
+        priority: 'medium',
+        assignee: null,
+        reporter: 'u-1',
+      };
+      const groups = computeTableGroups([taskWithoutStatus], 'status', null, mockUsers);
+      const todoGroup = groups.find((g) => g.id === 'todo');
+      const otherGroup = groups.find((g) => g.id === 'other');
+      expect(todoGroup?.tasks).toHaveLength(1);
+      expect(otherGroup).toBeUndefined();
+    });
+
     it('groups by status with custom workflow', () => {
       const groups = computeTableGroups(mockTasks, 'status', customWorkflow, mockUsers);
       // customWorkflow statuses: backlog, wip, qa_testing, closed + other (t-1, t-2, t-3)
@@ -176,8 +203,16 @@ describe('table-view utility', () => {
       expect(highGroup?.tasks[0]._id).toBe('t-1');
     });
 
-    it('groups by assignee into user groups plus unassigned', () => {
-      const groups = computeTableGroups(mockTasks, 'assignee', null, mockUsers);
+    it('groups by assignee into user groups plus unassigned (including unknown assignee IDs)', () => {
+      const taskWithUnknownAssignee: Task = {
+        _id: 't-unknown-user',
+        title: 'Task with unpopulated unknown user id',
+        status: 'todo',
+        priority: 'medium',
+        assignee: 'u-999',
+        reporter: 'u-1',
+      };
+      const groups = computeTableGroups([...mockTasks, taskWithUnknownAssignee], 'assignee', null, mockUsers);
       expect(groups).toHaveLength(3); // u-1, u-2, unassigned
 
       const aliceGroup = groups.find((g) => g.id === 'u-1');
@@ -192,7 +227,7 @@ describe('table-view utility', () => {
       expect(bobGroup?.prefillPayload).toEqual({ assignee: 'u-2' });
 
       const unassignedGroup = groups.find((g) => g.id === 'unassigned');
-      expect(unassignedGroup?.tasks).toHaveLength(2); // t-3, t-4
+      expect(unassignedGroup?.tasks.map((t) => t._id)).toEqual(['t-3', 't-4', 't-unknown-user']);
       expect(unassignedGroup?.prefillPayload).toEqual({ assignee: undefined });
     });
 

@@ -531,11 +531,16 @@ watch(
   () => props.initialTask,
   (newTask) => {
     if (newTask) {
-      if (newTask._id !== activeTask.value._id) {
+      const taskChanged = newTask._id !== activeTask.value._id;
+      if (taskChanged) {
         history.value = [];
       }
       activeTask.value = { ...newTask };
-      syncInputs(newTask);
+      editableTitle.value = newTask.title || '';
+      if (taskChanged || !isEditingDescription.value) {
+        editableDescription.value = newTask.description || '';
+        isEditingDescription.value = false;
+      }
     }
   },
   { immediate: true },

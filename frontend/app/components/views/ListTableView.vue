@@ -20,10 +20,14 @@
     >
       <!-- Group Header Bar -->
       <div
-        class="flex items-center justify-between py-1.5 px-2 rounded-xl hover:bg-slate-800/40 transition cursor-pointer select-none group/header"
-        @click="toggleGroup(group.id)"
+        class="flex items-center justify-between py-1.5 px-2 rounded-xl hover:bg-slate-800/40 transition select-none group/header"
       >
-        <div class="flex items-center gap-2.5">
+        <button
+          type="button"
+          class="flex items-center gap-2.5 cursor-pointer bg-transparent border-0 p-0 text-left"
+          :aria-expanded="!isGroupCollapsed(group.id)"
+          @click="toggleGroup(group.id)"
+        >
           <!-- Collapse/Expand Arrow -->
           <span
             class="text-xs text-slate-400 transition-transform duration-200"
@@ -49,7 +53,7 @@
           >
             {{ group.tasks.length }}
           </span>
-        </div>
+        </button>
 
         <div class="flex items-center gap-2" @click.stop>
           <button
@@ -69,7 +73,7 @@
         class="grid transition-[grid-template-rows] duration-200 ease-out"
         :class="isGroupCollapsed(group.id) ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]'"
       >
-        <div class="overflow-hidden">
+        <div :class="isGroupCollapsed(group.id) ? 'overflow-hidden' : 'overflow-visible min-h-0'">
           <div class="space-y-1.5 pt-1">
         <!-- Table Column Headers Bar (Desktop) -->
         <div
@@ -163,15 +167,17 @@
                   v-model="editingTitleText"
                   type="text"
                   class="w-full bg-slate-900 border border-indigo-500 rounded-lg px-2 py-0.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-400 font-medium"
+                  @click.stop
                   @keydown.enter.prevent="saveInlineTitle(task)"
                   @keydown.esc.prevent="cancelInlineTitle"
                   @blur="saveInlineTitle(task)"
                 >
-                <div
+                <button
                   v-else
-                  class="flex items-center gap-2 group/title cursor-text py-0.5 px-1 rounded hover:bg-slate-700/40 transition"
+                  type="button"
+                  class="flex w-full items-center gap-2 group/title cursor-text py-0.5 px-1 rounded border-0 bg-transparent text-left hover:bg-slate-700/40 transition"
                   title="Click to edit task title"
-                  @click="startInlineTitleEdit(task)"
+                  @click.stop="startInlineTitleEdit(task)"
                 >
                   <span
                     class="text-xs font-medium truncate"
@@ -188,7 +194,7 @@
                   >
                     ↳ {{ task.completedSubtasksCount || 0 }}/{{ task.subtasksCount }}
                   </span>
-                </div>
+                </button>
               </div>
             </div>
 
@@ -212,10 +218,10 @@
               <!-- Inline Due Date Picker -->
               <div class="w-28 shrink-0" @click.stop>
                 <DatePickerMenu
-                  :model-value="formatInputDate(task.dueDate)"
+                  :model-value="formatDateForInput(task.dueDate)"
                   placeholder="No date"
                   compact
-                  :is-overdue="isDateOverdue(task.dueDate, task.status)"
+                  :is-overdue="isDateOverdue(task)"
                   @update:model-value="(val) => handleDateChange(task, val)"
                 />
               </div>
@@ -225,7 +231,7 @@
                 <select
                   :value="task.priority || 'medium'"
                   class="w-full text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full border cursor-pointer focus:outline-none appearance-none text-center"
-                  :class="getPriorityClass(task.priority)"
+                  :class="getPriorityBadgeClass(task.priority)"
                   @change="(e) => handlePriorityChange(task, (e.target as HTMLSelectElement).value as TaskPriority)"
                 >
                   <option value="critical" class="bg-slate-900 text-rose-400">Critical</option>
@@ -244,7 +250,7 @@
                 >
                   <option value="" class="bg-slate-900 text-slate-400">Unassigned</option>
                   <option
-                    v-for="user in availableUsers"
+                    v-for="user in users"
                     :key="user._id"
                     :value="user._id"
                     class="bg-slate-900 text-white"
@@ -285,9 +291,17 @@
             </div>
           </div>
 
+          <!-- Subtasks Loading Indicator -->
+          <div
+            v-if="isTaskExpanded(task._id) && loadingSubtasksMap[task._id]"
+            class="pl-7 sm:pl-10 py-1.5 text-xs text-slate-400 animate-pulse"
+          >
+            Loading subtasks...
+          </div>
+
           <!-- Indented Subtasks Section under Parent Task -->
           <div
-            v-if="isTaskExpanded(task._id) && subtasksMap[task._id]?.length"
+            v-else-if="isTaskExpanded(task._id) && subtasksMap[task._id]?.length"
             class="pl-7 sm:pl-10 space-y-1.5 pt-0.5 pb-1"
           >
             <div
@@ -332,15 +346,17 @@
                     v-model="editingTitleText"
                     type="text"
                     class="w-full bg-slate-900 border border-indigo-500 rounded-lg px-2 py-0.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-400 font-medium"
+                    @click.stop
                     @keydown.enter.prevent="saveInlineTitle(sub)"
                     @keydown.esc.prevent="cancelInlineTitle"
                     @blur="saveInlineTitle(sub)"
                   >
-                  <div
+                  <button
                     v-else
-                    class="flex items-center gap-1.5 group/subtitle cursor-text py-0.5 px-1 rounded hover:bg-slate-800 transition"
+                    type="button"
+                    class="flex w-full items-center gap-1.5 group/subtitle cursor-text py-0.5 px-1 rounded border-0 bg-transparent text-left hover:bg-slate-800 transition"
                     title="Click to edit subtask title"
-                    @click="startInlineTitleEdit(sub)"
+                    @click.stop="startInlineTitleEdit(sub)"
                   >
                     <span
                       class="text-xs font-medium truncate"
@@ -351,7 +367,7 @@
                     <span class="text-[10px] text-slate-500 opacity-0 group-hover/subtitle:opacity-100 transition shrink-0">
                       ✏️
                     </span>
-                  </div>
+                  </button>
                 </div>
               </div>
 
@@ -375,10 +391,10 @@
                 <!-- Subtask Due Date -->
                 <div class="w-28 shrink-0" @click.stop>
                   <DatePickerMenu
-                    :model-value="formatInputDate(sub.dueDate)"
+                    :model-value="formatDateForInput(sub.dueDate)"
                     placeholder="No date"
                     compact
-                    :is-overdue="isDateOverdue(sub.dueDate, sub.status)"
+                    :is-overdue="isDateOverdue(sub)"
                     @update:model-value="(val) => handleDateChange(sub, val)"
                   />
                 </div>
@@ -388,7 +404,7 @@
                   <select
                     :value="sub.priority || 'medium'"
                     class="w-full text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full border cursor-pointer focus:outline-none appearance-none text-center"
-                    :class="getPriorityClass(sub.priority)"
+                    :class="getPriorityBadgeClass(sub.priority)"
                     @change="(e) => handlePriorityChange(sub, (e.target as HTMLSelectElement).value as TaskPriority)"
                   >
                     <option value="critical" class="bg-slate-900 text-rose-400">Critical</option>
@@ -407,7 +423,7 @@
                   >
                     <option value="" class="bg-slate-900 text-slate-400">Unassigned</option>
                     <option
-                      v-for="user in availableUsers"
+                      v-for="user in users"
                       :key="user._id"
                       :value="user._id"
                       class="bg-slate-900 text-white"
@@ -486,16 +502,14 @@ import type { Task, TaskPriority, TaskStatus, CreateTaskPayload, UpdateTaskPaylo
 import type { StatusWorkflow } from '../../types/hierarchy';
 import type { EffectiveCustomField } from '../../types/custom-field';
 import type { GroupByOption } from '../../types/view';
-import { useAuthStore } from '../../stores/auth';
-import { useHierarchyStore } from '../../stores/hierarchy';
-import { getPriorityBadgeClass } from '../../utils/task';
+import { getPriorityBadgeClass, formatDateForInput, toDateString } from '../../utils/task';
 import {
   computeTableGroups,
   getStatusOptions,
   getStatusBadgeStyle as getStatusBadgeStyleHelper,
   getAssigneeId,
   getUserLabel,
-  collectAssignableUsers,
+  isTaskCompleted,
   type UserOption,
   type TableGroup,
 } from '../../utils/table-view';
@@ -508,7 +522,6 @@ interface Props {
   effectiveFields?: EffectiveCustomField[];
   groupBy?: GroupByOption;
   users?: UserOption[];
-  showSubtasks?: boolean;
   expandedTaskIds?: Set<string>;
   subtasksMap?: Record<string, Task[]>;
   loadingSubtasksMap?: Record<string, boolean>;
@@ -519,7 +532,6 @@ const props = withDefaults(defineProps<Props>(), {
   effectiveFields: () => [],
   groupBy: 'status',
   users: () => [],
-  showSubtasks: false,
   expandedTaskIds: () => new Set(),
   subtasksMap: () => ({}),
   loadingSubtasksMap: () => ({}),
@@ -532,19 +544,6 @@ const emit = defineEmits<{
   (e: 'toggle-expand', taskId: string): void;
   (e: 'custom-field-change', task: Task, fieldId: string, val: unknown): void;
 }>();
-
-const authStore = useAuthStore();
-const hierarchyStore = useHierarchyStore();
-
-// Available Assignable Users (props + auth user + workspace members + task assignees)
-const availableUsers = computed<UserOption[]>(() => {
-  return collectAssignableUsers({
-    users: props.users,
-    currentUser: authStore.user,
-    workspace: hierarchyStore.currentWorkspace,
-    tasks: props.tasks,
-  });
-});
 
 // Group Collapse State
 const collapsedGroups = ref<Set<string>>(new Set());
@@ -629,8 +628,16 @@ function submitGroupAdd(group: TableGroup) {
 
 // Handlers for cell selectors
 function handleDateChange(task: Task, val: string) {
-  const newDate = val ? new Date(val).toISOString() : null;
-  emit('task-update', task._id, { dueDate: newDate });
+  if (!val) {
+    emit('task-update', task._id, { dueDate: null });
+    return;
+  }
+  const parts = val.split('-').map(Number);
+  const localDate =
+    parts.length === 3 && !parts.some(Number.isNaN)
+      ? new Date(parts[0], parts[1] - 1, parts[2])
+      : new Date(val);
+  emit('task-update', task._id, { dueDate: localDate.toISOString() });
 }
 
 function handlePriorityChange(task: Task, priority: TaskPriority) {
@@ -654,7 +661,7 @@ function getStatusBadgeStyle(status?: TaskStatus) {
 
 // Groups Calculation
 const groups = computed<TableGroup[]>(() => {
-  return computeTableGroups(props.tasks, props.groupBy, props.workflow, availableUsers.value);
+  return computeTableGroups(props.tasks, props.groupBy, props.workflow, props.users);
 });
 
 // Utilities
@@ -663,28 +670,13 @@ function isTaskExpanded(taskId: string): boolean {
 }
 
 function isTaskDone(task: Task): boolean {
-  if (task.completed) return true;
-  if (task.status === 'done') return true;
-  if (!props.workflow?.statuses) return false;
-  const st = props.workflow.statuses.find((s) => s.id === task.status);
-  return st ? st.category === 'done' || st.category === 'closed' : false;
+  return isTaskCompleted(task, props.workflow);
 }
 
-function getPriorityClass(priority?: TaskPriority): string {
-  return getPriorityBadgeClass(priority);
-}
-
-function formatInputDate(dateStr?: string): string {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return '';
-  return d.toISOString().split('T')[0];
-}
-
-function isDateOverdue(dueDate?: string, status?: TaskStatus): boolean {
-  if (!dueDate) return false;
-  if (isTaskDone({ status } as Task)) return false;
-  const due = new Date(dueDate).getTime();
-  return !isNaN(due) && due < Date.now();
+function isDateOverdue(task: Task): boolean {
+  if (!task.dueDate || isTaskDone(task)) return false;
+  const dueDay = formatDateForInput(task.dueDate);
+  if (!dueDay) return false;
+  return dueDay < toDateString(new Date());
 }
 </script>

@@ -192,7 +192,6 @@
           :workflow="listWorkflow"
           :users="listUsers"
           :effective-fields="effectiveFields"
-          :show-subtasks="showSubtasks"
           :subtasks-map="subtasksMap"
           :expanded-task-ids="expandedTaskIds"
           :loading-subtasks-map="loadingSubtasksMap"
@@ -285,7 +284,7 @@ import { useAuthStore } from '../../../stores/auth';
 import { useApi } from '../../../composables/useApi';
 import { useToast } from '../../../composables/useToast';
 import { extractApiErrorMessage } from '../../../utils/error';
-import { collectAssignableUsers } from '../../../utils/table-view';
+import { collectAssignableUsers, isTaskCompleted } from '../../../utils/table-view';
 import type { List, Space, StatusWorkflow } from '../../../types/hierarchy';
 import type { Task, TaskStatus, CreateTaskPayload, UpdateTaskPayload } from '../../../types/task';
 import type { EffectiveCustomField } from '../../../types/custom-field';
@@ -420,17 +419,8 @@ const currentSpace = computed<Space | null>(() => {
   };
 });
 
-function isStatusDoneOrClosed(status?: TaskStatus): boolean {
-  if (!status) return false;
-  if (status === 'done') return true;
-  if (!listWorkflow.value) return false;
-  const st = listWorkflow.value.statuses.find((s) => s.id === status);
-  return st ? (st.category === 'done' || st.category === 'closed') : false;
-}
-
 function isTaskDone(task: Task): boolean {
-  if (task.completed) return true;
-  return isStatusDoneOrClosed(task.status);
+  return isTaskCompleted(task, listWorkflow.value);
 }
 
 async function loadSubtasksForTask(taskId: string) {
