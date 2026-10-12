@@ -424,8 +424,8 @@ async function handleCustomFieldSave(fieldId: string, val: unknown) {
   }
 }
 
-const editableTitle = ref('');
-const editableDescription = ref('');
+const editableTitle = ref(props.initialTask?.title || '');
+const editableDescription = ref(props.initialTask?.description || '');
 const isEditingDescription = ref(false);
 const isDeleteDialogOpen = ref(false);
 
@@ -530,10 +530,17 @@ function syncInputs(task: Task) {
 watch(
   () => props.initialTask,
   (newTask) => {
-    if (newTask && newTask._id !== activeTask.value._id) {
+    if (newTask) {
+      const taskChanged = newTask._id !== activeTask.value._id;
+      if (taskChanged) {
+        history.value = [];
+      }
       activeTask.value = { ...newTask };
-      history.value = [];
-      syncInputs(newTask);
+      editableTitle.value = newTask.title || '';
+      if (taskChanged || !isEditingDescription.value) {
+        editableDescription.value = newTask.description || '';
+        isEditingDescription.value = false;
+      }
     }
   },
   { immediate: true },

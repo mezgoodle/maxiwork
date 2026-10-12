@@ -2,18 +2,18 @@
   <div ref="containerRef" class="relative w-full">
     <!-- Trigger Button -->
     <div
-      class="w-full px-3 py-2 bg-slate-800/80 border rounded-xl text-sm flex items-center justify-between transition cursor-pointer select-none"
+      class="w-full flex items-center justify-between transition cursor-pointer select-none"
       :class="[
-        isOpen
-          ? 'border-emerald-500 ring-2 ring-emerald-500/40 text-white'
-          : 'border-slate-700 hover:border-slate-600 text-slate-200',
+        compact
+          ? 'px-2 py-0.5 rounded-md text-[11px] font-mono border ' + (isOverdue ? 'text-rose-400 bg-rose-500/10 border-rose-500/40 hover:bg-rose-500/20' : (modelValue ? 'text-slate-200 bg-slate-900/80 border-slate-700/80 hover:border-slate-600' : 'text-slate-400 bg-slate-900/40 border-slate-800 hover:border-slate-700'))
+          : 'px-3 py-2 bg-slate-800/80 border rounded-xl text-sm ' + (isOpen ? 'border-emerald-500 ring-2 ring-emerald-500/40 text-white' : 'border-slate-700 hover:border-slate-600 text-slate-200'),
         disabled ? 'opacity-50 pointer-events-none' : '',
       ]"
       @click="toggleDropdown"
     >
-      <div class="flex items-center gap-2 overflow-hidden truncate">
-        <span class="text-slate-400 shrink-0">📅</span>
-        <span v-if="modelValue" class="font-medium text-white truncate">
+      <div class="flex items-center gap-1.5 overflow-hidden truncate">
+        <span class="text-slate-400 shrink-0 text-xs">📅</span>
+        <span v-if="modelValue" class="font-medium truncate" :class="compact ? '' : 'text-white'">
           {{ formattedDisplayDate }}
         </span>
         <span v-else class="text-slate-500 truncate">
@@ -21,7 +21,7 @@
         </span>
       </div>
 
-      <div class="flex items-center gap-1.5 shrink-0 ml-2">
+      <div class="flex items-center gap-1 shrink-0 ml-1">
         <button
           v-if="modelValue && !disabled"
           type="button"
@@ -31,97 +31,107 @@
         >
           ✕
         </button>
-        <span class="text-xs text-slate-400 transition-transform duration-200" :class="{ 'rotate-180': isOpen }">
+        <span
+          v-if="!compact"
+          class="text-xs text-slate-400 transition-transform duration-200"
+          :class="{ 'rotate-180': isOpen }"
+        >
           ▼
         </span>
       </div>
     </div>
 
     <!-- Dropdown Menu -->
-    <div
-      v-if="isOpen"
-      class="absolute left-0 top-full mt-1.5 w-64 sm:w-72 bg-slate-900 border border-slate-700/90 rounded-2xl shadow-2xl p-3 z-50 backdrop-blur-md"
-    >
-      <!-- Quick Options -->
-      <div class="mb-3">
-        <div class="text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-1.5 px-1">
-          Quick Presets
+    <Teleport to="body">
+      <div
+        v-if="isOpen"
+        ref="dropdownRef"
+        :style="dropdownStyle"
+        class="fixed w-64 sm:w-72 bg-slate-900 border border-slate-700/90 rounded-2xl shadow-2xl p-3 z-[100] backdrop-blur-md"
+      >
+        <!-- Quick Options -->
+        <div class="mb-3">
+          <div class="text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-1.5 px-1">
+            Quick Presets
+          </div>
+          <div class="space-y-1">
+            <button
+              type="button"
+              :disabled="isBeforeMin(todayStr)"
+              class="w-full px-2.5 py-1.5 rounded-lg text-left text-xs font-medium transition flex items-center justify-between cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              :class="modelValue === todayStr ? 'bg-emerald-500/20 text-emerald-300 font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white'"
+              @click="selectDate(todayStr)"
+            >
+              <span>⚡ Today</span>
+              <span class="text-[11px] text-slate-500 font-mono">{{ formatShort(todayStr) }}</span>
+            </button>
+
+            <button
+              type="button"
+              :disabled="isBeforeMin(tomorrowStr)"
+              class="w-full px-2.5 py-1.5 rounded-lg text-left text-xs font-medium transition flex items-center justify-between cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              :class="modelValue === tomorrowStr ? 'bg-emerald-500/20 text-emerald-300 font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white'"
+              @click="selectDate(tomorrowStr)"
+            >
+              <span>⏩ Tomorrow</span>
+              <span class="text-[11px] text-slate-500 font-mono">{{ formatShort(tomorrowStr) }}</span>
+            </button>
+
+            <button
+              type="button"
+              :disabled="isBeforeMin(inOneWeekStr)"
+              class="w-full px-2.5 py-1.5 rounded-lg text-left text-xs font-medium transition flex items-center justify-between cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              :class="modelValue === inOneWeekStr ? 'bg-emerald-500/20 text-emerald-300 font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white'"
+              @click="selectDate(inOneWeekStr)"
+            >
+              <span>📆 In 1 week</span>
+              <span class="text-[11px] text-slate-500 font-mono">{{ formatShort(inOneWeekStr) }}</span>
+            </button>
+          </div>
         </div>
-        <div class="space-y-1">
-          <button
-            type="button"
-            :disabled="isBeforeMin(todayStr)"
-            class="w-full px-2.5 py-1.5 rounded-lg text-left text-xs font-medium transition flex items-center justify-between cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-            :class="modelValue === todayStr ? 'bg-emerald-500/20 text-emerald-300 font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white'"
-            @click="selectDate(todayStr)"
-          >
-            <span>⚡ Today</span>
-            <span class="text-[11px] text-slate-500 font-mono">{{ formatShort(todayStr) }}</span>
-          </button>
 
-          <button
-            type="button"
-            :disabled="isBeforeMin(tomorrowStr)"
-            class="w-full px-2.5 py-1.5 rounded-lg text-left text-xs font-medium transition flex items-center justify-between cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-            :class="modelValue === tomorrowStr ? 'bg-emerald-500/20 text-emerald-300 font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white'"
-            @click="selectDate(tomorrowStr)"
-          >
-            <span>⏩ Tomorrow</span>
-            <span class="text-[11px] text-slate-500 font-mono">{{ formatShort(tomorrowStr) }}</span>
-          </button>
+        <!-- Divider -->
+        <div class="border-t border-slate-800/80 my-2.5" />
 
+        <!-- Specific Date Picker -->
+        <div>
+          <label class="block text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-1.5 px-1">
+            Specific Date
+          </label>
+          <input
+            :value="modelValue"
+            type="date"
+            :min="minDate"
+            class="w-full px-2.5 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition cursor-pointer"
+            @input="onNativeInput"
+          >
+        </div>
+
+        <!-- Clear Option -->
+        <div v-if="modelValue" class="mt-2.5 pt-2 border-t border-slate-800/80">
           <button
             type="button"
-            :disabled="isBeforeMin(inOneWeekStr)"
-            class="w-full px-2.5 py-1.5 rounded-lg text-left text-xs font-medium transition flex items-center justify-between cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-            :class="modelValue === inOneWeekStr ? 'bg-emerald-500/20 text-emerald-300 font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white'"
-            @click="selectDate(inOneWeekStr)"
+            class="w-full text-center py-1 text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg transition cursor-pointer"
+            @click="clearDate"
           >
-            <span>📆 In 1 week</span>
-            <span class="text-[11px] text-slate-500 font-mono">{{ formatShort(inOneWeekStr) }}</span>
+            Clear Date
           </button>
         </div>
       </div>
-
-      <!-- Divider -->
-      <div class="border-t border-slate-800/80 my-2.5" />
-
-      <!-- Specific Date Picker -->
-      <div>
-        <label class="block text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-1.5 px-1">
-          Specific Date
-        </label>
-        <input
-          :value="modelValue"
-          type="date"
-          :min="minDate"
-          class="w-full px-2.5 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition cursor-pointer"
-          @input="onNativeInput"
-        >
-      </div>
-
-      <!-- Clear Option -->
-      <div v-if="modelValue" class="mt-2.5 pt-2 border-t border-slate-800/80">
-        <button
-          type="button"
-          class="w-full text-center py-1 text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg transition cursor-pointer"
-          @click="clearDate"
-        >
-          Clear Date
-        </button>
-      </div>
-    </div>
+    </Teleport>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 
 interface Props {
   modelValue?: string;
   placeholder?: string;
   minDate?: string;
   disabled?: boolean;
+  compact?: boolean;
+  isOverdue?: boolean;
 }
 
 interface Emits {
@@ -133,11 +143,15 @@ const props = withDefaults(defineProps<Props>(), {
   placeholder: 'Select date',
   minDate: undefined,
   disabled: false,
+  compact: false,
+  isOverdue: false,
 });
 
 const emit = defineEmits<Emits>();
 
 const containerRef = ref<HTMLElement | null>(null);
+const dropdownRef = ref<HTMLElement | null>(null);
+const dropdownStyle = ref<Record<string, string>>({});
 const isOpen = ref(false);
 
 const todayStr = computed(() => toDateString(new Date()));
@@ -197,9 +211,41 @@ function formatShort(str: string): string {
   });
 }
 
+function updateDropdownPosition() {
+  if (!containerRef.value || typeof window === 'undefined') return;
+  const rect = containerRef.value.getBoundingClientRect();
+  const menuWidth = dropdownRef.value?.offsetWidth || (props.compact ? 256 : 288);
+  const menuHeight = dropdownRef.value?.offsetHeight || (props.modelValue ? 310 : 265);
+
+  let left = props.compact ? rect.right - menuWidth : rect.left;
+  if (left + menuWidth > window.innerWidth - 12) {
+    left = window.innerWidth - menuWidth - 12;
+  }
+  if (left < 12) {
+    left = 12;
+  }
+
+  const spaceBelow = window.innerHeight - rect.bottom;
+  let top = rect.bottom + 6;
+  if (spaceBelow < menuHeight + 12 && rect.top > menuHeight + 12) {
+    top = rect.top - menuHeight - 6;
+  }
+
+  dropdownStyle.value = {
+    top: `${top}px`,
+    left: `${left}px`,
+  };
+}
+
 function toggleDropdown() {
   if (props.disabled) return;
   isOpen.value = !isOpen.value;
+  if (isOpen.value) {
+    updateDropdownPosition();
+    nextTick(() => {
+      updateDropdownPosition();
+    });
+  }
 }
 
 function selectDate(dateStr: string) {
@@ -222,7 +268,11 @@ function clearDate() {
 
 function handleDocumentClick(event: MouseEvent) {
   if (!containerRef.value) return;
-  if (!containerRef.value.contains(event.target as Node)) {
+  const target = event.target as Node;
+  if (
+    !containerRef.value.contains(target) &&
+    (!dropdownRef.value || !dropdownRef.value.contains(target))
+  ) {
     isOpen.value = false;
   }
 }
@@ -233,10 +283,18 @@ function handleDocumentKeydown(event: KeyboardEvent) {
   }
 }
 
+function handleViewportChange() {
+  if (isOpen.value) {
+    updateDropdownPosition();
+  }
+}
+
 onMounted(() => {
   if ((import.meta as { client?: boolean }).client) {
     document.addEventListener('click', handleDocumentClick);
     document.addEventListener('keydown', handleDocumentKeydown);
+    window.addEventListener('scroll', handleViewportChange, true);
+    window.addEventListener('resize', handleViewportChange);
   }
 });
 
@@ -244,6 +302,8 @@ onBeforeUnmount(() => {
   if ((import.meta as { client?: boolean }).client) {
     document.removeEventListener('click', handleDocumentClick);
     document.removeEventListener('keydown', handleDocumentKeydown);
+    window.removeEventListener('scroll', handleViewportChange, true);
+    window.removeEventListener('resize', handleViewportChange);
   }
 });
 </script>
