@@ -74,6 +74,38 @@ export function getAssigneeId(assignee: unknown): string {
   return '';
 }
 
+export function resolveTaskAssignee(
+  assignee: unknown,
+  users?: UserOption[],
+): UserOption | null {
+  if (!assignee) return null;
+  if (typeof assignee === 'object' && assignee !== null) {
+    const obj = assignee as {
+      _id?: string;
+      id?: string;
+      firstName?: string;
+      lastName?: string;
+      email?: string;
+      avatarUrl?: string;
+    };
+    const uid = obj._id || obj.id;
+    if (uid) {
+      return {
+        _id: String(uid),
+        firstName: obj.firstName,
+        lastName: obj.lastName,
+        email: obj.email || '',
+        avatarUrl: obj.avatarUrl,
+      };
+    }
+  }
+  if (typeof assignee === 'string' && users?.length) {
+    const found = users.find((u) => u._id === assignee);
+    if (found) return found;
+  }
+  return null;
+}
+
 export function collectAssignableUsers(options: {
   users?: UserOption[];
   currentUser?: unknown;

@@ -240,8 +240,11 @@
         </div>
       </div>
 
-      <!-- Group By Selector -->
-      <div class="flex items-center gap-1.5 bg-slate-800/80 border border-slate-700/80 rounded-xl px-2.5 py-1 text-xs text-slate-300">
+      <!-- Group By Selector (Only relevant for List view) -->
+      <div
+        v-if="viewStore.activeView === 'list'"
+        class="flex items-center gap-1.5 bg-slate-800/80 border border-slate-700/80 rounded-xl px-2.5 py-1 text-xs text-slate-300"
+      >
         <span class="text-slate-400 text-[11px] font-medium hidden sm:inline">Group:</span>
         <select
           :value="viewStore.groupBy"

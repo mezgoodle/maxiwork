@@ -172,11 +172,14 @@
           :tasks="filteredTasks"
           :list-id="listId"
           :workflow="listWorkflow"
+          :users="listUsers"
           :loading="loading"
           @task-drop="handleDrop"
           @create-task="openCreateTaskModal"
+          @task-create="handleGroupTaskCreate"
           @task-click="openTaskDetail"
           @delete-task="promptDeleteTask"
+          @toggle-done="toggleTaskDone"
         />
       </div>
 

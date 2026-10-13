@@ -8,14 +8,31 @@
     @click="handleCardClick"
   >
     <div class="flex items-center justify-between gap-2 mb-2">
-      <span
-        class="font-mono text-xs font-bold px-2 py-0.5 rounded bg-slate-900/60 text-slate-300 border border-slate-700/50"
-      >
-        {{ task.taskKey }}
-      </span>
+      <div class="flex items-center gap-2 min-w-0">
+        <!-- Quick Completion Checkbox -->
+        <button
+          type="button"
+          class="w-4 h-4 rounded border flex items-center justify-center transition cursor-pointer shrink-0"
+          :class="
+            isTaskDone
+              ? 'bg-emerald-500 border-emerald-400 text-slate-950 hover:bg-emerald-400'
+              : 'bg-slate-900 border-slate-700 text-slate-500 hover:text-emerald-400'
+          "
+          :title="isTaskDone ? 'Reopen task' : 'Mark as Done'"
+          @click.stop="emit('toggle-done', task)"
+        >
+          <span class="text-[9px] font-bold leading-none">✓</span>
+        </button>
+
+        <span
+          class="font-mono text-xs font-bold px-2 py-0.5 rounded bg-slate-900/60 text-slate-300 border border-slate-700/50 truncate"
+        >
+          {{ task.taskKey }}
+        </span>
+      </div>
 
       <span
-        class="text-xs font-medium px-2 py-0.5 rounded-full border capitalize"
+        class="text-xs font-medium px-2 py-0.5 rounded-full border capitalize shrink-0"
         :class="priorityBadgeClass"
       >
         {{ task.priority }}
@@ -23,7 +40,8 @@
     </div>
 
     <div
-      class="block text-sm font-semibold text-slate-100 hover:text-indigo-400 transition mb-2.5 line-clamp-2 cursor-pointer"
+      class="block text-sm font-semibold transition mb-2.5 line-clamp-2 cursor-pointer"
+      :class="isTaskDone ? 'line-through text-slate-500' : 'text-slate-100 hover:text-indigo-400'"
       @click.stop="handleTitleClick"
     >
       {{ task.title }}
@@ -60,13 +78,22 @@
       </div>
 
       <div class="flex items-center gap-1.5">
-        <span
-          v-if="task.assignee"
-          class="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-200 border border-slate-600"
-          :title="assigneeName"
-        >
-          {{ assigneeInitials }}
-        </span>
+        <div v-if="resolvedAssignee || task.assignee" class="flex items-center">
+          <img
+            v-if="resolvedAssignee?.avatarUrl"
+            :src="resolvedAssignee.avatarUrl"
+            :alt="assigneeName"
+            :title="assigneeName"
+            class="w-6 h-6 rounded-full object-cover border border-slate-600"
+          >
+          <span
+            v-else
+            class="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-200 border border-slate-600"
+            :title="assigneeName"
+          >
+            {{ assigneeInitials }}
+          </span>
+        </div>
 
         <button
           type="button"
@@ -84,33 +111,57 @@
 <script lang="ts" setup>
 import { computed, ref } from 'vue';
 import type { Task } from '../../types/task';
-import { getPriorityBadgeClass, getUserDisplayName, getUserInitials } from '../../utils/task';
+import type { StatusWorkflow } from '../../types/hierarchy';
+import { getPriorityBadgeClass, getUserDisplayName, getUserInitials, toDateString } from '../../utils/task';
+import { isTaskCompleted, resolveTaskAssignee, getUserLabel, type UserOption } from '../../utils/table-view';
 import MarkdownViewer from '../ui/MarkdownViewer.vue';
 
 interface Props {
   task: Task;
   projectId?: string;
   listId?: string;
+  workflow?: StatusWorkflow | null;
+  users?: UserOption[];
 }
 
 interface Emits {
   (e: 'dragstart', event: DragEvent, task: Task): void;
-  (e: 'click', task: Task): void;
+  (e: 'click' | 'toggle-done', task: Task): void;
   (e: 'delete', taskId: string): void;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  projectId: undefined,
+  listId: undefined,
+  workflow: null,
+  users: () => [],
+});
+
 const emit = defineEmits<Emits>();
 
 const isDragging = ref(false);
+
+const isTaskDone = computed(() => isTaskCompleted(props.task, props.workflow));
 
 const priorityBadgeClass = computed(() =>
   getPriorityBadgeClass(props.task.priority),
 );
 
-const assigneeName = computed(() => getUserDisplayName(props.task.assignee));
+const resolvedAssignee = computed(() => resolveTaskAssignee(props.task.assignee, props.users));
 
-const assigneeInitials = computed(() => getUserInitials(props.task.assignee));
+const assigneeName = computed(() => {
+  if (resolvedAssignee.value) {
+    return getUserLabel(resolvedAssignee.value);
+  }
+  return getUserDisplayName(props.task.assignee);
+});
+
+const assigneeInitials = computed(() => {
+  if (resolvedAssignee.value) {
+    return getUserInitials(resolvedAssignee.value);
+  }
+  return getUserInitials(props.task.assignee);
+});
 
 const formattedDueDate = computed(() => {
   if (!props.task.dueDate) return '';
@@ -123,12 +174,12 @@ const formattedDueDate = computed(() => {
 
 const dueDateClass = computed(() => {
   if (!props.task.dueDate) return '';
-  const due = new Date(props.task.dueDate).getTime();
-  const now = Date.now();
-  if (props.task.status === 'done') {
-    return 'text-slate-400';
+  if (isTaskDone.value) {
+    return 'text-slate-500';
   }
-  if (due < now) {
+  const dueDay = toDateString(new Date(props.task.dueDate));
+  const today = toDateString(new Date());
+  if (dueDay < today) {
     return 'text-rose-400 font-semibold';
   }
   return 'text-slate-300';
