@@ -29,10 +29,14 @@
         :tasks="groupedTasks[col.id] || []"
         :project-id="projectId"
         :list-id="listId"
+        :workflow="workflow"
+        :users="users"
         @task-drop="handleTaskDrop"
         @create-task="(status) => emit('create-task', status)"
+        @inline-create="handleInlineCreate"
         @task-click="(task) => emit('task-click', task)"
         @delete-task="(taskId) => emit('delete-task', taskId)"
+        @toggle-done="(task) => emit('toggle-done', task)"
       />
     </div>
   </div>
@@ -42,6 +46,7 @@
 import { computed } from 'vue';
 import type { Task, TaskStatus } from '../../types/task';
 import { type StatusWorkflow, STATUS_CATEGORY_RANK } from '../../types/hierarchy';
+import type { UserOption } from '../../utils/table-view';
 import { useTasksStore } from '../../stores/tasks';
 import { useToast } from '../../composables/useToast';
 import KanbanColumn from './KanbanColumn.vue';
@@ -52,16 +57,26 @@ interface Props {
   listId?: string;
   loading?: boolean;
   workflow?: StatusWorkflow | null;
+  users?: UserOption[];
 }
 
 interface Emits {
   (e: 'task-drop', taskId: string, newStatus: TaskStatus): void;
   (e: 'create-task', status?: TaskStatus): void;
-  (e: 'task-click', task: Task): void;
+  (e: 'task-create', payload: { title: string; status: TaskStatus }): void;
+  (e: 'task-click' | 'toggle-done', task: Task): void;
   (e: 'delete-task', taskId: string): void;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  tasks: undefined,
+  projectId: undefined,
+  listId: undefined,
+  loading: undefined,
+  workflow: null,
+  users: () => [],
+});
+
 const emit = defineEmits<Emits>();
 
 const tasksStore = useTasksStore();
@@ -121,13 +136,13 @@ const groupedTasks = computed(() => {
 });
 
 async function handleTaskDrop(taskId: string, newStatus: TaskStatus) {
+  const current = allTasks.value.find((t) => t._id === taskId);
+  if (!current || current.status === newStatus) return;
+
   emit('task-drop', taskId, newStatus);
 
   // If using projectId and tasksStore, update status via store automatically
   if (props.projectId && !props.listId) {
-    const current = tasksStore.tasks.find((t) => t._id === taskId);
-    if (!current || current.status === newStatus) return;
-
     try {
       await tasksStore.updateTaskStatus(props.projectId, taskId, newStatus);
       showToast(`Task status updated to ${newStatus.replace('_', ' ')}`, 'success');
@@ -137,6 +152,31 @@ async function handleTaskDrop(taskId: string, newStatus: TaskStatus) {
           ?.message ||
         (err as { message?: string })?.message ||
         'Failed to update task status';
+      showToast(errorMsg, 'error');
+    }
+  }
+}
+
+async function handleInlineCreate(title: string, status: TaskStatus) {
+  if (props.listId) {
+    emit('task-create', { title, status });
+    return;
+  }
+
+  if (props.projectId) {
+    try {
+      await tasksStore.createTask({
+        title,
+        status,
+        project: props.projectId,
+      });
+      showToast('Task created', 'success');
+    } catch (err: unknown) {
+      const errorMsg =
+        (err as { data?: { message?: string }; message?: string })?.data
+          ?.message ||
+        (err as { message?: string })?.message ||
+        'Failed to create task';
       showToast(errorMsg, 'error');
     }
   }

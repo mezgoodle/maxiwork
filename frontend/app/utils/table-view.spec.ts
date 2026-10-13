@@ -5,6 +5,7 @@ import {
   isTaskCompleted,
   getUserLabel,
   getAssigneeId,
+  resolveTaskAssignee,
   collectAssignableUsers,
   computeTableGroups,
   type UserOption,
@@ -146,6 +147,33 @@ describe('table-view utility', () => {
     it('returns empty string when assignee is null or undefined', () => {
       expect(getAssigneeId(null)).toBe('');
       expect(getAssigneeId(undefined)).toBe('');
+    });
+  });
+
+  describe('resolveTaskAssignee', () => {
+    it('returns user option when assignee is already an object', () => {
+      const resolved = resolveTaskAssignee({ _id: 'u-1', firstName: 'Alice', email: 'a@test.com' }, mockUsers);
+      expect(resolved?._id).toBe('u-1');
+      expect(resolved?.firstName).toBe('Alice');
+    });
+
+    it('merges matching user details when assignee object omits details', () => {
+      const resolved = resolveTaskAssignee({ _id: 'u-1' }, mockUsers);
+      expect(resolved?._id).toBe('u-1');
+      expect(resolved?.firstName).toBe('Alice');
+      expect(resolved?.lastName).toBe('Smith');
+      expect(resolved?.email).toBe('alice@example.com');
+    });
+
+    it('finds user in users array when assignee is a string id', () => {
+      const resolved = resolveTaskAssignee('u-2', mockUsers);
+      expect(resolved?._id).toBe('u-2');
+      expect(resolved?.firstName).toBe('Bob');
+    });
+
+    it('returns null when assignee cannot be resolved or is empty', () => {
+      expect(resolveTaskAssignee(null, mockUsers)).toBeNull();
+      expect(resolveTaskAssignee('u-unknown', mockUsers)).toBeNull();
     });
   });
 
