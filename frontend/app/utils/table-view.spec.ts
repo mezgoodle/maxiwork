@@ -157,6 +157,14 @@ describe('table-view utility', () => {
       expect(resolved?.firstName).toBe('Alice');
     });
 
+    it('merges matching user details when assignee object omits details', () => {
+      const resolved = resolveTaskAssignee({ _id: 'u-1' }, mockUsers);
+      expect(resolved?._id).toBe('u-1');
+      expect(resolved?.firstName).toBe('Alice');
+      expect(resolved?.lastName).toBe('Smith');
+      expect(resolved?.email).toBe('alice@example.com');
+    });
+
     it('finds user in users array when assignee is a string id', () => {
       const resolved = resolveTaskAssignee('u-2', mockUsers);
       expect(resolved?._id).toBe('u-2');

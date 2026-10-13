@@ -90,12 +90,13 @@ export function resolveTaskAssignee(
     };
     const uid = obj._id || obj.id;
     if (uid) {
+      const matched = users?.find((u) => u._id === String(uid));
       return {
         _id: String(uid),
-        firstName: obj.firstName,
-        lastName: obj.lastName,
-        email: obj.email || '',
-        avatarUrl: obj.avatarUrl,
+        firstName: obj.firstName || matched?.firstName,
+        lastName: obj.lastName || matched?.lastName,
+        email: obj.email || matched?.email || '',
+        avatarUrl: obj.avatarUrl || matched?.avatarUrl,
       };
     }
   }
