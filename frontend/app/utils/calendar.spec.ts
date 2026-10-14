@@ -6,6 +6,7 @@ import {
   formatWeekRange,
   isTaskOverdue,
   groupTasksByDate,
+  getTaskSpanPosition,
 } from './calendar';
 import type { Task } from '../types/task';
 import type { StatusWorkflow } from '../types/hierarchy';
@@ -201,6 +202,59 @@ describe('calendar utils', () => {
 
       expect(unscheduled.length).toBe(2);
       expect(unscheduled.map((t) => t._id)).toEqual(['4', '5']);
+    });
+
+    it('spans task across every date from startDate to dueDate inclusive', () => {
+      const taskWithRange: Task = {
+        _id: '10',
+        title: 'Multi-day Task',
+        startDate: '2026-10-12T00:00:00.000Z',
+        dueDate: '2026-10-15T00:00:00.000Z',
+      } as Task;
+
+      const { scheduled } = groupTasksByDate([taskWithRange]);
+
+      expect(scheduled.get('2026-10-12')?.length).toBe(1);
+      expect(scheduled.get('2026-10-13')?.length).toBe(1);
+      expect(scheduled.get('2026-10-14')?.length).toBe(1);
+      expect(scheduled.get('2026-10-15')?.length).toBe(1);
+      expect(scheduled.get('2026-10-16')).toBeUndefined();
+    });
+  });
+
+  describe('getTaskSpanPosition', () => {
+    const multiDayTask: Task = {
+      _id: '10',
+      title: 'Multi-day Task',
+      startDate: '2026-10-12T00:00:00.000Z',
+      dueDate: '2026-10-15T00:00:00.000Z',
+    } as Task;
+
+    it('identifies start, middle, and end positions accurately', () => {
+      expect(getTaskSpanPosition(multiDayTask, '2026-10-12')).toBe('start');
+      expect(getTaskSpanPosition(multiDayTask, '2026-10-13')).toBe('middle');
+      expect(getTaskSpanPosition(multiDayTask, '2026-10-14')).toBe('middle');
+      expect(getTaskSpanPosition(multiDayTask, '2026-10-15')).toBe('end');
+      expect(getTaskSpanPosition(multiDayTask, '2026-10-11')).toBe('single');
+    });
+
+    it('returns single for tasks without startDate or with single day duration', () => {
+      const singleDayTask: Task = {
+        _id: '11',
+        title: 'Single Day Task',
+        dueDate: '2026-10-12T00:00:00.000Z',
+      } as Task;
+
+      expect(getTaskSpanPosition(singleDayTask, '2026-10-12')).toBe('single');
+
+      const sameDayTask: Task = {
+        _id: '12',
+        title: 'Same Day Task',
+        startDate: '2026-10-12T00:00:00.000Z',
+        dueDate: '2026-10-12T15:00:00.000Z',
+      } as Task;
+
+      expect(getTaskSpanPosition(sameDayTask, '2026-10-12')).toBe('single');
     });
   });
 });

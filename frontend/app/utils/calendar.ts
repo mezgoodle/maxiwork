@@ -177,7 +177,8 @@ export interface TaskCalendarPartition {
 
 /**
  * Partitions tasks into a Map keyed by YYYY-MM-DD for scheduled tasks,
- * and an array of unscheduled tasks (tasks without dueDate).
+ * and an array of unscheduled tasks (tasks without dueDate or valid date span).
+ * If a task has both startDate and dueDate, it spans across every calendar date in that range.
  */
 export function groupTasksByDate(tasks: Task[]): TaskCalendarPartition {
   const scheduled = new Map<string, Task[]>();
@@ -189,17 +190,76 @@ export function groupTasksByDate(tasks: Task[]): TaskCalendarPartition {
       continue;
     }
 
-    const d = new Date(task.dueDate);
-    if (Number.isNaN(d.getTime())) {
+    const dueD = new Date(task.dueDate);
+    if (Number.isNaN(dueD.getTime())) {
       unscheduled.push(task);
       continue;
     }
 
-    const key = toDateString(d);
-    const existing = scheduled.get(key) || [];
+    const dueKey = toDateString(dueD);
+
+    // If task has valid startDate that is <= dueDate, span across all dates in range
+    let startD: Date | null = null;
+    if (task.startDate) {
+      const parsedStart = new Date(task.startDate);
+      if (!Number.isNaN(parsedStart.getTime())) {
+        startD = parsedStart;
+      }
+    }
+
+    if (startD) {
+      const startKey = toDateString(startD);
+      if (startKey <= dueKey) {
+        // Populate all days from startKey to dueKey inclusive
+        const current = new Date(startD.getFullYear(), startD.getMonth(), startD.getDate());
+        const end = new Date(dueD.getFullYear(), dueD.getMonth(), dueD.getDate());
+
+        while (current <= end) {
+          const key = toDateString(current);
+          const existing = scheduled.get(key) || [];
+          existing.push(task);
+          scheduled.set(key, existing);
+          current.setDate(current.getDate() + 1);
+        }
+        continue;
+      }
+    }
+
+    // Default single-day entry for tasks with only dueDate or startDate > dueDate
+    const existing = scheduled.get(dueKey) || [];
     existing.push(task);
-    scheduled.set(key, existing);
+    scheduled.set(dueKey, existing);
   }
 
   return { scheduled, unscheduled };
+}
+
+export type TaskSpanPosition = 'single' | 'start' | 'middle' | 'end';
+
+/**
+ * Returns whether a task is at the start, middle, end, or is a single-day task on dateString.
+ */
+export function getTaskSpanPosition(task: Task, dateString: string): TaskSpanPosition {
+  if (!task.dueDate) return 'single';
+
+  const dueD = new Date(task.dueDate);
+  if (Number.isNaN(dueD.getTime())) return 'single';
+  const dueKey = toDateString(dueD);
+
+  let startKey: string | null = null;
+  if (task.startDate) {
+    const startD = new Date(task.startDate);
+    if (!Number.isNaN(startD.getTime())) {
+      startKey = toDateString(startD);
+    }
+  }
+
+  if (!startKey || startKey >= dueKey) {
+    return 'single';
+  }
+
+  if (dateString === startKey) return 'start';
+  if (dateString === dueKey) return 'end';
+  if (dateString > startKey && dateString < dueKey) return 'middle';
+  return 'single';
 }

@@ -160,8 +160,9 @@
                 v-for="task in getTasksForDate(day.dateString)"
                 :key="task._id"
                 draggable="true"
-                class="group/pill rounded-lg p-1.5 text-xs border transition cursor-grab active:cursor-grabbing select-none backdrop-blur-xs flex flex-col gap-1 shadow-xs hover:border-slate-500"
+                class="group/pill p-1.5 text-xs border transition cursor-grab active:cursor-grabbing select-none backdrop-blur-xs flex flex-col gap-1 shadow-xs hover:border-slate-500"
                 :class="[
+                  getSpanClasses(task, day.dateString),
                   isTaskDone(task)
                     ? 'bg-slate-900/60 border-slate-800 text-slate-500 opacity-75'
                     : 'bg-slate-800/90 border-slate-700/80 text-slate-200 hover:bg-slate-800',
@@ -209,6 +210,15 @@
                     title="Overdue"
                   >
                     !
+                  </span>
+
+                  <!-- Multi-day Range Badge -->
+                  <span
+                    v-if="getSpanPosition(task, day.dateString) !== 'single'"
+                    class="text-[9px] px-1 py-0.2 rounded font-medium text-indigo-300 bg-indigo-500/15 border border-indigo-500/30 shrink-0"
+                    :title="`Spans ${task.startDate?.split('T')[0]} to ${task.dueDate?.split('T')[0]}`"
+                  >
+                    {{ getSpanPosition(task, day.dateString) === 'start' ? 'Start' : getSpanPosition(task, day.dateString) === 'end' ? 'Due' : '↳' }}
                   </span>
                 </div>
 
@@ -349,7 +359,9 @@ import {
   formatWeekRange,
   isTaskOverdue,
   groupTasksByDate,
+  getTaskSpanPosition,
   type CalendarViewMode,
+  type TaskSpanPosition,
 } from '../../utils/calendar';
 import {
   isTaskCompleted,
@@ -476,6 +488,24 @@ const getAssigneeInitials = (assignee: unknown): string => {
   const resolved = resolveTaskAssignee(assignee, props.users);
   if (resolved) return getUserInitials(resolved);
   return getUserInitials(assignee);
+};
+
+const getSpanPosition = (task: Task, dateString: string): TaskSpanPosition => {
+  return getTaskSpanPosition(task, dateString);
+};
+
+const getSpanClasses = (task: Task, dateString: string): string => {
+  const pos = getTaskSpanPosition(task, dateString);
+  if (pos === 'start') {
+    return 'rounded-r-none border-r-0 mr-[-5px] md:mr-[-9px] z-[2] pr-2 shadow-sm';
+  }
+  if (pos === 'middle') {
+    return 'rounded-none border-x-0 mx-[-5px] md:mx-[-9px] z-[1] px-1 shadow-none';
+  }
+  if (pos === 'end') {
+    return 'rounded-l-none border-l-0 ml-[-5px] md:ml-[-9px] z-[2] pl-2 shadow-sm';
+  }
+  return 'rounded-lg';
 };
 
 // Drag and Drop handlers
