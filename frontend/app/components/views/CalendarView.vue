@@ -160,94 +160,154 @@
                 v-for="task in getTasksForDate(day.dateString)"
                 :key="task._id"
                 draggable="true"
-                class="group/pill p-1.5 text-xs border transition cursor-grab active:cursor-grabbing select-none backdrop-blur-xs flex flex-col gap-1 shadow-xs hover:border-slate-500"
+                class="group/pill select-none transition cursor-grab active:cursor-grabbing backdrop-blur-xs flex shadow-xs"
                 :class="[
-                  getSpanClasses(task, day.dateString),
+                  getSpanClasses(task, day.dateString, day.date.getDay()),
+                  isMultiDayTask(task)
+                    ? 'items-center gap-1.5 py-1 px-2 text-[11px] font-medium border my-0.5'
+                    : 'rounded-lg p-1.5 text-xs border flex-col gap-1 hover:border-slate-500',
                   isTaskDone(task)
                     ? 'bg-slate-900/60 border-slate-800 text-slate-500 opacity-75'
-                    : 'bg-slate-800/90 border-slate-700/80 text-slate-200 hover:bg-slate-800',
+                    : getTaskBadgeStyleClass(task),
                   draggingTaskId === task._id ? 'opacity-40 ring-2 ring-indigo-500' : '',
                 ]"
                 @dragstart="handleDragStart($event, task)"
                 @dragend="handleDragEnd"
                 @click.stop="emit('task-click', task)"
               >
-                <!-- Task Pill Header: Completion Checkbox, Status Pill, Priority / Overdue Badge -->
-                <div class="flex items-center justify-between gap-1.5 min-w-0">
-                  <div class="flex items-center gap-1.5 min-w-0">
+                <!-- A: Multi-day Ribbon Bar (ClickUp / Google Calendar Style) -->
+                <template v-if="isMultiDayTask(task)">
+                  <!-- Status Indicator Dot -->
+                  <span
+                    class="w-1.5 h-1.5 rounded-full shrink-0"
+                    :style="{ backgroundColor: getStatusColor(task.status) }"
+                    :title="getStatusName(task.status)"
+                  />
+
+                  <!-- Start segment: Key + Title -->
+                  <template v-if="getSpanPosition(task, day.dateString, day.date.getDay()) === 'start'">
+                    <span class="font-mono text-[10px] text-slate-400 font-semibold truncate shrink-0">
+                      {{ task.taskKey }}
+                    </span>
+                    <span
+                      class="truncate text-slate-200 group-hover/pill:text-indigo-300 font-medium"
+                      :class="isTaskDone(task) ? 'line-through text-slate-500' : ''"
+                    >
+                      {{ task.title }}
+                    </span>
+                    <span class="ml-auto text-[9px] text-slate-400 shrink-0 font-normal">
+                      &rarr;
+                    </span>
+                  </template>
+
+                  <!-- Middle segment: Continued connection line with subtle title -->
+                  <template v-else-if="getSpanPosition(task, day.dateString, day.date.getDay()) === 'middle'">
+                    <span
+                      class="truncate text-slate-400 group-hover/pill:text-slate-200 text-[10px]"
+                      :class="isTaskDone(task) ? 'line-through text-slate-500' : ''"
+                    >
+                      {{ task.title }}
+                    </span>
+                  </template>
+
+                  <!-- End segment: Due tag & completion check -->
+                  <template v-else-if="getSpanPosition(task, day.dateString, day.date.getDay()) === 'end'">
                     <!-- Done Checkbox -->
                     <button
                       type="button"
-                      class="w-3.5 h-3.5 rounded border flex items-center justify-center transition cursor-pointer shrink-0"
+                      class="w-3 h-3 rounded border flex items-center justify-center transition cursor-pointer shrink-0"
                       :class="
                         isTaskDone(task)
                           ? 'bg-emerald-500 border-emerald-400 text-slate-950'
-                          : 'bg-slate-900 border-slate-700 text-slate-500 hover:text-emerald-400'
+                          : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-emerald-400'
                       "
                       :title="isTaskDone(task) ? 'Reopen task' : 'Mark as Done'"
                       @click.stop="emit('toggle-done', task)"
                     >
-                      <span class="text-[8px] font-bold leading-none">✓</span>
+                      <span class="text-[7px] font-bold leading-none">✓</span>
                     </button>
-
-                    <!-- Status Indicator Dot / Pill -->
                     <span
-                      class="w-2 h-2 rounded-full shrink-0"
-                      :style="{ backgroundColor: getStatusColor(task.status) }"
-                      :title="getStatusName(task.status)"
-                    />
+                      class="truncate text-slate-200 group-hover/pill:text-indigo-300"
+                      :class="isTaskDone(task) ? 'line-through text-slate-500' : ''"
+                    >
+                      {{ task.title }}
+                    </span>
+                    <span class="ml-auto px-1 py-0.2 rounded text-[8px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shrink-0">
+                      Due
+                    </span>
+                  </template>
+                </template>
 
-                    <!-- Task Key (Monospace) -->
-                    <span class="font-mono text-[10px] text-slate-400 truncate">
-                      {{ task.taskKey }}
+                <!-- B: Single Day Task Card -->
+                <template v-else>
+                  <!-- Header: Completion Checkbox, Status Pill, Priority / Overdue Badge -->
+                  <div class="flex items-center justify-between gap-1.5 min-w-0">
+                    <div class="flex items-center gap-1.5 min-w-0">
+                      <!-- Done Checkbox -->
+                      <button
+                        type="button"
+                        class="w-3.5 h-3.5 rounded border flex items-center justify-center transition cursor-pointer shrink-0"
+                        :class="
+                          isTaskDone(task)
+                            ? 'bg-emerald-500 border-emerald-400 text-slate-950'
+                            : 'bg-slate-900 border-slate-700 text-slate-500 hover:text-emerald-400'
+                        "
+                        :title="isTaskDone(task) ? 'Reopen task' : 'Mark as Done'"
+                        @click.stop="emit('toggle-done', task)"
+                      >
+                        <span class="text-[8px] font-bold leading-none">✓</span>
+                      </button>
+
+                      <!-- Status Indicator Dot / Pill -->
+                      <span
+                        class="w-2 h-2 rounded-full shrink-0"
+                        :style="{ backgroundColor: getStatusColor(task.status) }"
+                        :title="getStatusName(task.status)"
+                      />
+
+                      <!-- Task Key (Monospace) -->
+                      <span class="font-mono text-[10px] text-slate-400 truncate">
+                        {{ task.taskKey }}
+                      </span>
+                    </div>
+
+                    <!-- Overdue Indicator -->
+                    <span
+                      v-if="checkOverdue(task)"
+                      class="px-1 py-0.2 rounded text-[9px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30 shrink-0"
+                      title="Overdue"
+                    >
+                      !
                     </span>
                   </div>
 
-                  <!-- Overdue Indicator -->
-                  <span
-                    v-if="checkOverdue(task)"
-                    class="px-1 py-0.2 rounded text-[9px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30 shrink-0"
-                    title="Overdue"
-                  >
-                    !
-                  </span>
-
-                  <!-- Multi-day Range Badge -->
-                  <span
-                    v-if="getSpanPosition(task, day.dateString) !== 'single'"
-                    class="text-[9px] px-1 py-0.2 rounded font-medium text-indigo-300 bg-indigo-500/15 border border-indigo-500/30 shrink-0"
-                    :title="`Spans ${task.startDate?.split('T')[0]} to ${task.dueDate?.split('T')[0]}`"
-                  >
-                    {{ getSpanPosition(task, day.dateString) === 'start' ? 'Start' : getSpanPosition(task, day.dateString) === 'end' ? 'Due' : '↳' }}
-                  </span>
-                </div>
-
-                <!-- Task Title -->
-                <div
-                  class="font-medium text-xs truncate leading-snug"
-                  :class="isTaskDone(task) ? 'line-through text-slate-500' : 'text-slate-100 group-hover/pill:text-indigo-300'"
-                >
-                  {{ task.title }}
-                </div>
-
-                <!-- Footer: Priority & Assignee Avatar (in Week view or on hover) -->
-                <div class="flex items-center justify-between gap-1 mt-0.5 text-[10px]">
-                  <span
-                    class="px-1.5 py-0.2 rounded text-[9px] font-medium border capitalize truncate"
-                    :class="getPriorityClass(task.priority)"
-                  >
-                    {{ task.priority }}
-                  </span>
-
-                  <!-- Assignee Avatar / Initials -->
+                  <!-- Task Title -->
                   <div
-                    v-if="task.assignee"
-                    class="w-4 h-4 rounded-full bg-indigo-600/40 text-indigo-200 border border-indigo-500/40 flex items-center justify-center font-bold text-[8px] shrink-0"
-                    :title="getAssigneeName(task.assignee)"
+                    class="font-medium text-xs truncate leading-snug"
+                    :class="isTaskDone(task) ? 'line-through text-slate-500' : 'text-slate-100 group-hover/pill:text-indigo-300'"
                   >
-                    {{ getAssigneeInitials(task.assignee) }}
+                    {{ task.title }}
                   </div>
-                </div>
+
+                  <!-- Footer: Priority & Assignee Avatar -->
+                  <div class="flex items-center justify-between gap-1 mt-0.5 text-[10px]">
+                    <span
+                      class="px-1.5 py-0.2 rounded text-[9px] font-medium border capitalize truncate"
+                      :class="getPriorityClass(task.priority)"
+                    >
+                      {{ task.priority }}
+                    </span>
+
+                    <!-- Assignee Avatar / Initials -->
+                    <div
+                      v-if="task.assignee"
+                      class="w-4 h-4 rounded-full bg-indigo-600/40 text-indigo-200 border border-indigo-500/40 flex items-center justify-center font-bold text-[8px] shrink-0"
+                      :title="getAssigneeName(task.assignee)"
+                    >
+                      {{ getAssigneeInitials(task.assignee) }}
+                    </div>
+                  </div>
+                </template>
               </div>
             </div>
           </div>
@@ -490,22 +550,39 @@ const getAssigneeInitials = (assignee: unknown): string => {
   return getUserInitials(assignee);
 };
 
-const getSpanPosition = (task: Task, dateString: string): TaskSpanPosition => {
-  return getTaskSpanPosition(task, dateString);
+const isMultiDayTask = (task: Task): boolean => {
+  return getTaskSpanPosition(task, '') !== 'single' || (
+    !!task.startDate && !!task.dueDate && task.startDate.split('T')[0] < task.dueDate.split('T')[0]
+  );
 };
 
-const getSpanClasses = (task: Task, dateString: string): string => {
-  const pos = getTaskSpanPosition(task, dateString);
+const getTaskBadgeStyleClass = (task: Task): string => {
+  if (isMultiDayTask(task)) {
+    return 'bg-indigo-950/70 border-indigo-700/60 text-indigo-100 hover:bg-indigo-900/80';
+  }
+  return 'bg-slate-800/90 border-slate-700/80 text-slate-200 hover:bg-slate-800';
+};
+
+const getSpanPosition = (task: Task, dateString: string, dayOfWeek?: number): TaskSpanPosition => {
+  return getTaskSpanPosition(task, dateString, dayOfWeek);
+};
+
+const getSpanClasses = (task: Task, dateString: string, dayOfWeek?: number): string => {
+  if (!isMultiDayTask(task)) {
+    return 'rounded-lg';
+  }
+
+  const pos = getTaskSpanPosition(task, dateString, dayOfWeek);
   if (pos === 'start') {
-    return 'rounded-r-none border-r-0 mr-[-5px] md:mr-[-9px] z-[2] pr-2 shadow-sm';
+    return 'rounded-l-md rounded-r-none border-r-0 mr-[-6px] md:mr-[-9px] z-[2] pr-1.5 shadow-sm';
   }
   if (pos === 'middle') {
-    return 'rounded-none border-x-0 mx-[-5px] md:mx-[-9px] z-[1] px-1 shadow-none';
+    return 'rounded-none border-x-0 mx-[-6px] md:mx-[-9px] z-[1] px-1 shadow-none';
   }
   if (pos === 'end') {
-    return 'rounded-l-none border-l-0 ml-[-5px] md:ml-[-9px] z-[2] pl-2 shadow-sm';
+    return 'rounded-r-md rounded-l-none border-l-0 ml-[-6px] md:ml-[-9px] z-[2] pl-1.5 shadow-sm';
   }
-  return 'rounded-lg';
+  return 'rounded-md';
 };
 
 // Drag and Drop handlers

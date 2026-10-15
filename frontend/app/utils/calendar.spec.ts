@@ -256,5 +256,26 @@ describe('calendar utils', () => {
 
       expect(getTaskSpanPosition(sameDayTask, '2026-10-12')).toBe('single');
     });
+
+    it('handles week-row boundary wrapping (Monday start, Sunday end)', () => {
+      // Task spans from Oct 13 (Tue) to Oct 20 (Tue)
+      const spanningTask: Task = {
+        _id: '15',
+        title: 'Two Week Task',
+        startDate: '2026-10-13T00:00:00.000Z',
+        dueDate: '2026-10-20T00:00:00.000Z',
+      } as Task;
+
+      // Oct 13 (Tue): start of task
+      expect(getTaskSpanPosition(spanningTask, '2026-10-13', 2)).toBe('start');
+      // Oct 17 (Sat): middle
+      expect(getTaskSpanPosition(spanningTask, '2026-10-17', 6)).toBe('middle');
+      // Oct 18 (Sun): end of first calendar week row
+      expect(getTaskSpanPosition(spanningTask, '2026-10-18', 0)).toBe('end');
+      // Oct 19 (Mon): start of next calendar week row
+      expect(getTaskSpanPosition(spanningTask, '2026-10-19', 1)).toBe('start');
+      // Oct 20 (Tue): end of task
+      expect(getTaskSpanPosition(spanningTask, '2026-10-20', 2)).toBe('end');
+    });
   });
 });

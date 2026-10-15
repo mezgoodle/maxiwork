@@ -238,8 +238,15 @@ export type TaskSpanPosition = 'single' | 'start' | 'middle' | 'end';
 
 /**
  * Returns whether a task is at the start, middle, end, or is a single-day task on dateString.
+ * If dayOfWeek is provided (0=Sun, 1=Mon, ..., 6=Sat), handles week-row boundaries:
+ * - A middle day on Sunday (end of week row) becomes 'end' of that row segment.
+ * - A middle day on Monday (start of week row) becomes 'start' of that row segment.
  */
-export function getTaskSpanPosition(task: Task, dateString: string): TaskSpanPosition {
+export function getTaskSpanPosition(
+  task: Task,
+  dateString: string,
+  dayOfWeek?: number,
+): TaskSpanPosition {
   if (!task.dueDate) return 'single';
 
   const dueD = new Date(task.dueDate);
@@ -258,8 +265,21 @@ export function getTaskSpanPosition(task: Task, dateString: string): TaskSpanPos
     return 'single';
   }
 
-  if (dateString === startKey) return 'start';
-  if (dateString === dueKey) return 'end';
-  if (dateString > startKey && dateString < dueKey) return 'middle';
+  if (dateString === startKey) {
+    // If it starts on Sunday, it's the start of the task
+    return 'start';
+  }
+
+  if (dateString === dueKey) {
+    return 'end';
+  }
+
+  if (dateString > startKey && dateString < dueKey) {
+    // If dayOfWeek is specified, Mon=1 (row start) and Sun=0 (row end)
+    if (dayOfWeek === 1) return 'start';
+    if (dayOfWeek === 0) return 'end';
+    return 'middle';
+  }
+
   return 'single';
 }
