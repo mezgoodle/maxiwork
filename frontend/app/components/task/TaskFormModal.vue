@@ -243,6 +243,7 @@ interface Props {
   listId?: string;
   task?: Task | null;
   defaultStatus?: TaskStatus;
+  defaultDueDate?: string;
   workflow?: StatusWorkflow | null;
 }
 
@@ -314,8 +315,8 @@ function formatDateForInput(dateStr?: string): string {
 }
 
 watch(
-  [() => props.isOpen, () => props.defaultStatus, () => props.task],
-  async ([open, defaultStatus, task]) => {
+  [() => props.isOpen, () => props.defaultStatus, () => props.defaultDueDate, () => props.task],
+  async ([open, defaultStatus, defaultDueDate, task]) => {
     if (open) {
       errorMessage.value = '';
       titleError.value = '';
@@ -351,7 +352,7 @@ watch(
         form.priority = 'medium';
         form.assignee = '';
         form.startDate = '';
-        form.dueDate = '';
+        form.dueDate = defaultDueDate ? formatDateForInput(defaultDueDate) : '';
         const initialCustomValues: Record<string, unknown> = {};
         for (const f of availableCustomFields.value) {
           if (f.defaultValue !== undefined && f.defaultValue !== null) {

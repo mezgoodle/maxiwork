@@ -59,7 +59,7 @@
             type="button"
             class="text-slate-400 hover:text-white p-1 rounded-lg transition cursor-pointer text-lg leading-none"
             title="Close"
-            @click="$emit('close')"
+            @click="handleCloseDrawer"
           >
             ✕
           </button>
@@ -303,7 +303,7 @@
         v-if="isDrawer"
         type="button"
         class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white transition cursor-pointer"
-        @click="$emit('close')"
+        @click="handleCloseDrawer"
       >
         Close
       </button>
@@ -323,7 +323,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onMounted } from 'vue';
+import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue';
 import type { Task, TaskPriority, TaskStatus, UpdateTaskPayload } from '../../types/task';
 import { type StatusWorkflow, STATUS_CATEGORY_RANK } from '../../types/hierarchy';
 import type { EffectiveCustomField } from '../../types/custom-field';
@@ -628,6 +628,19 @@ async function saveTitle() {
   }
   await updateField({ title: trimmed });
 }
+
+async function handleCloseDrawer() {
+  await saveTitle();
+  emit('close');
+}
+
+onBeforeUnmount(() => {
+  const trimmed = editableTitle.value.trim();
+  if (trimmed && trimmed !== activeTask.value.title) {
+    // Fire save without awaiting since component is unmounting
+    void updateField({ title: trimmed });
+  }
+});
 
 function startEditingDescription() {
   editableDescription.value = activeTask.value.description || '';
