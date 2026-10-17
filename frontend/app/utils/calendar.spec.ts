@@ -2,11 +2,13 @@ import { describe, it, expect } from 'vitest';
 import {
   getMonthDays,
   getWeekDays,
+  getMonthWeeks,
+  getWeekTaskSegments,
   formatMonthYear,
   formatWeekRange,
   isTaskOverdue,
   groupTasksByDate,
-  getTaskSpanPosition,
+  classifyTaskDateState,
 } from './calendar';
 import type { Task } from '../types/task';
 import type { StatusWorkflow } from '../types/hierarchy';
@@ -222,60 +224,117 @@ describe('calendar utils', () => {
     });
   });
 
-  describe('getTaskSpanPosition', () => {
-    const multiDayTask: Task = {
-      _id: '10',
-      title: 'Multi-day Task',
-      startDate: '2026-10-12T00:00:00.000Z',
-      dueDate: '2026-10-15T00:00:00.000Z',
-    } as Task;
+  describe('getMonthWeeks', () => {
+    it('groups 35 or 42 days into 5 or 6 rows of 7 days each', () => {
+      const weeks35 = getMonthWeeks(2026, 9); // Oct 2026 -> 35 cells
+      expect(weeks35.length).toBe(5);
+      expect(weeks35[0].length).toBe(7);
+      expect(weeks35[4].length).toBe(7);
 
-    it('identifies start, middle, and end positions accurately', () => {
-      expect(getTaskSpanPosition(multiDayTask, '2026-10-12')).toBe('start');
-      expect(getTaskSpanPosition(multiDayTask, '2026-10-13')).toBe('middle');
-      expect(getTaskSpanPosition(multiDayTask, '2026-10-14')).toBe('middle');
-      expect(getTaskSpanPosition(multiDayTask, '2026-10-15')).toBe('end');
-      expect(getTaskSpanPosition(multiDayTask, '2026-10-11')).toBe('single');
+      const weeks42 = getMonthWeeks(2026, 7); // Aug 2026 -> 42 cells
+      expect(weeks42.length).toBe(6);
+      expect(weeks42[5].length).toBe(7);
+    });
+  });
+
+  describe('getWeekTaskSegments', () => {
+    it('creates single continuous segments with grid-column startCol and span', () => {
+      const weekDays = getWeekDays(new Date(2026, 9, 14)); // Oct 12 (Mon) to Oct 18 (Sun)
+      const tasks: Task[] = [
+        {
+          _id: 't1',
+          title: 'Single Day',
+          dueDate: '2026-10-14T00:00:00.000Z', // Wed (col 3)
+        } as Task,
+        {
+          _id: 't2',
+          title: 'Multi-Day',
+          startDate: '2026-10-13T00:00:00.000Z', // Tue (col 2)
+          dueDate: '2026-10-16T00:00:00.000Z', // Fri (col 5)
+        } as Task,
+      ];
+
+      const segments = getWeekTaskSegments(weekDays, tasks);
+      expect(segments.length).toBe(2);
+
+      const multiSeg = segments.find((s) => s.task._id === 't2');
+      expect(multiSeg).toBeDefined();
+      expect(multiSeg?.startCol).toBe(2); // Tuesday
+      expect(multiSeg?.span).toBe(4); // Tue, Wed, Thu, Fri -> 4 days
+      expect(multiSeg?.isStartOfTask).toBe(true);
+      expect(multiSeg?.isEndOfTask).toBe(true);
+
+      const singleSeg = segments.find((s) => s.task._id === 't1');
+      expect(singleSeg).toBeDefined();
+      expect(singleSeg?.startCol).toBe(3); // Wednesday
+      expect(singleSeg?.span).toBe(1);
     });
 
-    it('returns single for tasks without startDate or with single day duration', () => {
-      const singleDayTask: Task = {
-        _id: '11',
-        title: 'Single Day Task',
-        dueDate: '2026-10-12T00:00:00.000Z',
-      } as Task;
-
-      expect(getTaskSpanPosition(singleDayTask, '2026-10-12')).toBe('single');
-
-      const sameDayTask: Task = {
-        _id: '12',
-        title: 'Same Day Task',
-        startDate: '2026-10-12T00:00:00.000Z',
-        dueDate: '2026-10-12T15:00:00.000Z',
-      } as Task;
-
-      expect(getTaskSpanPosition(sameDayTask, '2026-10-12')).toBe('single');
-    });
-
-    it('handles week-row boundary wrapping (Monday start, Sunday end)', () => {
-      // Task spans from Oct 13 (Tue) to Oct 20 (Tue)
+    it('clamps multi-day tasks crossing week boundaries and marks start/end accurately', () => {
+      // Oct 12 (Mon) to Oct 18 (Sun)
+      const week1 = getWeekDays(new Date(2026, 9, 14));
+      // Task spans from Oct 13 (Tue) to Oct 20 (Tue of next week)
       const spanningTask: Task = {
-        _id: '15',
-        title: 'Two Week Task',
+        _id: 't-cross',
+        title: 'Crossing Task',
         startDate: '2026-10-13T00:00:00.000Z',
         dueDate: '2026-10-20T00:00:00.000Z',
       } as Task;
 
-      // Oct 13 (Tue): start of task
-      expect(getTaskSpanPosition(spanningTask, '2026-10-13', 2)).toBe('start');
-      // Oct 17 (Sat): middle
-      expect(getTaskSpanPosition(spanningTask, '2026-10-17', 6)).toBe('middle');
-      // Oct 18 (Sun): end of first calendar week row
-      expect(getTaskSpanPosition(spanningTask, '2026-10-18', 0)).toBe('end');
-      // Oct 19 (Mon): start of next calendar week row
-      expect(getTaskSpanPosition(spanningTask, '2026-10-19', 1)).toBe('start');
-      // Oct 20 (Tue): end of task
-      expect(getTaskSpanPosition(spanningTask, '2026-10-20', 2)).toBe('end');
+      const week1Segs = getWeekTaskSegments(week1, [spanningTask]);
+      expect(week1Segs.length).toBe(1);
+      expect(week1Segs[0].startCol).toBe(2); // Tuesday
+      expect(week1Segs[0].span).toBe(6); // Tue to Sun
+      expect(week1Segs[0].isStartOfTask).toBe(true);
+      expect(week1Segs[0].isEndOfTask).toBe(false);
+
+      // Week 2: Oct 19 (Mon) to Oct 25 (Sun)
+      const week2 = getWeekDays(new Date(2026, 9, 21));
+      const week2Segs = getWeekTaskSegments(week2, [spanningTask]);
+      expect(week2Segs.length).toBe(1);
+      expect(week2Segs[0].startCol).toBe(1); // Monday
+      expect(week2Segs[0].span).toBe(2); // Mon to Tue
+      expect(week2Segs[0].isStartOfTask).toBe(false);
+      expect(week2Segs[0].isEndOfTask).toBe(true);
+    });
+  });
+
+  describe('classifyTaskDateState', () => {
+    it('classifies task as range when startDate and dueDate are distinct', () => {
+      const task = {
+        _id: '1',
+        startDate: '2026-10-12T00:00:00.000Z',
+        dueDate: '2026-10-15T00:00:00.000Z',
+      } as Task;
+      expect(classifyTaskDateState(task)).toBe('range');
+    });
+
+    it('classifies task as milestone when only dueDate is set or startDate equals dueDate', () => {
+      const taskDueOnly = {
+        _id: '2',
+        dueDate: '2026-10-15T00:00:00.000Z',
+      } as Task;
+      expect(classifyTaskDateState(taskDueOnly)).toBe('milestone');
+
+      const taskSameDay = {
+        _id: '3',
+        startDate: '2026-10-15T09:00:00.000Z',
+        dueDate: '2026-10-15T18:00:00.000Z',
+      } as Task;
+      expect(classifyTaskDateState(taskSameDay)).toBe('milestone');
+    });
+
+    it('classifies task as event when only startDate is set', () => {
+      const taskStartOnly = {
+        _id: '4',
+        startDate: '2026-10-12T00:00:00.000Z',
+      } as Task;
+      expect(classifyTaskDateState(taskStartOnly)).toBe('event');
+    });
+
+    it('classifies task as unscheduled when no dates are set', () => {
+      const taskNoDates = { _id: '5' } as Task;
+      expect(classifyTaskDateState(taskNoDates)).toBe('unscheduled');
     });
   });
 });

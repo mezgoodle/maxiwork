@@ -580,19 +580,39 @@ async function handleTaskDateChange(taskId: string, newDueDate: string) {
   const targetTask = tasks.value.find((t) => t._id === taskId);
   if (!targetTask) return;
 
-  const previousDate = targetTask.dueDate;
-  targetTask.dueDate = newDueDate;
+  const previousDueDate = targetTask.dueDate;
+  const previousStartDate = targetTask.startDate;
+
+  const payload: { dueDate: string; startDate?: string } = { dueDate: newDueDate };
+
+  // If task has both startDate and dueDate, preserve duration when shifting!
+  if (targetTask.startDate && targetTask.dueDate) {
+    const sDate = new Date(targetTask.startDate);
+    const dDate = new Date(targetTask.dueDate);
+    const diffDays = Math.round((dDate.getTime() - sDate.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays > 0) {
+      const newD = new Date(newDueDate);
+      newD.setDate(newD.getDate() - diffDays);
+      payload.startDate = newD.toISOString().split('T')[0];
+    }
+  }
+
+  targetTask.dueDate = payload.dueDate;
+  if (payload.startDate) {
+    targetTask.startDate = payload.startDate;
+  }
 
   try {
     const updated = await apiFetch<Task>(`/lists/${listId.value}/tasks/${taskId}`, {
       method: 'PATCH',
-      body: { dueDate: newDueDate },
+      body: payload,
     });
     handleTaskUpdated(updated);
-    showToast(`Due date updated to ${newDueDate}`, 'success');
+    showToast(`Task rescheduled to ${newDueDate}`, 'success');
   } catch (err: unknown) {
-    targetTask.dueDate = previousDate;
-    showToast(extractApiErrorMessage(err, 'Failed to update due date'), 'error');
+    targetTask.dueDate = previousDueDate;
+    targetTask.startDate = previousStartDate;
+    showToast(extractApiErrorMessage(err, 'Failed to update task date'), 'error');
   }
 }
 

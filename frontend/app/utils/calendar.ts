@@ -14,6 +14,29 @@ export interface CalendarDay {
 
 export type CalendarViewMode = 'month' | 'week';
 
+export type TaskDateState = 'range' | 'milestone' | 'event' | 'unscheduled';
+
+/**
+ * Classifies a task based on Rule of 4 States:
+ * 1. range: has both startDate and dueDate, and startDate < dueDate (different days).
+ * 2. milestone: has only dueDate (or startDate === dueDate).
+ * 3. event: has only startDate.
+ * 4. unscheduled: neither startDate nor dueDate is set.
+ */
+export function classifyTaskDateState(task: Task): TaskDateState {
+  const hasStart = !!task.startDate && !Number.isNaN(new Date(task.startDate).getTime());
+  const hasDue = !!task.dueDate && !Number.isNaN(new Date(task.dueDate).getTime());
+
+  if (!hasStart && !hasDue) return 'unscheduled';
+  if (hasStart && hasDue) {
+    const sStr = toDateString(new Date(task.startDate!));
+    const dStr = toDateString(new Date(task.dueDate!));
+    return sStr < dStr ? 'range' : 'milestone';
+  }
+  if (hasDue) return 'milestone';
+  return 'event';
+}
+
 /**
  * Returns an array of calendar days for a 35 or 42 grid cell month view.
  * The week always starts on Monday (ISO 8601).
@@ -177,109 +200,148 @@ export interface TaskCalendarPartition {
 
 /**
  * Partitions tasks into a Map keyed by YYYY-MM-DD for scheduled tasks,
- * and an array of unscheduled tasks (tasks without dueDate or valid date span).
- * If a task has both startDate and dueDate, it spans across every calendar date in that range.
+ * and an array of unscheduled tasks based on the Rule of 4 States:
+ * 1. Range (startDate < dueDate): populated across every date in [startDate, dueDate].
+ * 2. Milestone (only dueDate or startDate === dueDate): placed only on dueDate.
+ * 3. Event (only startDate): placed only on startDate.
+ * 4. Unscheduled (no dates): placed into unscheduled array.
  */
 export function groupTasksByDate(tasks: Task[]): TaskCalendarPartition {
   const scheduled = new Map<string, Task[]>();
   const unscheduled: Task[] = [];
 
   for (const task of tasks) {
-    if (!task.dueDate) {
+    const state = classifyTaskDateState(task);
+
+    if (state === 'unscheduled') {
       unscheduled.push(task);
       continue;
     }
 
-    const dueD = new Date(task.dueDate);
-    if (Number.isNaN(dueD.getTime())) {
-      unscheduled.push(task);
+    if (state === 'range') {
+      const startD = new Date(task.startDate!);
+      const dueD = new Date(task.dueDate!);
+      const current = new Date(startD.getFullYear(), startD.getMonth(), startD.getDate());
+      const end = new Date(dueD.getFullYear(), dueD.getMonth(), dueD.getDate());
+
+      while (current <= end) {
+        const key = toDateString(current);
+        const existing = scheduled.get(key) || [];
+        existing.push(task);
+        scheduled.set(key, existing);
+        current.setDate(current.getDate() + 1);
+      }
       continue;
     }
 
-    const dueKey = toDateString(dueD);
-
-    // If task has valid startDate that is <= dueDate, span across all dates in range
-    let startD: Date | null = null;
-    if (task.startDate) {
-      const parsedStart = new Date(task.startDate);
-      if (!Number.isNaN(parsedStart.getTime())) {
-        startD = parsedStart;
-      }
+    if (state === 'event') {
+      const startD = new Date(task.startDate!);
+      const key = toDateString(startD);
+      const existing = scheduled.get(key) || [];
+      existing.push(task);
+      scheduled.set(key, existing);
+      continue;
     }
 
-    if (startD) {
-      const startKey = toDateString(startD);
-      if (startKey <= dueKey) {
-        // Populate all days from startKey to dueKey inclusive
-        const current = new Date(startD.getFullYear(), startD.getMonth(), startD.getDate());
-        const end = new Date(dueD.getFullYear(), dueD.getMonth(), dueD.getDate());
-
-        while (current <= end) {
-          const key = toDateString(current);
-          const existing = scheduled.get(key) || [];
-          existing.push(task);
-          scheduled.set(key, existing);
-          current.setDate(current.getDate() + 1);
-        }
-        continue;
-      }
-    }
-
-    // Default single-day entry for tasks with only dueDate or startDate > dueDate
-    const existing = scheduled.get(dueKey) || [];
+    // state === 'milestone'
+    const dueD = new Date(task.dueDate!);
+    const key = toDateString(dueD);
+    const existing = scheduled.get(key) || [];
     existing.push(task);
-    scheduled.set(dueKey, existing);
+    scheduled.set(key, existing);
   }
 
   return { scheduled, unscheduled };
 }
 
-export type TaskSpanPosition = 'single' | 'start' | 'middle' | 'end';
+export interface CalendarWeek {
+  days: CalendarDay[];
+  segments: CalendarTaskSegment[];
+}
+
+export interface CalendarTaskSegment {
+  task: Task;
+  startCol: number; // 1 to 7 (Mon=1, Sun=7)
+  span: number; // 1 to 7
+  isStartOfTask: boolean;
+  isEndOfTask: boolean;
+}
 
 /**
- * Returns whether a task is at the start, middle, end, or is a single-day task on dateString.
- * If dayOfWeek is provided (0=Sun, 1=Mon, ..., 6=Sat), handles week-row boundaries:
- * - A middle day on Sunday (end of week row) becomes 'end' of that row segment.
- * - A middle day on Monday (start of week row) becomes 'start' of that row segment.
+ * Returns month days grouped into weeks of 7 days each.
  */
-export function getTaskSpanPosition(
-  task: Task,
-  dateString: string,
-  dayOfWeek?: number,
-): TaskSpanPosition {
-  if (!task.dueDate) return 'single';
+export function getMonthWeeks(year: number, monthIndex: number, referenceToday: Date = new Date()): CalendarDay[][] {
+  const days = getMonthDays(year, monthIndex, referenceToday);
+  const weeks: CalendarDay[][] = [];
+  for (let i = 0; i < days.length; i += 7) {
+    weeks.push(days.slice(i, i + 7));
+  }
+  return weeks;
+}
 
-  const dueD = new Date(task.dueDate);
-  if (Number.isNaN(dueD.getTime())) return 'single';
-  const dueKey = toDateString(dueD);
+/**
+ * Calculates continuous task segments for a given 7-day week row.
+ * Tasks spanning across multiple days in this week get a single segment with grid-column start and span!
+ */
+export function getWeekTaskSegments(weekDays: CalendarDay[], tasks: Task[]): CalendarTaskSegment[] {
+  if (weekDays.length !== 7) return [];
 
-  let startKey: string | null = null;
-  if (task.startDate) {
-    const startD = new Date(task.startDate);
-    if (!Number.isNaN(startD.getTime())) {
-      startKey = toDateString(startD);
+  const weekStartStr = weekDays[0].dateString;
+  const weekEndStr = weekDays[6].dateString;
+
+  const segments: CalendarTaskSegment[] = [];
+
+  for (const task of tasks) {
+    const hasStart = !!task.startDate && !Number.isNaN(new Date(task.startDate).getTime());
+    const hasDue = !!task.dueDate && !Number.isNaN(new Date(task.dueDate).getTime());
+
+    if (!hasStart && !hasDue) continue;
+
+    let startStr = hasStart ? toDateString(new Date(task.startDate!)) : '';
+    let dueStr = hasDue ? toDateString(new Date(task.dueDate!)) : '';
+
+    // If only one date is present, or startDate > dueDate: single day task
+    if (hasStart && !hasDue) {
+      dueStr = startStr;
+    } else if (hasDue && !hasStart) {
+      startStr = dueStr;
+    } else if (startStr > dueStr) {
+      // Inconsistent: fallback to due date
+      startStr = dueStr;
     }
+
+    // Check if task overlaps with this week [weekStartStr, weekEndStr]
+    if (dueStr < weekStartStr || startStr > weekEndStr) {
+      continue;
+    }
+
+    // Determine segment bounds clamped to this week
+    const clampedStartStr = startStr < weekStartStr ? weekStartStr : startStr;
+    const clampedEndStr = dueStr > weekEndStr ? weekEndStr : dueStr;
+
+    // Find 1-based column indices (1 to 7)
+    const startIndex = weekDays.findIndex((d) => d.dateString === clampedStartStr);
+    const endIndex = weekDays.findIndex((d) => d.dateString === clampedEndStr);
+
+    if (startIndex === -1 || endIndex === -1 || endIndex < startIndex) continue;
+
+    const startCol = startIndex + 1;
+    const span = endIndex - startIndex + 1;
+
+    segments.push({
+      task,
+      startCol,
+      span,
+      isStartOfTask: startStr === clampedStartStr,
+      isEndOfTask: dueStr === clampedEndStr,
+    });
   }
 
-  if (!startKey || startKey >= dueKey) {
-    return 'single';
-  }
+  // Sort multi-day segments first (longer spans first, then by taskKey)
+  segments.sort((a, b) => {
+    if (b.span !== a.span) return b.span - a.span;
+    return a.startCol - b.startCol;
+  });
 
-  if (dateString === startKey) {
-    // If it starts on Sunday, it's the start of the task
-    return 'start';
-  }
-
-  if (dateString === dueKey) {
-    return 'end';
-  }
-
-  if (dateString > startKey && dateString < dueKey) {
-    // If dayOfWeek is specified, Mon=1 (row start) and Sun=0 (row end)
-    if (dayOfWeek === 1) return 'start';
-    if (dayOfWeek === 0) return 'end';
-    return 'middle';
-  }
-
-  return 'single';
+  return segments;
 }
