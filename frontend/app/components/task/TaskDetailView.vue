@@ -618,23 +618,29 @@ async function updateField(payload: UpdateTaskPayload): Promise<boolean> {
   }
 }
 
-async function saveTitle() {
+const isDeletedOrDeleting = ref(false);
+
+async function saveTitle(): Promise<boolean> {
+  if (isDeletedOrDeleting.value) return false;
   const trimmed = editableTitle.value.trim();
   if (!trimmed || trimmed === activeTask.value.title) {
     if (!trimmed) {
       editableTitle.value = activeTask.value.title;
     }
-    return;
+    return true;
   }
-  await updateField({ title: trimmed });
+  return await updateField({ title: trimmed });
 }
 
 async function handleCloseDrawer() {
-  await saveTitle();
-  emit('close');
+  const success = await saveTitle();
+  if (success) {
+    emit('close');
+  }
 }
 
 onBeforeUnmount(() => {
+  if (isDeletedOrDeleting.value) return;
   const trimmed = editableTitle.value.trim();
   if (trimmed && trimmed !== activeTask.value.title) {
     // Fire save without awaiting since component is unmounting
@@ -736,6 +742,7 @@ function handleSubtaskUpdated() {
 
 async function handleConfirmDelete() {
   try {
+    isDeletedOrDeleting.value = true;
     if (props.listId) {
       await apiFetch(`/lists/${props.listId}/tasks/${activeTask.value._id}`, {
         method: 'DELETE',
