@@ -242,6 +242,58 @@
         </div>
       </div>
 
+      <!-- Recurrence Section -->
+      <div class="bg-slate-800/40 border border-slate-800 rounded-xl p-4 space-y-2.5">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="text-base">🔁</span>
+            <span class="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+              Recurrence
+            </span>
+            <span
+              v-if="activeTask.isRecurring"
+              class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
+            >
+              Active
+            </span>
+          </div>
+
+          <button
+            type="button"
+            class="text-xs font-medium px-2.5 py-1 rounded-lg transition cursor-pointer"
+            :class="
+              activeTask.isRecurring
+                ? 'text-rose-400 hover:text-rose-300 hover:bg-rose-500/10'
+                : 'text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10'
+            "
+            @click="toggleRecurrenceActive"
+          >
+            {{ activeTask.isRecurring ? 'Disable recurrence' : '+ Enable recurrence' }}
+          </button>
+        </div>
+
+        <div
+          v-if="activeTask.isRecurring && activeTask.recurrence"
+          class="text-xs text-slate-300 flex items-center justify-between"
+        >
+          <span class="font-medium text-slate-200">
+            {{ formatRecurrenceLabel(activeTask.recurrence) }}
+          </span>
+          <span
+            v-if="activeTask.recurrence.currentOccurrence"
+            class="font-mono text-slate-400 text-[11px]"
+          >
+            Cycle #{{ activeTask.recurrence.currentOccurrence }}
+          </span>
+        </div>
+        <div
+          v-else-if="!activeTask.isRecurring"
+          class="text-xs text-slate-500 italic"
+        >
+          This task does not repeat.
+        </div>
+      </div>
+
       <!-- Custom Fields Section -->
       <div
         v-if="effectiveCustomFields.length > 0"
@@ -341,6 +393,10 @@ import SubtaskList from './SubtaskList.vue';
 import CustomFieldInput from '../custom-fields/CustomFieldInput.vue';
 import MarkdownViewer from '../ui/MarkdownViewer.vue';
 import MarkdownEditor from '../ui/MarkdownEditor.vue';
+import {
+  formatRecurrenceLabel,
+  getDefaultRecurrenceSettings,
+} from '../../utils/recurrence';
 
 interface Props {
   initialTask: Task;
@@ -615,6 +671,17 @@ async function updateField(payload: UpdateTaskPayload): Promise<boolean> {
   } catch (err: unknown) {
     showToast(extractApiErrorMessage(err, 'Failed to update task'), 'error');
     return false;
+  }
+}
+
+async function toggleRecurrenceActive() {
+  if (activeTask.value.isRecurring) {
+    await updateField({ isRecurring: false, recurrence: null });
+  } else {
+    await updateField({
+      isRecurring: true,
+      recurrence: activeTask.value.recurrence || getDefaultRecurrenceSettings(),
+    });
   }
 }
 

@@ -7,8 +7,9 @@ import {
 } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { TasksService } from './tasks.service';
-import { Task } from './schemas/task.schema';
+import { Task, TaskDocument } from './schemas/task.schema';
 import { Project } from '../projects/schemas/project.schema';
+import { RecurrenceService } from './services/recurrence.service';
 import { TaskStatus } from './enums/task-status.enum';
 import { TaskPriority } from './enums/task-priority.enum';
 import { CreateTaskDto } from './dto/create-task.dto';
@@ -121,6 +122,7 @@ describe('TasksService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TasksService,
+        RecurrenceService,
         {
           provide: getModelToken(Task.name),
           useValue: mockTaskModel,
@@ -735,6 +737,62 @@ describe('TasksService', () => {
           mockOwnerId,
         ),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('advanceRecurrence', () => {
+    it('advances a recurring task in place and resets status to todo', async () => {
+      const saveSpy = jest.fn().mockImplementation(function (this: unknown) {
+        return Promise.resolve(this);
+      });
+      const mockTask = {
+        _id: mockTaskId,
+        title: 'Weekly Grooming',
+        status: 'done',
+        isRecurring: true,
+        startDate: new Date('2026-10-01T10:00:00.000Z'),
+        dueDate: new Date('2026-10-02T10:00:00.000Z'),
+        recurrence: {
+          frequency: 'weekly',
+          interval: 1,
+          daysOfWeek: [],
+          endType: 'never',
+          currentOccurrence: 1,
+        },
+        save: saveSpy,
+      } as unknown as TaskDocument;
+
+      const updated = await service.advanceRecurrence(mockTask);
+      expect(updated.status).toBe('todo');
+      expect(updated.isRecurring).toBe(true);
+      expect(updated.recurrence?.currentOccurrence).toBe(2);
+      expect(updated.dueDate?.toISOString()).toBe('2026-10-09T10:00:00.000Z');
+      expect(saveSpy).toHaveBeenCalled();
+    });
+
+    it('terminates recurrence when shouldEnd is true and keeps completed status', async () => {
+      const saveSpy = jest.fn().mockImplementation(function (this: unknown) {
+        return Promise.resolve(this);
+      });
+      const mockTask = {
+        _id: mockTaskId,
+        title: 'One-off repeating',
+        status: 'done',
+        isRecurring: true,
+        dueDate: new Date('2026-10-01T10:00:00.000Z'),
+        recurrence: {
+          frequency: 'daily',
+          interval: 1,
+          endType: 'after_occurrences',
+          occurrences: 1,
+          currentOccurrence: 1,
+        },
+        save: saveSpy,
+      } as unknown as TaskDocument;
+
+      const updated = await service.advanceRecurrence(mockTask);
+      expect(updated.isRecurring).toBe(false);
+      expect(saveSpy).toHaveBeenCalled();
     });
   });
 });

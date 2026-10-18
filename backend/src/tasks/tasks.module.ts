@@ -6,6 +6,8 @@ import { List, ListSchema } from '../hierarchy/schemas/list.schema';
 import { Space, SpaceSchema } from '../hierarchy/schemas/space.schema';
 import { TasksService } from './tasks.service';
 import { TasksController } from './tasks.controller';
+import { RecurrenceService } from './services/recurrence.service';
+import { RecurrenceSchedulerService } from './services/recurrence-scheduler.service';
 
 @Module({
   imports: [
@@ -17,7 +19,7 @@ import { TasksController } from './tasks.controller';
     ]),
   ],
   controllers: [TasksController],
-  providers: [TasksService],
-  exports: [TasksService],
+  providers: [TasksService, RecurrenceService, RecurrenceSchedulerService],
+  exports: [TasksService, RecurrenceService, RecurrenceSchedulerService],
 })
 export class TasksModule {}

@@ -159,6 +159,15 @@
                 {{ task.taskKey }}
               </button>
 
+              <!-- Recurrence Badge -->
+              <span
+                v-if="task.isRecurring"
+                class="text-[11px] px-1 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 flex items-center shrink-0 cursor-help"
+                title="Recurring task"
+              >
+                🔁
+              </span>
+
               <!-- Inline Editable Title -->
               <div class="flex-1 min-w-0 mr-2">
                 <input

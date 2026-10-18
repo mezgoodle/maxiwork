@@ -26,6 +26,8 @@ import {
   StatusWorkflow,
   isStatusDone,
 } from '../hierarchy/schemas/status-workflow.schema';
+import { RecurrenceService } from './services/recurrence.service';
+import { RecurrenceSettings } from './schemas/recurrence.schema';
 
 export interface PaginatedTasksResult {
   data: TaskDocument[];
@@ -50,6 +52,8 @@ export class TasksService {
     @Optional()
     @InjectModel(Space.name)
     private readonly spaceModel?: Model<SpaceDocument>,
+    @Optional()
+    private readonly recurrenceService?: RecurrenceService,
   ) {}
 
   private extractId(ref: unknown): string {
@@ -226,6 +230,15 @@ export class TasksService {
         ? new Date(createTaskDto.dueDate)
         : undefined,
       customFieldValues: createTaskDto.customFieldValues || {},
+      isRecurring: createTaskDto.isRecurring ?? false,
+      recurrence: createTaskDto.recurrence
+        ? ({
+            ...createTaskDto.recurrence,
+            endDate: createTaskDto.recurrence.endDate
+              ? new Date(createTaskDto.recurrence.endDate)
+              : undefined,
+          } as unknown as RecurrenceSettings)
+        : undefined,
     });
 
     const saved = await createdTask.save();
@@ -363,9 +376,10 @@ export class TasksService {
         const newStatus = targetStatus;
         task.status = newStatus;
 
+        const wasDone = isStatusDone(prevStatus, workflow);
+        const isNowDone = isStatusDone(newStatus, workflow);
+
         if (task.parentTaskId) {
-          const wasDone = isStatusDone(prevStatus, workflow);
-          const isNowDone = isStatusDone(newStatus, workflow);
           let inc = 0;
           if (!wasDone && isNowDone) {
             inc = 1;
@@ -381,7 +395,26 @@ export class TasksService {
               .exec();
           }
         }
+
+        if (isNowDone && task.isRecurring && task.recurrence) {
+          await this.advanceRecurrence(task, workflow);
+        }
       }
+    }
+
+    if (updateTaskDto.isRecurring !== undefined) {
+      task.isRecurring = updateTaskDto.isRecurring;
+    }
+
+    if (updateTaskDto.recurrence !== undefined) {
+      task.recurrence = updateTaskDto.recurrence
+        ? ({
+            ...updateTaskDto.recurrence,
+            endDate: updateTaskDto.recurrence.endDate
+              ? new Date(updateTaskDto.recurrence.endDate)
+              : undefined,
+          } as unknown as RecurrenceSettings)
+        : undefined;
     }
 
     if (updateTaskDto.priority !== undefined) {
@@ -464,9 +497,10 @@ export class TasksService {
 
     if (prevStatus !== newStatus) {
       task.status = newStatus;
+      const wasDone = isStatusDone(prevStatus, workflow);
+      const isNowDone = isStatusDone(newStatus, workflow);
+
       if (task.parentTaskId) {
-        const wasDone = isStatusDone(prevStatus, workflow);
-        const isNowDone = isStatusDone(newStatus, workflow);
         let inc = 0;
         if (!wasDone && isNowDone) {
           inc = 1;
@@ -482,6 +516,10 @@ export class TasksService {
             .exec();
         }
       }
+
+      if (isNowDone && task.isRecurring && task.recurrence) {
+        await this.advanceRecurrence(task, workflow);
+      }
     }
 
     const updated = await task.save();
@@ -489,6 +527,35 @@ export class TasksService {
       { path: 'reporter', select: 'firstName lastName email avatarUrl' },
       { path: 'assignee', select: 'firstName lastName email avatarUrl' },
     ]);
+  }
+
+  async advanceRecurrence(
+    task: TaskDocument,
+    workflow?: StatusWorkflow,
+  ): Promise<TaskDocument> {
+    if (!task.isRecurring || !task.recurrence || !this.recurrenceService) {
+      return task;
+    }
+
+    const { nextStartDate, nextDueDate, nextOccurrence, shouldEnd } =
+      this.recurrenceService.computeNextOccurrence(
+        task.startDate,
+        task.dueDate,
+        task.recurrence,
+      );
+
+    if (shouldEnd) {
+      task.isRecurring = false;
+    } else {
+      task.startDate = nextStartDate;
+      task.dueDate = nextDueDate;
+      if (task.recurrence) {
+        task.recurrence.currentOccurrence = nextOccurrence;
+      }
+      task.status = workflow?.defaultTodoStatusId || 'todo';
+    }
+
+    return await task.save();
   }
 
   async remove(
