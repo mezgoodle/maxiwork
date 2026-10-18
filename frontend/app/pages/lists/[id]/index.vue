@@ -183,9 +183,18 @@
         />
       </div>
 
-      <!-- Calendar View Placeholder (Phase 1) -->
-      <div v-else-if="viewStore.activeView === 'calendar'" class="flex-1 flex flex-col">
-        <CalendarPlaceholder @switch-view="viewStore.setActiveView" />
+      <!-- Calendar View (Monthly & Weekly Interactive View) -->
+      <div v-else-if="viewStore.activeView === 'calendar'" class="flex-1 flex flex-col min-h-0">
+        <CalendarView
+          :tasks="filteredTasks"
+          :workflow="listWorkflow"
+          :users="listUsers"
+          :loading="loading"
+          @task-click="openTaskDetail"
+          @task-date-change="handleTaskDateChange"
+          @toggle-done="toggleTaskDone"
+          @create-task="openCreateTaskModalWithDate"
+        />
       </div>
 
       <!-- List View (Interactive ClickUp-Style Table View) -->
@@ -216,6 +225,7 @@
       :list-id="listId"
       :workflow="listWorkflow"
       :default-status="modalDefaultStatus"
+      :default-due-date="modalDefaultDueDate"
       @close="isCreateModalOpen = false"
       @saved="handleTaskSaved"
     />
@@ -288,12 +298,13 @@ import { useApi } from '../../../composables/useApi';
 import { useToast } from '../../../composables/useToast';
 import { extractApiErrorMessage } from '../../../utils/error';
 import { collectAssignableUsers, isTaskCompleted } from '../../../utils/table-view';
+import { calculateRescheduledDates } from '../../../utils/calendar';
 import type { List, Space, StatusWorkflow } from '../../../types/hierarchy';
 import type { Task, TaskStatus, CreateTaskPayload, UpdateTaskPayload } from '../../../types/task';
 import type { EffectiveCustomField } from '../../../types/custom-field';
 import KanbanBoard from '../../../components/board/KanbanBoard.vue';
 import ViewToolbar from '../../../components/views/ViewToolbar.vue';
-import CalendarPlaceholder from '../../../components/views/CalendarPlaceholder.vue';
+import CalendarView from '../../../components/views/CalendarView.vue';
 import ListTableView from '../../../components/views/ListTableView.vue';
 import TaskFormModal from '../../../components/task/TaskFormModal.vue';
 import TaskDetailDrawer from '../../../components/task/TaskDetailDrawer.vue';
@@ -391,6 +402,7 @@ const loadingSubtasksMap = ref<Record<string, boolean>>({});
 
 const isCreateModalOpen = ref(false);
 const modalDefaultStatus = ref<TaskStatus>('todo');
+const modalDefaultDueDate = ref<string>('');
 
 const selectedTask = ref<Task | null>(null);
 const isDetailOpen = ref(false);
@@ -555,7 +567,40 @@ async function handleWorkflowSaved() {
 
 function openCreateTaskModal(status?: TaskStatus) {
   modalDefaultStatus.value = status || (listWorkflow.value?.defaultTodoStatusId as TaskStatus) || 'todo';
+  modalDefaultDueDate.value = '';
   isCreateModalOpen.value = true;
+}
+
+function openCreateTaskModalWithDate(dateStr?: string) {
+  modalDefaultStatus.value = (listWorkflow.value?.defaultTodoStatusId as TaskStatus) || 'todo';
+  modalDefaultDueDate.value = dateStr || '';
+  isCreateModalOpen.value = true;
+}
+
+async function handleTaskDateChange(taskId: string, targetDate: string) {
+  const targetTask = tasks.value.find((t) => t._id === taskId);
+  if (!targetTask) return;
+
+  const previousDueDate = targetTask.dueDate;
+  const previousStartDate = targetTask.startDate;
+
+  const payload = calculateRescheduledDates(targetTask, targetDate);
+
+  if (payload.dueDate !== undefined) targetTask.dueDate = payload.dueDate;
+  if (payload.startDate !== undefined) targetTask.startDate = payload.startDate;
+
+  try {
+    const updated = await apiFetch<Task>(`/lists/${listId.value}/tasks/${taskId}`, {
+      method: 'PATCH',
+      body: payload,
+    });
+    handleTaskUpdated(updated);
+    showToast(`Task rescheduled to ${targetDate}`, 'success');
+  } catch (err: unknown) {
+    targetTask.dueDate = previousDueDate;
+    targetTask.startDate = previousStartDate;
+    showToast(extractApiErrorMessage(err, 'Failed to update task date'), 'error');
+  }
 }
 
 function openTaskDetail(task: Task) {

@@ -59,7 +59,7 @@
             type="button"
             class="text-slate-400 hover:text-white p-1 rounded-lg transition cursor-pointer text-lg leading-none"
             title="Close"
-            @click="$emit('close')"
+            @click="handleCloseDrawer"
           >
             ✕
           </button>
@@ -303,7 +303,7 @@
         v-if="isDrawer"
         type="button"
         class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white transition cursor-pointer"
-        @click="$emit('close')"
+        @click="handleCloseDrawer"
       >
         Close
       </button>
@@ -323,7 +323,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onMounted } from 'vue';
+import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue';
 import type { Task, TaskPriority, TaskStatus, UpdateTaskPayload } from '../../types/task';
 import { type StatusWorkflow, STATUS_CATEGORY_RANK } from '../../types/hierarchy';
 import type { EffectiveCustomField } from '../../types/custom-field';
@@ -618,16 +618,42 @@ async function updateField(payload: UpdateTaskPayload): Promise<boolean> {
   }
 }
 
-async function saveTitle() {
+const isDeletedOrDeleting = ref(false);
+let pendingTitleSave: Promise<boolean> | null = null;
+
+async function saveTitle(): Promise<boolean> {
+  if (isDeletedOrDeleting.value) return false;
+  if (pendingTitleSave) {
+    return await pendingTitleSave;
+  }
   const trimmed = editableTitle.value.trim();
   if (!trimmed || trimmed === activeTask.value.title) {
     if (!trimmed) {
       editableTitle.value = activeTask.value.title;
     }
-    return;
+    return true;
   }
-  await updateField({ title: trimmed });
+  pendingTitleSave = updateField({ title: trimmed }).finally(() => {
+    pendingTitleSave = null;
+  });
+  return await pendingTitleSave;
 }
+
+async function handleCloseDrawer() {
+  const success = await saveTitle();
+  if (success) {
+    emit('close');
+  }
+}
+
+onBeforeUnmount(() => {
+  if (isDeletedOrDeleting.value) return;
+  const trimmed = editableTitle.value.trim();
+  if (trimmed && trimmed !== activeTask.value.title) {
+    // Fire save without awaiting since component is unmounting
+    void updateField({ title: trimmed });
+  }
+});
 
 function startEditingDescription() {
   editableDescription.value = activeTask.value.description || '';
@@ -723,6 +749,7 @@ function handleSubtaskUpdated() {
 
 async function handleConfirmDelete() {
   try {
+    isDeletedOrDeleting.value = true;
     if (props.listId) {
       await apiFetch(`/lists/${props.listId}/tasks/${activeTask.value._id}`, {
         method: 'DELETE',
@@ -734,11 +761,13 @@ async function handleConfirmDelete() {
     emit('deleted', activeTask.value._id);
     isDeleteDialogOpen.value = false;
     if (history.value.length > 0) {
+      isDeletedOrDeleting.value = false;
       navigateBack();
     } else {
       emit('close');
     }
   } catch (err: unknown) {
+    isDeletedOrDeleting.value = false;
     showToast(extractApiErrorMessage(err, 'Failed to delete task'), 'error');
   }
 }
