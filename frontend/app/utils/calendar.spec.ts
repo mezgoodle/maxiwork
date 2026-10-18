@@ -10,6 +10,7 @@ import {
   isTaskOverdue,
   groupTasksByDate,
   classifyTaskDateState,
+  calculateRescheduledDates,
 } from './calendar';
 import type { Task } from '../types/task';
 import type { StatusWorkflow } from '../types/hierarchy';
@@ -378,6 +379,45 @@ describe('calendar utils', () => {
     it('classifies task as unscheduled when no dates are set', () => {
       const taskNoDates = { _id: '5' } as Task;
       expect(classifyTaskDateState(taskNoDates)).toBe('unscheduled');
+    });
+  });
+
+  describe('calculateRescheduledDates', () => {
+    it('reschedules Event task by updating only startDate', () => {
+      const eventTask = {
+        _id: 'e1',
+        startDate: '2026-10-12',
+      } as Task;
+      const res = calculateRescheduledDates(eventTask, '2026-10-20');
+      expect(res).toEqual({ startDate: '2026-10-20' });
+    });
+
+    it('reschedules Milestone task by updating only dueDate', () => {
+      const milestoneTask = {
+        _id: 'm1',
+        dueDate: '2026-10-15',
+      } as Task;
+      const res = calculateRescheduledDates(milestoneTask, '2026-10-22');
+      expect(res).toEqual({ dueDate: '2026-10-22' });
+    });
+
+    it('reschedules Range task by anchoring on target date and preserving exact day duration', () => {
+      const rangeTask = {
+        _id: 'r1',
+        startDate: '2026-10-13',
+        dueDate: '2026-10-16', // 3 days duration
+      } as Task;
+      const res = calculateRescheduledDates(rangeTask, '2026-10-20');
+      expect(res).toEqual({
+        startDate: '2026-10-20',
+        dueDate: '2026-10-23', // 2026-10-20 + 3 days
+      });
+    });
+
+    it('reschedules Unscheduled task by assigning dueDate', () => {
+      const unscheduledTask = { _id: 'u1' } as Task;
+      const res = calculateRescheduledDates(unscheduledTask, '2026-10-25');
+      expect(res).toEqual({ dueDate: '2026-10-25' });
     });
   });
 });

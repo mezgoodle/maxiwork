@@ -258,6 +258,15 @@
                   {{ getAssigneeInitials(seg.task.assignee) }}
                 </div>
 
+                <!-- Priority badge when span >= 3 or on single-day point cards -->
+                <span
+                  v-if="(seg.span >= 3 || seg.span === 1) && seg.task.priority"
+                  class="px-1 py-0.2 rounded text-[8px] font-medium border capitalize shrink-0 ml-1"
+                  :class="getPriorityClass(seg.task.priority)"
+                >
+                  {{ seg.task.priority }}
+                </span>
+
                 <!-- Overdue tag -->
                 <span
                   v-if="checkOverdue(seg.task) && !isTaskDone(seg.task)"

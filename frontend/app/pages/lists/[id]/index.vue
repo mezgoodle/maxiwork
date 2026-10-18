@@ -298,6 +298,7 @@ import { useApi } from '../../../composables/useApi';
 import { useToast } from '../../../composables/useToast';
 import { extractApiErrorMessage } from '../../../utils/error';
 import { collectAssignableUsers, isTaskCompleted } from '../../../utils/table-view';
+import { calculateRescheduledDates } from '../../../utils/calendar';
 import type { List, Space, StatusWorkflow } from '../../../types/hierarchy';
 import type { Task, TaskStatus, CreateTaskPayload, UpdateTaskPayload } from '../../../types/task';
 import type { EffectiveCustomField } from '../../../types/custom-field';
@@ -576,31 +577,17 @@ function openCreateTaskModalWithDate(dateStr?: string) {
   isCreateModalOpen.value = true;
 }
 
-async function handleTaskDateChange(taskId: string, newDueDate: string) {
+async function handleTaskDateChange(taskId: string, targetDate: string) {
   const targetTask = tasks.value.find((t) => t._id === taskId);
   if (!targetTask) return;
 
   const previousDueDate = targetTask.dueDate;
   const previousStartDate = targetTask.startDate;
 
-  const payload: { dueDate: string; startDate?: string } = { dueDate: newDueDate };
+  const payload = calculateRescheduledDates(targetTask, targetDate);
 
-  // If task has both startDate and dueDate, preserve duration when shifting!
-  if (targetTask.startDate && targetTask.dueDate) {
-    const sDate = new Date(targetTask.startDate);
-    const dDate = new Date(targetTask.dueDate);
-    const diffDays = Math.round((dDate.getTime() - sDate.getTime()) / (1000 * 60 * 60 * 24));
-    if (diffDays > 0) {
-      const newD = new Date(newDueDate);
-      newD.setDate(newD.getDate() - diffDays);
-      payload.startDate = newD.toISOString().split('T')[0];
-    }
-  }
-
-  targetTask.dueDate = payload.dueDate;
-  if (payload.startDate) {
-    targetTask.startDate = payload.startDate;
-  }
+  if (payload.dueDate !== undefined) targetTask.dueDate = payload.dueDate;
+  if (payload.startDate !== undefined) targetTask.startDate = payload.startDate;
 
   try {
     const updated = await apiFetch<Task>(`/lists/${listId.value}/tasks/${taskId}`, {
@@ -608,7 +595,7 @@ async function handleTaskDateChange(taskId: string, newDueDate: string) {
       body: payload,
     });
     handleTaskUpdated(updated);
-    showToast(`Task rescheduled to ${newDueDate}`, 'success');
+    showToast(`Task rescheduled to ${targetDate}`, 'success');
   } catch (err: unknown) {
     targetTask.dueDate = previousDueDate;
     targetTask.startDate = previousStartDate;

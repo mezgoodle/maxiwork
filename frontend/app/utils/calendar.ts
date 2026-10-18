@@ -455,3 +455,53 @@ export function getWeekTaskSegments(weekDays: CalendarDay[], tasks: Task[]): Cal
   const [week] = getWeeksWithTaskSegments([weekDays], tasks);
   return week ? week.segments : [];
 }
+
+export interface RescheduledTaskDates {
+  startDate?: string;
+  dueDate?: string;
+}
+
+/**
+ * Calculates updated startDate and/or dueDate when a task is dropped onto a calendar date,
+ * conforming strictly to the Rule of 4 States and timezone-safe UTC calendar-day arithmetic:
+ * - Event (only startDate): updates startDate to targetDateStr.
+ * - Milestone (only dueDate or single-day): updates dueDate to targetDateStr.
+ * - Range (startDate < dueDate): anchors new startDate at targetDateStr and maintains exact duration in days.
+ * - Unscheduled: sets dueDate to targetDateStr.
+ */
+export function calculateRescheduledDates(
+  task: Task,
+  targetDateStr: string,
+): RescheduledTaskDates {
+  const state = classifyTaskDateState(task);
+
+  if (state === 'event') {
+    return { startDate: targetDateStr };
+  }
+
+  if (state === 'milestone') {
+    return { dueDate: targetDateStr };
+  }
+
+  if (state === 'range') {
+    const sStr = toTaskDateKey(task.startDate);
+    const dStr = toTaskDateKey(task.dueDate);
+    const [sY, sM, sD] = sStr.split('-').map(Number);
+    const [dY, dM, dD] = dStr.split('-').map(Number);
+    const sUtc = Date.UTC(sY, sM - 1, sD);
+    const dUtc = Date.UTC(dY, dM - 1, dD);
+    const diffDays = Math.max(1, Math.round((dUtc - sUtc) / (1000 * 60 * 60 * 24)));
+
+    const [tY, tM, tD] = targetDateStr.split('-').map(Number);
+    const newEndUtc = new Date(Date.UTC(tY, tM - 1, tD + diffDays));
+    const newEndStr = toDateString(newEndUtc);
+
+    return {
+      startDate: targetDateStr,
+      dueDate: newEndStr,
+    };
+  }
+
+  // unscheduled
+  return { dueDate: targetDateStr };
+}
