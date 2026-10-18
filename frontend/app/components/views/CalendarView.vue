@@ -166,13 +166,16 @@
 
             <!-- Layer 2: Foreground Task Segments (CSS Grid 7 columns) -->
             <div
-              class="relative z-10 grid grid-cols-7 [grid-auto-flow:row_dense] gap-y-1 pt-8 pb-2 px-1 pointer-events-none"
+              class="relative z-10 grid grid-cols-7 gap-y-1 pt-8 pb-2 px-1 pointer-events-none auto-rows-[26px]"
             >
               <div
                 v-for="seg in week.segments"
                 :key="`${seg.task._id}-${seg.startCol}-${seg.span}`"
-                :style="{ gridColumn: `${seg.startCol} / span ${seg.span}` }"
-                class="group/bar h-6.5 max-h-7 flex items-center px-2 text-xs transition cursor-grab active:cursor-grabbing select-none shadow-xs border overflow-hidden whitespace-nowrap"
+                :style="[
+                  { gridColumn: `${seg.startCol} / span ${seg.span}`, gridRow: `${seg.rowSlot}` },
+                  getSegmentInlineStyles(seg),
+                ]"
+                class="group/bar h-6.5 max-h-[26px] flex items-center px-2 text-xs transition cursor-grab active:cursor-grabbing select-none shadow-xs border overflow-hidden whitespace-nowrap"
                 :class="[
                   draggingTaskId ? 'pointer-events-none' : 'pointer-events-auto',
                   getSegmentBorderRadius(seg),
@@ -371,7 +374,7 @@ import {
   getMonthDays,
   getWeekDays,
   getMonthWeeks,
-  getWeekTaskSegments,
+  getWeeksWithTaskSegments,
   formatMonthYear,
   formatWeekRange,
   isTaskOverdue,
@@ -463,18 +466,10 @@ const displayedDays = computed(() => {
 const weekRows = computed<{ days: CalendarDay[]; segments: CalendarTaskSegment[] }[]>(() => {
   if (viewMode.value === 'month') {
     const rawWeeks = getMonthWeeks(currentDate.value.getFullYear(), currentDate.value.getMonth());
-    return rawWeeks.map((days) => ({
-      days,
-      segments: getWeekTaskSegments(days, props.tasks),
-    }));
+    return getWeeksWithTaskSegments(rawWeeks, props.tasks);
   }
   const weekDays = getWeekDays(currentDate.value);
-  return [
-    {
-      days: weekDays,
-      segments: getWeekTaskSegments(weekDays, props.tasks),
-    },
-  ];
+  return getWeeksWithTaskSegments([weekDays], props.tasks);
 });
 
 // Period title display
@@ -545,20 +540,35 @@ const getSegmentBorderRadius = (seg: CalendarTaskSegment): string => {
 // Returns visual styling based on task date state, completion, and overdue status
 const getSegmentStyleClasses = (seg: CalendarTaskSegment): string => {
   if (isTaskDone(seg.task)) {
-    return 'bg-slate-900/80 border-slate-800 text-slate-500 opacity-70';
+    return 'bg-slate-900/90 border-slate-700/60 text-slate-500 opacity-70';
   }
   if (checkOverdue(seg.task)) {
-    return 'bg-rose-950/50 hover:bg-rose-900/50 border-rose-700/60 text-rose-200';
+    return 'bg-rose-950/70 hover:bg-rose-900/80 border border-rose-500/50 text-rose-100 shadow-sm';
   }
   const state = getTaskState(seg.task);
   if (state === 'milestone') {
-    return 'bg-amber-950/40 hover:bg-amber-900/40 border-amber-600/40 text-amber-200';
+    return 'bg-amber-950/50 hover:bg-amber-900/60 border border-amber-500/50 text-amber-100 shadow-sm';
   }
   if (state === 'event') {
-    return 'bg-sky-950/40 hover:bg-sky-900/40 border-sky-600/40 text-sky-200';
+    return 'bg-sky-950/50 hover:bg-sky-900/60 border border-sky-500/50 text-sky-100 shadow-sm';
   }
   // Range (start + due)
-  return 'bg-indigo-950/50 hover:bg-indigo-900/50 border-indigo-600/40 text-indigo-100';
+  return 'bg-indigo-950/80 hover:bg-indigo-900/90 border border-indigo-500/40 hover:border-indigo-400/60 text-indigo-100 shadow-sm backdrop-blur-xs';
+};
+
+// Returns dynamic inline styles such as status-colored left border accent
+const getSegmentInlineStyles = (seg: CalendarTaskSegment) => {
+  if (isTaskDone(seg.task)) {
+    return {};
+  }
+  const statusColor = getStatusColor(seg.task.status);
+  if (seg.isStartOfTask) {
+    return {
+      borderLeftWidth: '3px',
+      borderLeftColor: statusColor,
+    };
+  }
+  return {};
 };
 
 // Drag and Drop handlers

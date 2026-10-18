@@ -3,6 +3,7 @@ import {
   getMonthDays,
   getWeekDays,
   getMonthWeeks,
+  getWeeksWithTaskSegments,
   getWeekTaskSegments,
   formatMonthYear,
   formatWeekRange,
@@ -296,6 +297,48 @@ describe('calendar utils', () => {
       expect(week2Segs[0].span).toBe(2); // Mon to Tue
       expect(week2Segs[0].isStartOfTask).toBe(false);
       expect(week2Segs[0].isEndOfTask).toBe(true);
+    });
+
+    it('preserves vertical rowSlot consistently across week transitions (Sunday to Monday)', () => {
+      // Oct 12 to Oct 18 (Week 1)
+      const week1 = getWeekDays(new Date(2026, 9, 14));
+      // Oct 19 to Oct 25 (Week 2)
+      const week2 = getWeekDays(new Date(2026, 9, 21));
+
+      // Task A: Oct 13 to Oct 21 (crosses week boundary, spans 6 days in W1, 3 days in W2)
+      const taskA: Task = {
+        _id: 'task-a',
+        title: 'Task A',
+        startDate: '2026-10-13T00:00:00.000Z',
+        dueDate: '2026-10-21T00:00:00.000Z',
+      } as Task;
+
+      // Task B: Oct 18 to Oct 25 (starts on Sunday of W1, spans all 7 days of W2)
+      const taskB: Task = {
+        _id: 'task-b',
+        title: 'Task B',
+        startDate: '2026-10-18T00:00:00.000Z',
+        dueDate: '2026-10-25T00:00:00.000Z',
+      } as Task;
+
+      // Process both weeks together via getWeeksWithTaskSegments
+      const weeks = getWeeksWithTaskSegments([week1, week2], [taskA, taskB]);
+      expect(weeks.length).toBe(2);
+
+      const [w1, w2] = weeks;
+
+      // In Week 1: Task A started first (span 6), Task B on Sunday (span 1)
+      const w1SegA = w1.segments.find((s) => s.task._id === 'task-a')!;
+      const w1SegB = w1.segments.find((s) => s.task._id === 'task-b')!;
+      expect(w1SegA.rowSlot).toBe(1);
+      expect(w1SegB.rowSlot).toBe(2);
+
+      // In Week 2: Even though Task B has longer span (7 days vs 3 days),
+      // both tasks MUST retain their rowSlot from Sunday so lines do not swap!
+      const w2SegA = w2.segments.find((s) => s.task._id === 'task-a')!;
+      const w2SegB = w2.segments.find((s) => s.task._id === 'task-b')!;
+      expect(w2SegA.rowSlot).toBe(1);
+      expect(w2SegB.rowSlot).toBe(2);
     });
   });
 

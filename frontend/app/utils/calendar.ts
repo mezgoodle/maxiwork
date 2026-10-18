@@ -263,6 +263,7 @@ export interface CalendarTaskSegment {
   task: Task;
   startCol: number; // 1 to 7 (Mon=1, Sun=7)
   span: number; // 1 to 7
+  rowSlot: number; // 1-based vertical track/row slot in the week
   isStartOfTask: boolean;
   isEndOfTask: boolean;
 }
@@ -280,68 +281,167 @@ export function getMonthWeeks(year: number, monthIndex: number, referenceToday: 
 }
 
 /**
- * Calculates continuous task segments for a given 7-day week row.
- * Tasks spanning across multiple days in this week get a single segment with grid-column start and span!
+ * Calculates continuous task segments with persistent rowSlot packing across week boundaries.
+ * Tasks spanning across multiple weeks maintain their exact vertical track (rowSlot) from Sunday to Monday!
  */
-export function getWeekTaskSegments(weekDays: CalendarDay[], tasks: Task[]): CalendarTaskSegment[] {
-  if (weekDays.length !== 7) return [];
+export function getWeeksWithTaskSegments(
+  weeks: CalendarDay[][],
+  tasks: Task[],
+): CalendarWeek[] {
+  const result: CalendarWeek[] = [];
+  let prevSundaySlots = new Map<string, number>();
 
-  const weekStartStr = weekDays[0].dateString;
-  const weekEndStr = weekDays[6].dateString;
-
-  const segments: CalendarTaskSegment[] = [];
-
-  for (const task of tasks) {
-    const hasStart = !!task.startDate && !Number.isNaN(new Date(task.startDate).getTime());
-    const hasDue = !!task.dueDate && !Number.isNaN(new Date(task.dueDate).getTime());
-
-    if (!hasStart && !hasDue) continue;
-
-    let startStr = hasStart ? toDateString(new Date(task.startDate!)) : '';
-    let dueStr = hasDue ? toDateString(new Date(task.dueDate!)) : '';
-
-    // If only one date is present, or startDate > dueDate: single day task
-    if (hasStart && !hasDue) {
-      dueStr = startStr;
-    } else if (hasDue && !hasStart) {
-      startStr = dueStr;
-    } else if (startStr > dueStr) {
-      // Inconsistent: fallback to due date
-      startStr = dueStr;
-    }
-
-    // Check if task overlaps with this week [weekStartStr, weekEndStr]
-    if (dueStr < weekStartStr || startStr > weekEndStr) {
+  for (const weekDays of weeks) {
+    if (weekDays.length !== 7) {
+      result.push({ days: weekDays, segments: [] });
       continue;
     }
 
-    // Determine segment bounds clamped to this week
-    const clampedStartStr = startStr < weekStartStr ? weekStartStr : startStr;
-    const clampedEndStr = dueStr > weekEndStr ? weekEndStr : dueStr;
+    const weekStartStr = weekDays[0].dateString;
+    const weekEndStr = weekDays[6].dateString;
 
-    // Find 1-based column indices (1 to 7)
-    const startIndex = weekDays.findIndex((d) => d.dateString === clampedStartStr);
-    const endIndex = weekDays.findIndex((d) => d.dateString === clampedEndStr);
+    interface RawSegment {
+      task: Task;
+      startCol: number;
+      span: number;
+      isStartOfTask: boolean;
+      isEndOfTask: boolean;
+    }
 
-    if (startIndex === -1 || endIndex === -1 || endIndex < startIndex) continue;
+    const rawSegments: RawSegment[] = [];
 
-    const startCol = startIndex + 1;
-    const span = endIndex - startIndex + 1;
+    for (const task of tasks) {
+      const hasStart = !!task.startDate && !Number.isNaN(new Date(task.startDate).getTime());
+      const hasDue = !!task.dueDate && !Number.isNaN(new Date(task.dueDate).getTime());
 
-    segments.push({
-      task,
-      startCol,
-      span,
-      isStartOfTask: startStr === clampedStartStr,
-      isEndOfTask: dueStr === clampedEndStr,
+      if (!hasStart && !hasDue) continue;
+
+      let startStr = hasStart ? toDateString(new Date(task.startDate!)) : '';
+      let dueStr = hasDue ? toDateString(new Date(task.dueDate!)) : '';
+
+      // If only one date is present, or startDate > dueDate: single day task
+      if (hasStart && !hasDue) {
+        dueStr = startStr;
+      } else if (hasDue && !hasStart) {
+        startStr = dueStr;
+      } else if (startStr > dueStr) {
+        // Inconsistent: fallback to due date
+        startStr = dueStr;
+      }
+
+      // Check if task overlaps with this week [weekStartStr, weekEndStr]
+      if (dueStr < weekStartStr || startStr > weekEndStr) {
+        continue;
+      }
+
+      // Determine segment bounds clamped to this week
+      const clampedStartStr = startStr < weekStartStr ? weekStartStr : startStr;
+      const clampedEndStr = dueStr > weekEndStr ? weekEndStr : dueStr;
+
+      // Find 1-based column indices (1 to 7)
+      const startIndex = weekDays.findIndex((d) => d.dateString === clampedStartStr);
+      const endIndex = weekDays.findIndex((d) => d.dateString === clampedEndStr);
+
+      if (startIndex === -1 || endIndex === -1 || endIndex < startIndex) continue;
+
+      const startCol = startIndex + 1;
+      const span = endIndex - startIndex + 1;
+
+      rawSegments.push({
+        task,
+        startCol,
+        span,
+        isStartOfTask: startStr === clampedStartStr,
+        isEndOfTask: dueStr === clampedEndStr,
+      });
+    }
+
+    // Grid of occupied tracks: trackOccupied[row][col] (row >= 1, col: 1..7)
+    const trackOccupied: boolean[][] = [];
+
+    const isTrackFree = (row: number, startCol: number, span: number): boolean => {
+      if (!trackOccupied[row]) return true;
+      for (let c = startCol; c < startCol + span; c++) {
+        if (trackOccupied[row][c]) return false;
+      }
+      return true;
+    };
+
+    const occupyTrack = (row: number, startCol: number, span: number) => {
+      if (!trackOccupied[row]) {
+        trackOccupied[row] = [];
+      }
+      for (let c = startCol; c < startCol + span; c++) {
+        trackOccupied[row][c] = true;
+      }
+    };
+
+    const assignedSegments: CalendarTaskSegment[] = [];
+    const unassignedRaw: RawSegment[] = [];
+
+    // Step 1: Preserve rowSlot for tasks continuing from the previous week's Sunday
+    for (const raw of rawSegments) {
+      if (!raw.isStartOfTask && prevSundaySlots.has(raw.task._id)) {
+        const preferredRow = prevSundaySlots.get(raw.task._id)!;
+        if (isTrackFree(preferredRow, raw.startCol, raw.span)) {
+          occupyTrack(preferredRow, raw.startCol, raw.span);
+          assignedSegments.push({
+            ...raw,
+            rowSlot: preferredRow,
+          });
+          continue;
+        }
+      }
+      unassignedRaw.push(raw);
+    }
+
+    // Step 2: Sort remaining unassigned segments by span descending, then startCol
+    unassignedRaw.sort((a, b) => {
+      if (b.span !== a.span) return b.span - a.span;
+      return a.startCol - b.startCol;
+    });
+
+    // Step 3: Assign the lowest available track for each unassigned segment
+    for (const raw of unassignedRaw) {
+      let r = 1;
+      while (!isTrackFree(r, raw.startCol, raw.span)) {
+        r++;
+      }
+      occupyTrack(r, raw.startCol, raw.span);
+      assignedSegments.push({
+        ...raw,
+        rowSlot: r,
+      });
+    }
+
+    // Step 4: Record Sunday slots for tasks continuing into next week
+    const currentSundaySlots = new Map<string, number>();
+    for (const seg of assignedSegments) {
+      if (seg.startCol + seg.span - 1 === 7 && !seg.isEndOfTask) {
+        currentSundaySlots.set(seg.task._id, seg.rowSlot);
+      }
+    }
+    prevSundaySlots = currentSundaySlots;
+
+    // Step 5: Sort segments in DOM order (rowSlot asc, then startCol asc)
+    assignedSegments.sort((a, b) => {
+      if (a.rowSlot !== b.rowSlot) return a.rowSlot - b.rowSlot;
+      return a.startCol - b.startCol;
+    });
+
+    result.push({
+      days: weekDays,
+      segments: assignedSegments,
     });
   }
 
-  // Sort multi-day segments first (longer spans first, then by taskKey)
-  segments.sort((a, b) => {
-    if (b.span !== a.span) return b.span - a.span;
-    return a.startCol - b.startCol;
-  });
+  return result;
+}
 
-  return segments;
+/**
+ * Calculates continuous task segments for a single 7-day week row.
+ */
+export function getWeekTaskSegments(weekDays: CalendarDay[], tasks: Task[]): CalendarTaskSegment[] {
+  const [week] = getWeeksWithTaskSegments([weekDays], tasks);
+  return week ? week.segments : [];
 }
