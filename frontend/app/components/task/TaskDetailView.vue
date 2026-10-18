@@ -619,9 +619,13 @@ async function updateField(payload: UpdateTaskPayload): Promise<boolean> {
 }
 
 const isDeletedOrDeleting = ref(false);
+let pendingTitleSave: Promise<boolean> | null = null;
 
 async function saveTitle(): Promise<boolean> {
   if (isDeletedOrDeleting.value) return false;
+  if (pendingTitleSave) {
+    return await pendingTitleSave;
+  }
   const trimmed = editableTitle.value.trim();
   if (!trimmed || trimmed === activeTask.value.title) {
     if (!trimmed) {
@@ -629,7 +633,10 @@ async function saveTitle(): Promise<boolean> {
     }
     return true;
   }
-  return await updateField({ title: trimmed });
+  pendingTitleSave = updateField({ title: trimmed }).finally(() => {
+    pendingTitleSave = null;
+  });
+  return await pendingTitleSave;
 }
 
 async function handleCloseDrawer() {
@@ -754,11 +761,13 @@ async function handleConfirmDelete() {
     emit('deleted', activeTask.value._id);
     isDeleteDialogOpen.value = false;
     if (history.value.length > 0) {
+      isDeletedOrDeleting.value = false;
       navigateBack();
     } else {
       emit('close');
     }
   } catch (err: unknown) {
+    isDeletedOrDeleting.value = false;
     showToast(extractApiErrorMessage(err, 'Failed to delete task'), 'error');
   }
 }
