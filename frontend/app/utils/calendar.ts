@@ -17,6 +17,22 @@ export type CalendarViewMode = 'month' | 'week';
 export type TaskDateState = 'range' | 'milestone' | 'event' | 'unscheduled';
 
 /**
+ * Safely extracts the YYYY-MM-DD date key from a Date or ISO string,
+ * avoiding timezone offset shifts when working with date-only values.
+ */
+export function toTaskDateKey(val: string | Date | null | undefined): string {
+  if (!val) return '';
+  if (typeof val === 'string') {
+    const match = val.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (match) return match[1];
+    const parsed = new Date(val);
+    if (!Number.isNaN(parsed.getTime())) return toDateString(parsed);
+    return '';
+  }
+  return toDateString(val);
+}
+
+/**
  * Classifies a task based on Rule of 4 States:
  * 1. range: has both startDate and dueDate, and startDate < dueDate (different days).
  * 2. milestone: has only dueDate (or startDate === dueDate).
@@ -24,16 +40,14 @@ export type TaskDateState = 'range' | 'milestone' | 'event' | 'unscheduled';
  * 4. unscheduled: neither startDate nor dueDate is set.
  */
 export function classifyTaskDateState(task: Task): TaskDateState {
-  const hasStart = !!task.startDate && !Number.isNaN(new Date(task.startDate).getTime());
-  const hasDue = !!task.dueDate && !Number.isNaN(new Date(task.dueDate).getTime());
+  const startStr = toTaskDateKey(task.startDate);
+  const dueStr = toTaskDateKey(task.dueDate);
 
-  if (!hasStart && !hasDue) return 'unscheduled';
-  if (hasStart && hasDue) {
-    const sStr = toDateString(new Date(task.startDate!));
-    const dStr = toDateString(new Date(task.dueDate!));
-    return sStr < dStr ? 'range' : 'milestone';
+  if (!startStr && !dueStr) return 'unscheduled';
+  if (startStr && dueStr) {
+    return startStr < dueStr ? 'range' : 'milestone';
   }
-  if (hasDue) return 'milestone';
+  if (dueStr) return 'milestone';
   return 'event';
 }
 
@@ -218,11 +232,14 @@ export function groupTasksByDate(tasks: Task[]): TaskCalendarPartition {
       continue;
     }
 
+    const startStr = toTaskDateKey(task.startDate);
+    const dueStr = toTaskDateKey(task.dueDate);
+
     if (state === 'range') {
-      const startD = new Date(task.startDate!);
-      const dueD = new Date(task.dueDate!);
-      const current = new Date(startD.getFullYear(), startD.getMonth(), startD.getDate());
-      const end = new Date(dueD.getFullYear(), dueD.getMonth(), dueD.getDate());
+      const [sY, sM, sD] = startStr.split('-').map(Number);
+      const [dY, dM, dD] = dueStr.split('-').map(Number);
+      const current = new Date(sY, sM - 1, sD);
+      const end = new Date(dY, dM - 1, dD);
 
       while (current <= end) {
         const key = toDateString(current);
@@ -235,20 +252,16 @@ export function groupTasksByDate(tasks: Task[]): TaskCalendarPartition {
     }
 
     if (state === 'event') {
-      const startD = new Date(task.startDate!);
-      const key = toDateString(startD);
-      const existing = scheduled.get(key) || [];
+      const existing = scheduled.get(startStr) || [];
       existing.push(task);
-      scheduled.set(key, existing);
+      scheduled.set(startStr, existing);
       continue;
     }
 
     // state === 'milestone'
-    const dueD = new Date(task.dueDate!);
-    const key = toDateString(dueD);
-    const existing = scheduled.get(key) || [];
+    const existing = scheduled.get(dueStr) || [];
     existing.push(task);
-    scheduled.set(key, existing);
+    scheduled.set(dueStr, existing);
   }
 
   return { scheduled, unscheduled };
@@ -311,18 +324,15 @@ export function getWeeksWithTaskSegments(
     const rawSegments: RawSegment[] = [];
 
     for (const task of tasks) {
-      const hasStart = !!task.startDate && !Number.isNaN(new Date(task.startDate).getTime());
-      const hasDue = !!task.dueDate && !Number.isNaN(new Date(task.dueDate).getTime());
+      let startStr = toTaskDateKey(task.startDate);
+      let dueStr = toTaskDateKey(task.dueDate);
 
-      if (!hasStart && !hasDue) continue;
-
-      let startStr = hasStart ? toDateString(new Date(task.startDate!)) : '';
-      let dueStr = hasDue ? toDateString(new Date(task.dueDate!)) : '';
+      if (!startStr && !dueStr) continue;
 
       // If only one date is present, or startDate > dueDate: single day task
-      if (hasStart && !hasDue) {
+      if (startStr && !dueStr) {
         dueStr = startStr;
-      } else if (hasDue && !hasStart) {
+      } else if (dueStr && !startStr) {
         startStr = dueStr;
       } else if (startStr > dueStr) {
         // Inconsistent: fallback to due date

@@ -309,16 +309,16 @@ describe('calendar utils', () => {
       const taskA: Task = {
         _id: 'task-a',
         title: 'Task A',
-        startDate: '2026-10-13T00:00:00.000Z',
-        dueDate: '2026-10-21T00:00:00.000Z',
+        startDate: '2026-10-13',
+        dueDate: '2026-10-21',
       } as Task;
 
       // Task B: Oct 18 to Oct 25 (starts on Sunday of W1, spans all 7 days of W2)
       const taskB: Task = {
         _id: 'task-b',
         title: 'Task B',
-        startDate: '2026-10-18T00:00:00.000Z',
-        dueDate: '2026-10-25T00:00:00.000Z',
+        startDate: '2026-10-18',
+        dueDate: '2026-10-25',
       } as Task;
 
       // Process both weeks together via getWeeksWithTaskSegments
