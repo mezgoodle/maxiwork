@@ -245,13 +245,13 @@ describe('calendar utils', () => {
         {
           _id: 't1',
           title: 'Single Day',
-          dueDate: '2026-10-14T00:00:00.000Z', // Wed (col 3)
+          dueDate: '2026-10-14', // Wed (col 3)
         } as Task,
         {
           _id: 't2',
           title: 'Multi-Day',
-          startDate: '2026-10-13T00:00:00.000Z', // Tue (col 2)
-          dueDate: '2026-10-16T00:00:00.000Z', // Fri (col 5)
+          startDate: '2026-10-13', // Tue (col 2)
+          dueDate: '2026-10-16', // Fri (col 5)
         } as Task,
       ];
 
@@ -278,8 +278,8 @@ describe('calendar utils', () => {
       const spanningTask: Task = {
         _id: 't-cross',
         title: 'Crossing Task',
-        startDate: '2026-10-13T00:00:00.000Z',
-        dueDate: '2026-10-20T00:00:00.000Z',
+        startDate: '2026-10-13',
+        dueDate: '2026-10-20',
       } as Task;
 
       const week1Segs = getWeekTaskSegments(week1, [spanningTask]);
@@ -346,8 +346,8 @@ describe('calendar utils', () => {
     it('classifies task as range when startDate and dueDate are distinct', () => {
       const task = {
         _id: '1',
-        startDate: '2026-10-12T00:00:00.000Z',
-        dueDate: '2026-10-15T00:00:00.000Z',
+        startDate: '2026-10-12',
+        dueDate: '2026-10-15',
       } as Task;
       expect(classifyTaskDateState(task)).toBe('range');
     });
@@ -355,14 +355,14 @@ describe('calendar utils', () => {
     it('classifies task as milestone when only dueDate is set or startDate equals dueDate', () => {
       const taskDueOnly = {
         _id: '2',
-        dueDate: '2026-10-15T00:00:00.000Z',
+        dueDate: '2026-10-15',
       } as Task;
       expect(classifyTaskDateState(taskDueOnly)).toBe('milestone');
 
       const taskSameDay = {
         _id: '3',
-        startDate: '2026-10-15T09:00:00.000Z',
-        dueDate: '2026-10-15T18:00:00.000Z',
+        startDate: '2026-10-15T09:00:00',
+        dueDate: '2026-10-15T18:00:00',
       } as Task;
       expect(classifyTaskDateState(taskSameDay)).toBe('milestone');
     });
@@ -370,7 +370,7 @@ describe('calendar utils', () => {
     it('classifies task as event when only startDate is set', () => {
       const taskStartOnly = {
         _id: '4',
-        startDate: '2026-10-12T00:00:00.000Z',
+        startDate: '2026-10-12',
       } as Task;
       expect(classifyTaskDateState(taskStartOnly)).toBe('event');
     });
