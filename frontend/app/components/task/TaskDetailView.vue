@@ -243,7 +243,7 @@
       </div>
 
       <!-- Recurrence Section -->
-      <div class="bg-slate-800/40 border border-slate-800 rounded-xl p-4 space-y-2.5">
+      <div class="bg-slate-800/40 border border-slate-800 rounded-xl p-4 space-y-3">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
             <span class="text-base">🔁</span>
@@ -258,23 +258,34 @@
             </span>
           </div>
 
-          <button
-            type="button"
-            class="text-xs font-medium px-2.5 py-1 rounded-lg transition cursor-pointer"
-            :class="
-              activeTask.isRecurring
-                ? 'text-rose-400 hover:text-rose-300 hover:bg-rose-500/10'
-                : 'text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10'
-            "
-            @click="toggleRecurrenceActive"
-          >
-            {{ activeTask.isRecurring ? 'Disable recurrence' : '+ Enable recurrence' }}
-          </button>
+          <div class="flex items-center gap-2">
+            <button
+              v-if="activeTask.isRecurring && !isEditingRecurrence"
+              type="button"
+              class="text-xs font-medium px-2.5 py-1 rounded-lg text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 transition cursor-pointer"
+              @click="startEditingRecurrence"
+            >
+              Edit schedule
+            </button>
+            <button
+              type="button"
+              class="text-xs font-medium px-2.5 py-1 rounded-lg transition cursor-pointer"
+              :class="
+                activeTask.isRecurring
+                  ? 'text-rose-400 hover:text-rose-300 hover:bg-rose-500/10'
+                  : 'text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10'
+              "
+              @click="toggleRecurrenceActive"
+            >
+              {{ activeTask.isRecurring ? 'Disable recurrence' : '+ Enable recurrence' }}
+            </button>
+          </div>
         </div>
 
+        <!-- Recurrence View Mode -->
         <div
-          v-if="activeTask.isRecurring && activeTask.recurrence"
-          class="text-xs text-slate-300 flex items-center justify-between"
+          v-if="activeTask.isRecurring && activeTask.recurrence && !isEditingRecurrence"
+          class="text-xs text-slate-300 flex items-center justify-between bg-slate-900/60 p-2.5 rounded-lg border border-slate-700/50"
         >
           <span class="font-medium text-slate-200">
             {{ formatRecurrenceLabel(activeTask.recurrence) }}
@@ -286,6 +297,153 @@
             Cycle #{{ activeTask.recurrence.currentOccurrence }}
           </span>
         </div>
+
+        <!-- Recurrence Edit Mode -->
+        <div
+          v-else-if="isEditingRecurrence"
+          class="p-3 bg-slate-900/80 rounded-xl border border-slate-700/70 space-y-3 text-xs"
+        >
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-slate-400 font-medium mb-1">
+                Frequency
+              </label>
+              <select
+                v-model="editableRecurrence.frequency"
+                class="w-full px-2.5 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+              >
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="custom">Custom (Days)</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-slate-400 font-medium mb-1">
+                Every
+              </label>
+              <div class="flex items-center gap-1.5">
+                <input
+                  v-model.number="editableRecurrence.interval"
+                  type="number"
+                  min="1"
+                  max="999"
+                  class="w-full px-2.5 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs focus:ring-1 focus:ring-indigo-500"
+                >
+                <span class="text-slate-400 shrink-0">
+                  {{ editableRecurrence.frequency === 'weekly' ? 'week(s)' : editableRecurrence.frequency === 'monthly' ? 'month(s)' : 'day(s)' }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Days of week selector if weekly -->
+          <div v-if="editableRecurrence.frequency === 'weekly'">
+            <label class="block text-slate-400 font-medium mb-1.5">
+              Repeat on
+            </label>
+            <div class="flex flex-wrap gap-1.5">
+              <button
+                v-for="day in WEEKDAYS"
+                :key="day.value"
+                type="button"
+                class="px-2.5 py-1 rounded-md text-xs font-semibold border transition cursor-pointer"
+                :class="
+                  editableRecurrence.daysOfWeek?.includes(day.value)
+                    ? 'bg-indigo-600 text-white border-indigo-500'
+                    : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-white'
+                "
+                @click="toggleRecurrenceDay(day.value)"
+              >
+                {{ day.shortLabel }}
+              </button>
+            </div>
+          </div>
+
+          <!-- End condition -->
+          <div>
+            <label class="block text-slate-400 font-medium mb-1">
+              Ends
+            </label>
+            <div class="grid grid-cols-3 gap-2 mb-2">
+              <button
+                type="button"
+                class="px-2 py-1 text-center rounded-lg border text-xs font-medium transition cursor-pointer"
+                :class="
+                  editableRecurrence.endType === 'never'
+                    ? 'bg-indigo-600 text-white border-indigo-500'
+                    : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-white'
+                "
+                @click="editableRecurrence.endType = 'never'"
+              >
+                Never
+              </button>
+              <button
+                type="button"
+                class="px-2 py-1 text-center rounded-lg border text-xs font-medium transition cursor-pointer"
+                :class="
+                  editableRecurrence.endType === 'after_occurrences'
+                    ? 'bg-indigo-600 text-white border-indigo-500'
+                    : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-white'
+                "
+                @click="editableRecurrence.endType = 'after_occurrences'"
+              >
+                After #
+              </button>
+              <button
+                type="button"
+                class="px-2 py-1 text-center rounded-lg border text-xs font-medium transition cursor-pointer"
+                :class="
+                  editableRecurrence.endType === 'on_date'
+                    ? 'bg-indigo-600 text-white border-indigo-500'
+                    : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-white'
+                "
+                @click="editableRecurrence.endType = 'on_date'"
+              >
+                On date
+              </button>
+            </div>
+
+            <div v-if="editableRecurrence.endType === 'after_occurrences'" class="flex items-center gap-2">
+              <span class="text-slate-400">Total occurrences:</span>
+              <input
+                v-model.number="editableRecurrence.occurrences"
+                type="number"
+                min="1"
+                placeholder="e.g. 10"
+                class="w-24 px-2.5 py-1 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs focus:ring-1 focus:ring-indigo-500"
+              >
+            </div>
+
+            <div v-if="editableRecurrence.endType === 'on_date'">
+              <DatePickerMenu
+                :model-value="formatDateForInput(editableRecurrence.endDate)"
+                placeholder="Select end date"
+                :min-date="formatDateForInput(activeTask.dueDate || activeTask.startDate)"
+                @update:model-value="(val) => (editableRecurrence.endDate = val ? new Date(val).toISOString() : undefined)"
+              />
+            </div>
+          </div>
+
+          <div class="flex items-center justify-end gap-2 pt-1 border-t border-slate-800">
+            <button
+              type="button"
+              class="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              @click="cancelRecurrenceEdit"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition shadow-xs cursor-pointer"
+              @click="saveRecurrenceEdit"
+            >
+              Save schedule
+            </button>
+          </div>
+        </div>
+
         <div
           v-else-if="!activeTask.isRecurring"
           class="text-xs text-slate-500 italic"
@@ -376,7 +534,13 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue';
-import type { Task, TaskPriority, TaskStatus, UpdateTaskPayload } from '../../types/task';
+import type {
+  Task,
+  TaskPriority,
+  TaskStatus,
+  UpdateTaskPayload,
+  RecurrenceSettings,
+} from '../../types/task';
 import { type StatusWorkflow, STATUS_CATEGORY_RANK } from '../../types/hierarchy';
 import type { EffectiveCustomField } from '../../types/custom-field';
 import { useApi } from '../../composables/useApi';
@@ -396,6 +560,7 @@ import MarkdownEditor from '../ui/MarkdownEditor.vue';
 import {
   formatRecurrenceLabel,
   getDefaultRecurrenceSettings,
+  WEEKDAYS,
 } from '../../utils/recurrence';
 
 interface Props {
@@ -674,13 +839,79 @@ async function updateField(payload: UpdateTaskPayload): Promise<boolean> {
   }
 }
 
+const isEditingRecurrence = ref(false);
+const editableRecurrence = ref<RecurrenceSettings>(getDefaultRecurrenceSettings());
+
+function startEditingRecurrence() {
+  editableRecurrence.value = activeTask.value.recurrence
+    ? {
+        ...activeTask.value.recurrence,
+        daysOfWeek: [...(activeTask.value.recurrence.daysOfWeek || [])],
+      }
+    : getDefaultRecurrenceSettings();
+  isEditingRecurrence.value = true;
+}
+
+function cancelRecurrenceEdit() {
+  isEditingRecurrence.value = false;
+}
+
+function toggleRecurrenceDay(dayVal: number) {
+  if (!editableRecurrence.value.daysOfWeek) {
+    editableRecurrence.value.daysOfWeek = [];
+  }
+  const idx = editableRecurrence.value.daysOfWeek.indexOf(dayVal);
+  if (idx > -1) {
+    editableRecurrence.value.daysOfWeek.splice(idx, 1);
+  } else {
+    editableRecurrence.value.daysOfWeek.push(dayVal);
+  }
+}
+
+async function saveRecurrenceEdit() {
+  const payloadRecurrence: RecurrenceSettings = {
+    frequency: editableRecurrence.value.frequency || 'daily',
+    interval: Math.max(1, Number(editableRecurrence.value.interval) || 1),
+    daysOfWeek:
+      editableRecurrence.value.frequency === 'weekly'
+        ? editableRecurrence.value.daysOfWeek || []
+        : [],
+    endType: editableRecurrence.value.endType || 'never',
+    occurrences:
+      editableRecurrence.value.endType === 'after_occurrences'
+        ? Math.max(1, Number(editableRecurrence.value.occurrences) || 1)
+        : undefined,
+    currentOccurrence: activeTask.value.recurrence?.currentOccurrence || 1,
+    endDate:
+      editableRecurrence.value.endType === 'on_date' &&
+      editableRecurrence.value.endDate
+        ? new Date(editableRecurrence.value.endDate).toISOString()
+        : undefined,
+  };
+
+  const success = await updateField({
+    isRecurring: true,
+    recurrence: payloadRecurrence,
+  });
+  if (success) {
+    isEditingRecurrence.value = false;
+  }
+}
+
 async function toggleRecurrenceActive() {
   if (activeTask.value.isRecurring) {
+    isEditingRecurrence.value = false;
     await updateField({ isRecurring: false, recurrence: null });
   } else {
+    const defaultSettings =
+      activeTask.value.recurrence || getDefaultRecurrenceSettings();
+    editableRecurrence.value = {
+      ...defaultSettings,
+      daysOfWeek: [...(defaultSettings.daysOfWeek || [])],
+    };
     await updateField({
       isRecurring: true,
-      recurrence: activeTask.value.recurrence || getDefaultRecurrenceSettings(),
+      recurrence: defaultSettings,
     });
   }
 }

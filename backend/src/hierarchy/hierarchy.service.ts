@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
   OnModuleInit,
+  Optional,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -12,6 +13,8 @@ import { Space, SpaceDocument } from './schemas/space.schema';
 import { Folder, FolderDocument } from './schemas/folder.schema';
 import { List, ListDocument } from './schemas/list.schema';
 import { Project, ProjectDocument } from '../projects/schemas/project.schema';
+import { RecurrenceSettings } from '../tasks/schemas/recurrence.schema';
+import { RecurrenceService } from '../tasks/services/recurrence.service';
 import {
   Task,
   TaskDocument,
@@ -108,6 +111,8 @@ export class HierarchyService implements OnModuleInit {
     private readonly projectModel: Model<ProjectDocument>,
     @InjectModel(User.name)
     private readonly userModel: Model<UserDocument>,
+    @Optional()
+    private readonly recurrenceService?: RecurrenceService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -1070,6 +1075,15 @@ export class HierarchyService implements OnModuleInit {
       completedSubtasksCount: 0,
       order: num,
       customFieldValues: dto.customFieldValues || {},
+      isRecurring: dto.isRecurring ?? false,
+      recurrence: dto.recurrence
+        ? ({
+            ...dto.recurrence,
+            endDate: dto.recurrence.endDate
+              ? new Date(dto.recurrence.endDate)
+              : undefined,
+          } as unknown as RecurrenceSettings)
+        : undefined,
     });
 
     const saved = await createdTask.save();
@@ -1142,6 +1156,21 @@ export class HierarchyService implements OnModuleInit {
       );
     }
 
+    if (dto.isRecurring !== undefined) {
+      task.isRecurring = dto.isRecurring;
+    }
+
+    if (dto.recurrence !== undefined) {
+      task.recurrence = dto.recurrence
+        ? ({
+            ...dto.recurrence,
+            endDate: dto.recurrence.endDate
+              ? new Date(dto.recurrence.endDate)
+              : undefined,
+          } as unknown as RecurrenceSettings)
+        : undefined;
+    }
+
     if (dto.status !== undefined) {
       const trimmedStatus = dto.status.trim();
       const match = workflow.statuses.find(
@@ -1159,9 +1188,10 @@ export class HierarchyService implements OnModuleInit {
         const newStatus = canonicalStatus;
         task.status = newStatus;
 
+        const wasDone = isStatusDone(prevStatus, workflow);
+        const isNowDone = isStatusDone(newStatus, workflow);
+
         if (task.parentTaskId) {
-          const wasDone = isStatusDone(prevStatus, workflow);
-          const isNowDone = isStatusDone(newStatus, workflow);
           let inc = 0;
           if (!wasDone && isNowDone) {
             inc = 1;
@@ -1174,6 +1204,10 @@ export class HierarchyService implements OnModuleInit {
               $inc: { completedSubtasksCount: inc },
             });
           }
+        }
+
+        if (isNowDone && task.isRecurring && task.recurrence) {
+          await this.advanceRecurrence(task, workflow);
         }
       }
     }
@@ -1190,6 +1224,35 @@ export class HierarchyService implements OnModuleInit {
       throw new NotFoundException('Failed to retrieve updated task');
     }
     return updated;
+  }
+
+  async advanceRecurrence(
+    task: TaskDocument,
+    workflow?: StatusWorkflow,
+  ): Promise<TaskDocument> {
+    if (!task.isRecurring || !task.recurrence || !this.recurrenceService) {
+      return task;
+    }
+
+    const { nextStartDate, nextDueDate, nextOccurrence, shouldEnd } =
+      this.recurrenceService.computeNextOccurrence(
+        task.startDate,
+        task.dueDate,
+        task.recurrence,
+      );
+
+    if (shouldEnd) {
+      task.isRecurring = false;
+    } else {
+      task.startDate = nextStartDate;
+      task.dueDate = nextDueDate;
+      if (task.recurrence) {
+        task.recurrence.currentOccurrence = nextOccurrence;
+      }
+      task.status = workflow?.defaultTodoStatusId || 'todo';
+    }
+
+    return await task.save();
   }
 
   async deleteListTask(
