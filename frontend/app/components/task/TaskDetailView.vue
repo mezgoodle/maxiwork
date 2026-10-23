@@ -268,16 +268,20 @@
               Edit schedule
             </button>
             <button
+              v-if="activeTask.isRecurring"
               type="button"
-              class="text-xs font-medium px-2.5 py-1 rounded-lg transition cursor-pointer"
-              :class="
-                activeTask.isRecurring
-                  ? 'text-rose-400 hover:text-rose-300 hover:bg-rose-500/10'
-                  : 'text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10'
-              "
-              @click="toggleRecurrenceActive"
+              class="text-xs font-medium px-2.5 py-1 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition cursor-pointer"
+              @click="disableRecurrence"
             >
-              {{ activeTask.isRecurring ? 'Disable recurrence' : '+ Enable recurrence' }}
+              Disable recurrence
+            </button>
+            <button
+              v-else-if="!isEditingRecurrence"
+              type="button"
+              class="text-xs font-medium px-2.5 py-1 rounded-lg text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 transition cursor-pointer"
+              @click="startEnablingRecurrence"
+            >
+              + Enable recurrence
             </button>
           </div>
         </div>
@@ -446,9 +450,16 @@
 
         <div
           v-else-if="!activeTask.isRecurring"
-          class="text-xs text-slate-500 italic"
+          class="text-xs text-slate-400 flex items-center justify-between bg-slate-900/30 p-2.5 rounded-lg border border-slate-800/80"
         >
-          This task does not repeat.
+          <span class="italic text-slate-500">This task does not repeat.</span>
+          <button
+            type="button"
+            class="text-xs font-medium text-indigo-400 hover:text-indigo-300 hover:underline cursor-pointer"
+            @click="startEnablingRecurrence"
+          >
+            + Set up repeat schedule
+          </button>
         </div>
       </div>
 
@@ -828,8 +839,19 @@ async function updateField(payload: UpdateTaskPayload): Promise<boolean> {
     } else {
       return false;
     }
-    activeTask.value = updated;
-    syncInputs(updated);
+    activeTask.value = {
+      ...activeTask.value,
+      ...updated,
+      ...(payload.isRecurring !== undefined ? { isRecurring: payload.isRecurring } : {}),
+      ...(payload.recurrence !== undefined
+        ? {
+            recurrence: payload.recurrence
+              ? { ...(activeTask.value.recurrence || {}), ...payload.recurrence }
+              : undefined,
+          }
+        : {}),
+    };
+    syncInputs(activeTask.value);
     emit('updated', updated);
     showToast('Task updated', 'success');
     return true;
@@ -868,6 +890,23 @@ function toggleRecurrenceDay(dayVal: number) {
   }
 }
 
+function startEnablingRecurrence() {
+  const defaultSettings =
+    activeTask.value.recurrence || getDefaultRecurrenceSettings();
+  editableRecurrence.value = {
+    ...defaultSettings,
+    daysOfWeek: [...(defaultSettings.daysOfWeek || [])],
+  };
+  isEditingRecurrence.value = true;
+}
+
+async function disableRecurrence() {
+  isEditingRecurrence.value = false;
+  activeTask.value.isRecurring = false;
+  activeTask.value.recurrence = undefined;
+  await updateField({ isRecurring: false, recurrence: null });
+}
+
 async function saveRecurrenceEdit() {
   const payloadRecurrence: RecurrenceSettings = {
     frequency: editableRecurrence.value.frequency || 'daily',
@@ -889,30 +928,19 @@ async function saveRecurrenceEdit() {
         : undefined,
   };
 
+  // Optimistically set recurrence so UI updates immediately
+  activeTask.value.isRecurring = true;
+  activeTask.value.recurrence = payloadRecurrence;
+  isEditingRecurrence.value = false;
+
   const success = await updateField({
     isRecurring: true,
     recurrence: payloadRecurrence,
   });
-  if (success) {
-    isEditingRecurrence.value = false;
-  }
-}
-
-async function toggleRecurrenceActive() {
-  if (activeTask.value.isRecurring) {
-    isEditingRecurrence.value = false;
-    await updateField({ isRecurring: false, recurrence: null });
-  } else {
-    const defaultSettings =
-      activeTask.value.recurrence || getDefaultRecurrenceSettings();
-    editableRecurrence.value = {
-      ...defaultSettings,
-      daysOfWeek: [...(defaultSettings.daysOfWeek || [])],
-    };
-    await updateField({
-      isRecurring: true,
-      recurrence: defaultSettings,
-    });
+  if (!success) {
+    // Revert if API failed
+    activeTask.value.isRecurring = false;
+    activeTask.value.recurrence = undefined;
   }
 }
 
