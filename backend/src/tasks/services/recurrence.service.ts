@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { RecurrenceSettings } from '../schemas/recurrence.schema';
+import { RecurrenceSettingsDto } from '../dto/recurrence.dto';
+import { StatusWorkflow } from '../../hierarchy/schemas/status-workflow.schema';
 
 export interface NextOccurrenceResult {
   nextStartDate?: Date;
@@ -10,6 +12,57 @@ export interface NextOccurrenceResult {
 
 @Injectable()
 export class RecurrenceService {
+  toRecurrenceSettings(
+    dto?: RecurrenceSettingsDto | null,
+    existingCurrentOccurrence?: number,
+  ): RecurrenceSettings | undefined {
+    if (!dto) return undefined;
+    return {
+      ...dto,
+      currentOccurrence:
+        existingCurrentOccurrence ?? dto.currentOccurrence ?? 1,
+      endDate: dto.endDate ? new Date(dto.endDate) : undefined,
+    };
+  }
+
+  applyNextRecurrenceToTask<
+    T extends {
+      isRecurring?: boolean;
+      recurrence?: RecurrenceSettings;
+      startDate?: Date;
+      dueDate?: Date;
+      status: string;
+    },
+  >(task: T, workflow?: StatusWorkflow): T {
+    if (!task.isRecurring || !task.recurrence) {
+      return task;
+    }
+
+    const { nextStartDate, nextDueDate, nextOccurrence, shouldEnd } =
+      this.computeNextOccurrence(task.startDate, task.dueDate, task.recurrence);
+
+    if (shouldEnd) {
+      task.isRecurring = false;
+    } else {
+      task.startDate = nextStartDate;
+      task.dueDate = nextDueDate;
+      if (task.recurrence) {
+        task.recurrence.currentOccurrence = nextOccurrence;
+      }
+      task.status = workflow?.defaultTodoStatusId || 'todo';
+    }
+
+    return task;
+  }
+
+  computeNextDates(
+    startDate?: Date | null,
+    dueDate?: Date | null,
+    recurrence?: RecurrenceSettings | null,
+  ): NextOccurrenceResult {
+    return this.computeNextOccurrence(startDate, dueDate, recurrence);
+  }
+
   computeNextOccurrence(
     startDate?: Date | null,
     dueDate?: Date | null,

@@ -92,17 +92,22 @@ export class RecurrenceSchedulerService {
 
     const workflowCache = new Map<string, StatusWorkflow | undefined>();
     const batchSize = 100;
-    let skip = 0;
+    let lastId: Types.ObjectId | undefined;
     let advancedCount = 0;
 
     while (true) {
+      const query: Record<string, unknown> = {
+        isRecurring: true,
+        recurrence: { $ne: null },
+        ...(lastId ? { _id: { $gt: lastId } } : {}),
+      };
+
       const recurringTasks = await this.taskModel
-        .find({
-          isRecurring: true,
-          recurrence: { $ne: null },
-        })
-        .select('_id status startDate dueDate list isRecurring recurrence')
-        .skip(skip)
+        .find(query)
+        .sort({ _id: 1 })
+        .select(
+          '_id status startDate dueDate list parentTaskId isRecurring recurrence',
+        )
         .limit(batchSize)
         .lean()
         .exec();
@@ -110,6 +115,8 @@ export class RecurrenceSchedulerService {
       if (!recurringTasks || recurringTasks.length === 0) {
         break;
       }
+
+      lastId = recurringTasks[recurringTasks.length - 1]._id;
 
       for (const task of recurringTasks) {
         const workflow = await this.getEffectiveWorkflowForList(
@@ -156,6 +163,20 @@ export class RecurrenceSchedulerService {
 
           if (updateResult.modifiedCount === 1) {
             advancedCount++;
+            if (!shouldEnd && task.parentTaskId) {
+              const parentId = this.extractId(task.parentTaskId);
+              if (parentId && Types.ObjectId.isValid(parentId)) {
+                await this.taskModel
+                  .updateOne(
+                    {
+                      _id: new Types.ObjectId(parentId),
+                      completedSubtasksCount: { $gt: 0 },
+                    },
+                    { $inc: { completedSubtasksCount: -1 } },
+                  )
+                  .exec();
+              }
+            }
           }
         }
       }
@@ -163,7 +184,6 @@ export class RecurrenceSchedulerService {
       if (recurringTasks.length < batchSize) {
         break;
       }
-      skip += batchSize;
     }
 
     if (advancedCount > 0) {

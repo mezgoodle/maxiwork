@@ -26,6 +26,42 @@ export function getDefaultRecurrenceSettings(): RecurrenceSettings {
   };
 }
 
+export function validateRecurrenceSettings(
+  settings: RecurrenceSettings,
+): string | null {
+  if (settings.endType === 'after_occurrences') {
+    const count = Number(settings.occurrences);
+    if (!Number.isInteger(count) || count < 1) {
+      return 'Please specify a valid number of occurrences (at least 1)';
+    }
+  } else if (settings.endType === 'on_date' && !settings.endDate) {
+    return 'Please select an end date for the recurrence schedule';
+  }
+  return null;
+}
+
+export function buildRecurrencePayload(
+  settings: RecurrenceSettings,
+  currentOccurrenceFallback = 1,
+): RecurrenceSettings {
+  return {
+    frequency: settings.frequency || 'daily',
+    interval: Math.max(1, Number(settings.interval) || 1),
+    daysOfWeek:
+      settings.frequency === 'weekly' ? [...(settings.daysOfWeek || [])] : [],
+    endType: settings.endType || 'never',
+    occurrences:
+      settings.endType === 'after_occurrences'
+        ? Number(settings.occurrences)
+        : undefined,
+    currentOccurrence: settings.currentOccurrence || currentOccurrenceFallback,
+    endDate:
+      settings.endType === 'on_date' && settings.endDate
+        ? new Date(settings.endDate).toISOString()
+        : undefined,
+  };
+}
+
 export function formatRecurrenceLabel(settings?: RecurrenceSettings | null): string {
   if (!settings) return '';
 
@@ -34,7 +70,7 @@ export function formatRecurrenceLabel(settings?: RecurrenceSettings | null): str
 
   switch (settings.frequency) {
     case 'daily':
-      base = interval === 1 ? 'Daily' : `Every ${interval} days`;
+      base = interval === 1 ? 'Repeats daily' : `Repeats every ${interval} days`;
       break;
     case 'weekly': {
       const selectedDays = (settings.daysOfWeek || [])
@@ -45,17 +81,20 @@ export function formatRecurrenceLabel(settings?: RecurrenceSettings | null): str
         .filter(Boolean);
 
       const daysPart = selectedDays.length > 0 ? ` on ${selectedDays.join(', ')}` : '';
-      base = interval === 1 ? `Weekly${daysPart}` : `Every ${interval} weeks${daysPart}`;
+      base =
+        interval === 1
+          ? `Repeats weekly${daysPart}`
+          : `Repeats every ${interval} weeks${daysPart}`;
       break;
     }
     case 'monthly':
-      base = interval === 1 ? 'Monthly' : `Every ${interval} months`;
+      base = interval === 1 ? 'Repeats monthly' : `Repeats every ${interval} months`;
       break;
     case 'custom':
-      base = `Every ${interval} days`;
+      base = `Repeats every ${interval} days`;
       break;
     default:
-      base = 'Recurring';
+      base = 'Repeats';
   }
 
   if (settings.endType === 'after_occurrences' && settings.occurrences) {

@@ -180,141 +180,12 @@
               <!-- Recurrence Settings Panel -->
               <div
                 v-if="form.isRecurring"
-                class="p-3.5 bg-slate-800/40 rounded-xl border border-slate-700/60 space-y-3 text-xs"
+                class="p-3.5 bg-slate-800/40 rounded-xl border border-slate-700/60"
               >
-                <!-- Frequency and Interval -->
-                <div class="grid grid-cols-2 gap-3">
-                  <div>
-                    <label class="block text-slate-400 font-medium mb-1">
-                      Frequency
-                    </label>
-                    <select
-                      v-model="form.recurrence.frequency"
-                      class="w-full px-2.5 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs focus:ring-1 focus:ring-indigo-500"
-                    >
-                      <option value="daily">Daily</option>
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
-                      <option value="custom">Custom (Days)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label class="block text-slate-400 font-medium mb-1">
-                      Every
-                    </label>
-                    <div class="flex items-center gap-1.5">
-                      <input
-                        v-model.number="form.recurrence.interval"
-                        type="number"
-                        min="1"
-                        max="999"
-                        class="w-full px-2.5 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs focus:ring-1 focus:ring-indigo-500"
-                      >
-                      <span class="text-slate-400 shrink-0">
-                        {{ form.recurrence.frequency === 'weekly' ? 'week(s)' : form.recurrence.frequency === 'monthly' ? 'month(s)' : 'day(s)' }}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Days of week selector if weekly -->
-                <div v-if="form.recurrence.frequency === 'weekly'">
-                  <label class="block text-slate-400 font-medium mb-1.5">
-                    Repeat on
-                  </label>
-                  <div class="flex flex-wrap gap-1.5">
-                    <button
-                      v-for="day in WEEKDAYS"
-                      :key="day.value"
-                      type="button"
-                      :aria-pressed="Boolean(form.recurrence.daysOfWeek?.includes(day.value))"
-                      class="px-2.5 py-1 rounded-md text-xs font-semibold border transition cursor-pointer"
-                      :class="
-                        form.recurrence.daysOfWeek?.includes(day.value)
-                          ? 'bg-indigo-600 text-white border-indigo-500'
-                          : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-white'
-                      "
-                      @click="toggleRecurrenceDay(day.value)"
-                    >
-                      {{ day.shortLabel }}
-                    </button>
-                  </div>
-                </div>
-
-                <!-- End condition -->
-                <div>
-                  <label class="block text-slate-400 font-medium mb-1">
-                    Ends
-                  </label>
-                  <div
-                    role="radiogroup"
-                    aria-label="Recurrence end condition"
-                    class="grid grid-cols-3 gap-2 mb-2"
-                  >
-                    <button
-                      type="button"
-                      role="radio"
-                      :aria-checked="form.recurrence.endType === 'never'"
-                      class="px-2 py-1 text-center rounded-lg border text-xs font-medium transition cursor-pointer"
-                      :class="
-                        form.recurrence.endType === 'never'
-                          ? 'bg-indigo-600 text-white border-indigo-500'
-                          : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-white'
-                      "
-                      @click="form.recurrence.endType = 'never'"
-                    >
-                      Never
-                    </button>
-                    <button
-                      type="button"
-                      role="radio"
-                      :aria-checked="form.recurrence.endType === 'after_occurrences'"
-                      class="px-2 py-1 text-center rounded-lg border text-xs font-medium transition cursor-pointer"
-                      :class="
-                        form.recurrence.endType === 'after_occurrences'
-                          ? 'bg-indigo-600 text-white border-indigo-500'
-                          : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-white'
-                      "
-                      @click="form.recurrence.endType = 'after_occurrences'"
-                    >
-                      After #
-                    </button>
-                    <button
-                      type="button"
-                      role="radio"
-                      :aria-checked="form.recurrence.endType === 'on_date'"
-                      class="px-2 py-1 text-center rounded-lg border text-xs font-medium transition cursor-pointer"
-                      :class="
-                        form.recurrence.endType === 'on_date'
-                          ? 'bg-indigo-600 text-white border-indigo-500'
-                          : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-white'
-                      "
-                      @click="form.recurrence.endType = 'on_date'"
-                    >
-                      On date
-                    </button>
-                  </div>
-
-                  <div v-if="form.recurrence.endType === 'after_occurrences'" class="flex items-center gap-2">
-                    <span class="text-slate-400">Total occurrences:</span>
-                    <input
-                      v-model.number="form.recurrence.occurrences"
-                      type="number"
-                      min="1"
-                      placeholder="e.g. 10"
-                      class="w-24 px-2.5 py-1 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs focus:ring-1 focus:ring-indigo-500"
-                    >
-                  </div>
-
-                  <div v-if="form.recurrence.endType === 'on_date'">
-                    <DatePickerMenu
-                      v-model="form.recurrence.endDate"
-                      placeholder="Select end date"
-                      :min-date="form.dueDate || form.startDate"
-                    />
-                  </div>
-                </div>
+                <RecurrenceConfigForm
+                  v-model="form.recurrence"
+                  :min-end-date="form.dueDate || form.startDate"
+                />
               </div>
             </div>
 
@@ -396,9 +267,11 @@ import { extractApiErrorMessage } from '../../utils/error';
 import DatePickerMenu from '../ui/DatePickerMenu.vue';
 import CustomFieldInput from '../custom-fields/CustomFieldInput.vue';
 import MarkdownEditor from '../ui/MarkdownEditor.vue';
+import RecurrenceConfigForm from './RecurrenceConfigForm.vue';
 import {
   getDefaultRecurrenceSettings,
-  WEEKDAYS,
+  validateRecurrenceSettings,
+  buildRecurrencePayload,
 } from '../../utils/recurrence';
 
 interface Props {
@@ -472,19 +345,6 @@ const form = reactive({
   isRecurring: false,
   recurrence: getDefaultRecurrenceSettings(),
 });
-
-function toggleRecurrenceDay(dayVal: number) {
-  if (!form.recurrence.daysOfWeek) {
-    form.recurrence.daysOfWeek = [];
-  }
-  const idx = form.recurrence.daysOfWeek.indexOf(dayVal);
-  if (idx >= 0) {
-    form.recurrence.daysOfWeek.splice(idx, 1);
-  } else {
-    form.recurrence.daysOfWeek.push(dayVal);
-    form.recurrence.daysOfWeek.sort((a, b) => a - b);
-  }
-}
 
 function formatDateForInput(dateStr?: string): string {
   if (!dateStr) return '';
@@ -641,14 +501,9 @@ async function handleSubmit() {
   }
 
   if (form.isRecurring) {
-    if (form.recurrence.endType === 'after_occurrences') {
-      const count = Number(form.recurrence.occurrences);
-      if (!Number.isInteger(count) || count < 1) {
-        errorMessage.value = 'Please specify a valid number of occurrences (at least 1)';
-        return;
-      }
-    } else if (form.recurrence.endType === 'on_date' && !form.recurrence.endDate) {
-      errorMessage.value = 'Please select an end date for the recurrence schedule';
+    const recurrenceErr = validateRecurrenceSettings(form.recurrence);
+    if (recurrenceErr) {
+      errorMessage.value = recurrenceErr;
       return;
     }
   }
@@ -669,24 +524,7 @@ async function handleSubmit() {
           : undefined,
       isRecurring: form.isRecurring,
       recurrence: form.isRecurring
-        ? {
-            frequency: form.recurrence.frequency,
-            interval: Math.max(1, Number(form.recurrence.interval) || 1),
-            daysOfWeek:
-              form.recurrence.frequency === 'weekly'
-                ? form.recurrence.daysOfWeek
-                : [],
-            endType: form.recurrence.endType,
-            occurrences:
-              form.recurrence.endType === 'after_occurrences'
-                ? Number(form.recurrence.occurrences)
-                : undefined,
-            currentOccurrence: form.recurrence.currentOccurrence || 1,
-            endDate:
-              form.recurrence.endType === 'on_date' && form.recurrence.endDate
-                ? new Date(form.recurrence.endDate).toISOString()
-                : undefined,
-          }
+        ? buildRecurrencePayload(form.recurrence)
         : null,
     };
 

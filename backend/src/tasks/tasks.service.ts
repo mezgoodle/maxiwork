@@ -27,7 +27,6 @@ import {
   isStatusDone,
 } from '../hierarchy/schemas/status-workflow.schema';
 import { RecurrenceService } from './services/recurrence.service';
-import { RecurrenceSettings } from './schemas/recurrence.schema';
 
 export interface PaginatedTasksResult {
   data: TaskDocument[];
@@ -232,12 +231,13 @@ export class TasksService {
       customFieldValues: createTaskDto.customFieldValues || {},
       isRecurring: createTaskDto.isRecurring ?? false,
       recurrence: createTaskDto.recurrence
-        ? ({
+        ? {
             ...createTaskDto.recurrence,
+            currentOccurrence: createTaskDto.recurrence.currentOccurrence ?? 1,
             endDate: createTaskDto.recurrence.endDate
               ? new Date(createTaskDto.recurrence.endDate)
               : undefined,
-          } as unknown as RecurrenceSettings)
+          }
         : undefined,
     });
 
@@ -542,26 +542,7 @@ export class TasksService {
     if (!task.isRecurring || !task.recurrence || !this.recurrenceService) {
       return task;
     }
-
-    const { nextStartDate, nextDueDate, nextOccurrence, shouldEnd } =
-      this.recurrenceService.computeNextOccurrence(
-        task.startDate,
-        task.dueDate,
-        task.recurrence,
-      );
-
-    if (shouldEnd) {
-      task.isRecurring = false;
-    } else {
-      task.startDate = nextStartDate;
-      task.dueDate = nextDueDate;
-      if (task.recurrence) {
-        task.recurrence.currentOccurrence = nextOccurrence;
-      }
-      task.status = workflow?.defaultTodoStatusId || 'todo';
-    }
-
-    return task;
+    return this.recurrenceService.applyNextRecurrenceToTask(task, workflow);
   }
 
   async advanceRecurrence(

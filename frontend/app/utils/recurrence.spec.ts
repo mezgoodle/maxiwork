@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   formatRecurrenceLabel,
   getDefaultRecurrenceSettings,
+  validateRecurrenceSettings,
+  buildRecurrencePayload,
   WEEKDAYS,
 } from './recurrence';
 import type { RecurrenceSettings } from '../types/task';
@@ -17,8 +19,8 @@ describe('recurrence utils', () => {
   });
 
   it('formats daily recurrence', () => {
-    expect(formatRecurrenceLabel({ frequency: 'daily', interval: 1, endType: 'never', currentOccurrence: 1 })).toBe('Daily');
-    expect(formatRecurrenceLabel({ frequency: 'daily', interval: 3, endType: 'never', currentOccurrence: 1 })).toBe('Every 3 days');
+    expect(formatRecurrenceLabel({ frequency: 'daily', interval: 1, endType: 'never', currentOccurrence: 1 })).toBe('Repeats daily');
+    expect(formatRecurrenceLabel({ frequency: 'daily', interval: 3, endType: 'never', currentOccurrence: 1 })).toBe('Repeats every 3 days');
   });
 
   it('formats weekly recurrence with days', () => {
@@ -29,7 +31,7 @@ describe('recurrence utils', () => {
       endType: 'never',
       currentOccurrence: 1,
     };
-    expect(formatRecurrenceLabel(settings)).toBe('Weekly on Mon, Fri');
+    expect(formatRecurrenceLabel(settings)).toBe('Repeats weekly on Mon, Fri');
 
     const biweekly: RecurrenceSettings = {
       frequency: 'weekly',
@@ -38,13 +40,13 @@ describe('recurrence utils', () => {
       endType: 'never',
       currentOccurrence: 1,
     };
-    expect(formatRecurrenceLabel(biweekly)).toBe('Every 2 weeks on Tue, Thu');
+    expect(formatRecurrenceLabel(biweekly)).toBe('Repeats every 2 weeks on Tue, Thu');
   });
 
   it('formats monthly and custom recurrence', () => {
-    expect(formatRecurrenceLabel({ frequency: 'monthly', interval: 1, endType: 'never', currentOccurrence: 1 })).toBe('Monthly');
-    expect(formatRecurrenceLabel({ frequency: 'monthly', interval: 2, endType: 'never', currentOccurrence: 1 })).toBe('Every 2 months');
-    expect(formatRecurrenceLabel({ frequency: 'custom', interval: 10, endType: 'never', currentOccurrence: 1 })).toBe('Every 10 days');
+    expect(formatRecurrenceLabel({ frequency: 'monthly', interval: 1, endType: 'never', currentOccurrence: 1 })).toBe('Repeats monthly');
+    expect(formatRecurrenceLabel({ frequency: 'monthly', interval: 2, endType: 'never', currentOccurrence: 1 })).toBe('Repeats every 2 months');
+    expect(formatRecurrenceLabel({ frequency: 'custom', interval: 10, endType: 'never', currentOccurrence: 1 })).toBe('Repeats every 10 days');
   });
 
   it('formats end conditions and cycle counters', () => {
@@ -55,7 +57,7 @@ describe('recurrence utils', () => {
       occurrences: 5,
       currentOccurrence: 2,
     };
-    expect(formatRecurrenceLabel(countSettings)).toBe('Daily (Cycle 2 of 5)');
+    expect(formatRecurrenceLabel(countSettings)).toBe('Repeats daily (Cycle 2 of 5)');
 
     const dateSettings: RecurrenceSettings = {
       frequency: 'weekly',
@@ -65,7 +67,7 @@ describe('recurrence utils', () => {
       endDate: '2026-12-31T00:00:00.000Z',
       currentOccurrence: 1,
     };
-    expect(formatRecurrenceLabel(dateSettings)).toBe('Weekly (until 2026-12-31)');
+    expect(formatRecurrenceLabel(dateSettings)).toBe('Repeats weekly (until 2026-12-31)');
 
     const cycleSettings: RecurrenceSettings = {
       frequency: 'monthly',
@@ -73,7 +75,37 @@ describe('recurrence utils', () => {
       endType: 'never',
       currentOccurrence: 4,
     };
-    expect(formatRecurrenceLabel(cycleSettings)).toBe('Monthly (Cycle #4)');
+    expect(formatRecurrenceLabel(cycleSettings)).toBe('Repeats monthly (Cycle #4)');
+  });
+
+  it('validates recurrence end conditions and builds payload', () => {
+    expect(
+      validateRecurrenceSettings({
+        frequency: 'daily',
+        interval: 1,
+        endType: 'after_occurrences',
+      }),
+    ).toBeTruthy();
+
+    expect(
+      validateRecurrenceSettings({
+        frequency: 'daily',
+        interval: 1,
+        endType: 'on_date',
+      }),
+    ).toBeTruthy();
+
+    const valid: RecurrenceSettings = {
+      frequency: 'weekly',
+      interval: 2,
+      daysOfWeek: [1, 3],
+      endType: 'after_occurrences',
+      occurrences: 5,
+    };
+    expect(validateRecurrenceSettings(valid)).toBeNull();
+    const payload = buildRecurrencePayload(valid, 2);
+    expect(payload.currentOccurrence).toBe(2);
+    expect(payload.occurrences).toBe(5);
   });
 
   it('handles null/undefined gracefully', () => {

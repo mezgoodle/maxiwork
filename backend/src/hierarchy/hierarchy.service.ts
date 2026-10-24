@@ -13,7 +13,6 @@ import { Space, SpaceDocument } from './schemas/space.schema';
 import { Folder, FolderDocument } from './schemas/folder.schema';
 import { List, ListDocument } from './schemas/list.schema';
 import { Project, ProjectDocument } from '../projects/schemas/project.schema';
-import { RecurrenceSettings } from '../tasks/schemas/recurrence.schema';
 import { RecurrenceService } from '../tasks/services/recurrence.service';
 import {
   Task,
@@ -1077,12 +1076,13 @@ export class HierarchyService implements OnModuleInit {
       customFieldValues: dto.customFieldValues || {},
       isRecurring: dto.isRecurring ?? false,
       recurrence: dto.recurrence
-        ? ({
+        ? {
             ...dto.recurrence,
+            currentOccurrence: dto.recurrence.currentOccurrence ?? 1,
             endDate: dto.recurrence.endDate
               ? new Date(dto.recurrence.endDate)
               : undefined,
-          } as unknown as RecurrenceSettings)
+          }
         : undefined,
     });
 
@@ -1195,8 +1195,13 @@ export class HierarchyService implements OnModuleInit {
         const wasDone = isStatusDone(prevStatus, workflow);
         let isNowDone = isStatusDone(newStatus, workflow);
 
-        if (isNowDone && task.isRecurring && task.recurrence) {
-          await this.advanceRecurrence(task, workflow);
+        if (
+          isNowDone &&
+          task.isRecurring &&
+          task.recurrence &&
+          this.recurrenceService
+        ) {
+          this.recurrenceService.applyNextRecurrenceToTask(task, workflow);
           isNowDone = isStatusDone(task.status, workflow);
         }
 
@@ -1238,25 +1243,7 @@ export class HierarchyService implements OnModuleInit {
     if (!task.isRecurring || !task.recurrence || !this.recurrenceService) {
       return task;
     }
-
-    const { nextStartDate, nextDueDate, nextOccurrence, shouldEnd } =
-      this.recurrenceService.computeNextOccurrence(
-        task.startDate,
-        task.dueDate,
-        task.recurrence,
-      );
-
-    if (shouldEnd) {
-      task.isRecurring = false;
-    } else {
-      task.startDate = nextStartDate;
-      task.dueDate = nextDueDate;
-      if (task.recurrence) {
-        task.recurrence.currentOccurrence = nextOccurrence;
-      }
-      task.status = workflow?.defaultTodoStatusId || 'todo';
-    }
-
+    this.recurrenceService.applyNextRecurrenceToTask(task, workflow);
     return await task.save();
   }
 
