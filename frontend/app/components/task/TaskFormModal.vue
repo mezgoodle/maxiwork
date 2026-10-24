@@ -698,7 +698,12 @@ async function handleSubmit() {
       throw new Error('Either listId or projectId must be provided');
     }
 
-    emit('saved', result);
+    const mergedResult: Task = {
+      ...result,
+      isRecurring: payload.isRecurring,
+      recurrence: payload.recurrence ?? undefined,
+    };
+    emit('saved', mergedResult);
     handleClose();
   } catch (err: unknown) {
     errorMessage.value = extractApiErrorMessage(err, 'Failed to save task');

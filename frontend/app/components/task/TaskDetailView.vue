@@ -852,7 +852,7 @@ async function updateField(payload: UpdateTaskPayload): Promise<boolean> {
         : {}),
     };
     syncInputs(activeTask.value);
-    emit('updated', updated);
+    emit('updated', activeTask.value);
     showToast('Task updated', 'success');
     return true;
   } catch (err: unknown) {
