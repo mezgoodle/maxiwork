@@ -1,7 +1,7 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Task, TaskDocument } from '../schemas/task.schema';
 import { RecurrenceService } from './recurrence.service';
 import { List, ListDocument } from '../../hierarchy/schemas/list.schema';
@@ -48,29 +48,40 @@ export class RecurrenceSchedulerService {
 
   private async getEffectiveWorkflowForList(
     listRef: unknown,
+    cache?: Map<string, StatusWorkflow | undefined>,
   ): Promise<StatusWorkflow | undefined> {
     if (!listRef || !this.listModel) return undefined;
+    const listId = this.extractId(listRef);
+    if (!listId || !Types.ObjectId.isValid(listId)) return undefined;
+
+    if (cache && cache.has(listId)) {
+      return cache.get(listId);
+    }
+
+    let resolved: StatusWorkflow | undefined;
     try {
-      const listId = this.extractId(listRef);
-      if (!listId) return undefined;
       const list = await this.listModel.findById(listId).lean().exec();
-      if (!list) return undefined;
-      if (list.statusWorkflow?.statuses?.length) {
-        return list.statusWorkflow;
-      }
-      if (list.spaceId && this.spaceModel) {
-        const space = await this.spaceModel
-          .findById(list.spaceId)
-          .lean()
-          .exec();
-        if (space?.statusWorkflow?.statuses?.length) {
-          return space.statusWorkflow;
+      if (list) {
+        if (list.statusWorkflow?.statuses?.length) {
+          resolved = list.statusWorkflow;
+        } else if (list.spaceId && this.spaceModel) {
+          const space = await this.spaceModel
+            .findById(list.spaceId)
+            .lean()
+            .exec();
+          if (space?.statusWorkflow?.statuses?.length) {
+            resolved = space.statusWorkflow;
+          }
         }
       }
     } catch {
-      return undefined;
+      resolved = undefined;
     }
-    return undefined;
+
+    if (cache) {
+      cache.set(listId, resolved);
+    }
+    return resolved;
   }
 
   @Cron(CronExpression.EVERY_10_MINUTES)
@@ -79,42 +90,80 @@ export class RecurrenceSchedulerService {
       'Scanning for recurring tasks needing date progression...',
     );
 
-    const recurringTasks = await this.taskModel
-      .find({
-        isRecurring: true,
-        recurrence: { $ne: null },
-      })
-      .exec();
-
+    const workflowCache = new Map<string, StatusWorkflow | undefined>();
+    const batchSize = 100;
+    let skip = 0;
     let advancedCount = 0;
 
-    for (const task of recurringTasks) {
-      const workflow = await this.getEffectiveWorkflowForList(task.list);
-      const isDone = isStatusDone(task.status, workflow);
+    while (true) {
+      const recurringTasks = await this.taskModel
+        .find({
+          isRecurring: true,
+          recurrence: { $ne: null },
+        })
+        .select('_id status startDate dueDate list isRecurring recurrence')
+        .skip(skip)
+        .limit(batchSize)
+        .lean()
+        .exec();
 
-      // If a recurring task is in done/closed status, advance it
-      if (isDone) {
-        const { nextStartDate, nextDueDate, nextOccurrence, shouldEnd } =
-          this.recurrenceService.computeNextOccurrence(
-            task.startDate,
-            task.dueDate,
-            task.recurrence,
-          );
-
-        if (shouldEnd) {
-          task.isRecurring = false;
-        } else {
-          task.startDate = nextStartDate;
-          task.dueDate = nextDueDate;
-          if (task.recurrence) {
-            task.recurrence.currentOccurrence = nextOccurrence;
-          }
-          task.status = workflow?.defaultTodoStatusId || 'todo';
-        }
-
-        await task.save();
-        advancedCount++;
+      if (!recurringTasks || recurringTasks.length === 0) {
+        break;
       }
+
+      for (const task of recurringTasks) {
+        const workflow = await this.getEffectiveWorkflowForList(
+          task.list,
+          workflowCache,
+        );
+        const isDone = isStatusDone(task.status, workflow);
+
+        if (isDone && task.recurrence) {
+          const curOccurrence = task.recurrence.currentOccurrence || 1;
+          const { nextStartDate, nextDueDate, nextOccurrence, shouldEnd } =
+            this.recurrenceService.computeNextOccurrence(
+              task.startDate,
+              task.dueDate,
+              task.recurrence,
+            );
+
+          const filter: Record<string, unknown> = {
+            _id: task._id,
+            status: task.status,
+            isRecurring: true,
+            $or: [
+              { 'recurrence.currentOccurrence': curOccurrence },
+              ...(curOccurrence === 1
+                ? [{ 'recurrence.currentOccurrence': { $exists: false } }]
+                : []),
+            ],
+          };
+
+          const updatePayload = shouldEnd
+            ? { $set: { isRecurring: false } }
+            : {
+                $set: {
+                  startDate: nextStartDate,
+                  dueDate: nextDueDate,
+                  'recurrence.currentOccurrence': nextOccurrence,
+                  status: workflow?.defaultTodoStatusId || 'todo',
+                },
+              };
+
+          const updateResult = await this.taskModel
+            .updateOne(filter, updatePayload)
+            .exec();
+
+          if (updateResult.modifiedCount === 1) {
+            advancedCount++;
+          }
+        }
+      }
+
+      if (recurringTasks.length < batchSize) {
+        break;
+      }
+      skip += batchSize;
     }
 
     if (advancedCount > 0) {

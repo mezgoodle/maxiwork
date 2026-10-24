@@ -41,7 +41,10 @@ export class RecurrenceSettingsDto {
   @Min(1)
   currentOccurrence?: number;
 
-  @ValidateIf((o: RecurrenceSettingsDto) => o.endType === 'on_date')
+  @ValidateIf(
+    (o: RecurrenceSettingsDto, value) =>
+      o.endType === 'on_date' || value !== undefined,
+  )
   @IsDateString()
   endDate?: string;
 }

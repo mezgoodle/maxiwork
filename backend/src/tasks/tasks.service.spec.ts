@@ -794,5 +794,59 @@ describe('TasksService', () => {
       expect(updated.isRecurring).toBe(false);
       expect(saveSpy).toHaveBeenCalled();
     });
+
+    it('advances recurrence after applying dueDate and recurrence in a single update call', async () => {
+      const saveSpy = jest.fn().mockImplementation(function (this: unknown) {
+        return Promise.resolve({
+          ...(this as Record<string, unknown>),
+          populate: jest.fn().mockResolvedValue(this),
+        });
+      });
+
+      const mockTask = {
+        _id: mockTaskId,
+        project: mockProjectId,
+        title: 'Daily Standup',
+        status: 'todo',
+        isRecurring: true,
+        dueDate: new Date('2026-10-01T10:00:00.000Z'),
+        recurrence: {
+          frequency: 'daily',
+          interval: 1,
+          endType: 'never',
+          currentOccurrence: 1,
+        },
+        save: saveSpy,
+      } as unknown as TaskDocument;
+
+      mockProjectModel.findById.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockProject),
+      });
+      mockTaskModel.findOne.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockTask),
+      });
+
+      await service.update(
+        mockProjectId,
+        mockTaskId,
+        {
+          status: 'done',
+          dueDate: '2026-10-10T10:00:00.000Z',
+          isRecurring: true,
+          recurrence: {
+            frequency: 'daily',
+            interval: 1,
+            endType: 'never',
+            currentOccurrence: 1,
+          },
+        },
+        mockOwnerId,
+      );
+
+      expect(mockTask.status).toBe('todo');
+      expect(mockTask.recurrence?.currentOccurrence).toBe(2);
+      expect(mockTask.dueDate?.toISOString()).toBe('2026-10-11T10:00:00.000Z');
+      expect(saveSpy).toHaveBeenCalledTimes(1);
+    });
   });
 });

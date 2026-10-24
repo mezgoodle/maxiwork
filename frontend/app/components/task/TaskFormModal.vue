@@ -228,6 +228,7 @@
                       v-for="day in WEEKDAYS"
                       :key="day.value"
                       type="button"
+                      :aria-pressed="Boolean(form.recurrence.daysOfWeek?.includes(day.value))"
                       class="px-2.5 py-1 rounded-md text-xs font-semibold border transition cursor-pointer"
                       :class="
                         form.recurrence.daysOfWeek?.includes(day.value)
@@ -246,9 +247,15 @@
                   <label class="block text-slate-400 font-medium mb-1">
                     Ends
                   </label>
-                  <div class="grid grid-cols-3 gap-2 mb-2">
+                  <div
+                    role="radiogroup"
+                    aria-label="Recurrence end condition"
+                    class="grid grid-cols-3 gap-2 mb-2"
+                  >
                     <button
                       type="button"
+                      role="radio"
+                      :aria-checked="form.recurrence.endType === 'never'"
                       class="px-2 py-1 text-center rounded-lg border text-xs font-medium transition cursor-pointer"
                       :class="
                         form.recurrence.endType === 'never'
@@ -261,6 +268,8 @@
                     </button>
                     <button
                       type="button"
+                      role="radio"
+                      :aria-checked="form.recurrence.endType === 'after_occurrences'"
                       class="px-2 py-1 text-center rounded-lg border text-xs font-medium transition cursor-pointer"
                       :class="
                         form.recurrence.endType === 'after_occurrences'
@@ -273,6 +282,8 @@
                     </button>
                     <button
                       type="button"
+                      role="radio"
+                      :aria-checked="form.recurrence.endType === 'on_date'"
                       class="px-2 py-1 text-center rounded-lg border text-xs font-medium transition cursor-pointer"
                       :class="
                         form.recurrence.endType === 'on_date'
@@ -629,6 +640,19 @@ async function handleSubmit() {
     }
   }
 
+  if (form.isRecurring) {
+    if (form.recurrence.endType === 'after_occurrences') {
+      const count = Number(form.recurrence.occurrences);
+      if (!Number.isInteger(count) || count < 1) {
+        errorMessage.value = 'Please specify a valid number of occurrences (at least 1)';
+        return;
+      }
+    } else if (form.recurrence.endType === 'on_date' && !form.recurrence.endDate) {
+      errorMessage.value = 'Please select an end date for the recurrence schedule';
+      return;
+    }
+  }
+
   loading.value = true;
   try {
     const payload = {
@@ -655,7 +679,7 @@ async function handleSubmit() {
             endType: form.recurrence.endType,
             occurrences:
               form.recurrence.endType === 'after_occurrences'
-                ? Math.max(1, Number(form.recurrence.occurrences) || 1)
+                ? Number(form.recurrence.occurrences)
                 : undefined,
             currentOccurrence: form.recurrence.currentOccurrence || 1,
             endDate:
@@ -700,8 +724,12 @@ async function handleSubmit() {
 
     const mergedResult: Task = {
       ...result,
-      isRecurring: payload.isRecurring,
-      recurrence: payload.recurrence ?? undefined,
+      isRecurring:
+        result.isRecurring !== undefined ? result.isRecurring : payload.isRecurring,
+      recurrence:
+        result.recurrence !== undefined
+          ? result.recurrence
+          : (payload.recurrence ?? undefined),
     };
     emit('saved', mergedResult);
     handleClose();

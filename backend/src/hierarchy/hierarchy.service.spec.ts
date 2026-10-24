@@ -1066,7 +1066,16 @@ describe('HierarchyService', () => {
         );
 
         expect(result).toBeDefined();
-        expect(result.isRecurring).toBe(true);
+        expect(mockTaskModel).toHaveBeenCalledWith(
+          expect.objectContaining({
+            isRecurring: true,
+            recurrence: expect.objectContaining({
+              frequency: 'daily',
+              interval: 1,
+              endType: 'never',
+            }),
+          }),
+        );
       });
 
       it('should update isRecurring and recurrence settings in updateListTask', async () => {

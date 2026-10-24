@@ -820,11 +820,12 @@ async function navigateToParent() {
 }
 
 async function updateField(payload: UpdateTaskPayload): Promise<boolean> {
+  const taskId = activeTask.value._id;
   try {
     let updated: Task;
     if (props.listId) {
       updated = await apiFetch<Task>(
-        `/lists/${props.listId}/tasks/${activeTask.value._id}`,
+        `/lists/${props.listId}/tasks/${taskId}`,
         {
           method: 'PATCH',
           body: payload,
@@ -833,26 +834,37 @@ async function updateField(payload: UpdateTaskPayload): Promise<boolean> {
     } else if (props.projectId) {
       updated = await tasksStore.updateTask(
         props.projectId,
-        activeTask.value._id,
+        taskId,
         payload,
       );
     } else {
       return false;
     }
-    activeTask.value = {
-      ...activeTask.value,
+
+    const mergedTask: Task = {
+      ...(activeTask.value._id === taskId ? activeTask.value : updated),
       ...updated,
-      ...(payload.isRecurring !== undefined ? { isRecurring: payload.isRecurring } : {}),
-      ...(payload.recurrence !== undefined
-        ? {
-            recurrence: payload.recurrence
+      isRecurring:
+        updated.isRecurring !== undefined
+          ? updated.isRecurring
+          : payload.isRecurring !== undefined
+            ? payload.isRecurring
+            : activeTask.value.isRecurring,
+      recurrence:
+        updated.recurrence !== undefined
+          ? updated.recurrence
+          : payload.recurrence !== undefined
+            ? payload.recurrence
               ? { ...(activeTask.value.recurrence || {}), ...payload.recurrence }
-              : undefined,
-          }
-        : {}),
+              : undefined
+            : activeTask.value.recurrence,
     };
-    syncInputs(activeTask.value);
-    emit('updated', activeTask.value);
+
+    if (activeTask.value._id === taskId) {
+      activeTask.value = mergedTask;
+      syncInputs(activeTask.value);
+    }
+    emit('updated', mergedTask);
     showToast('Task updated', 'success');
     return true;
   } catch (err: unknown) {
@@ -863,6 +875,14 @@ async function updateField(payload: UpdateTaskPayload): Promise<boolean> {
 
 const isEditingRecurrence = ref(false);
 const editableRecurrence = ref<RecurrenceSettings>(getDefaultRecurrenceSettings());
+
+watch(
+  () => activeTask.value._id,
+  () => {
+    isEditingRecurrence.value = false;
+    editableRecurrence.value = getDefaultRecurrenceSettings();
+  },
+);
 
 function startEditingRecurrence() {
   editableRecurrence.value = activeTask.value.recurrence
@@ -901,13 +921,32 @@ function startEnablingRecurrence() {
 }
 
 async function disableRecurrence() {
+  const previousIsRecurring = activeTask.value.isRecurring;
+  const previousRecurrence = activeTask.value.recurrence;
   isEditingRecurrence.value = false;
   activeTask.value.isRecurring = false;
-  activeTask.value.recurrence = undefined;
-  await updateField({ isRecurring: false, recurrence: null });
+  const success = await updateField({ isRecurring: false });
+  if (!success) {
+    activeTask.value.isRecurring = previousIsRecurring;
+    activeTask.value.recurrence = previousRecurrence;
+  }
 }
 
 async function saveRecurrenceEdit() {
+  if (editableRecurrence.value.endType === 'after_occurrences') {
+    const count = Number(editableRecurrence.value.occurrences);
+    if (!Number.isInteger(count) || count < 1) {
+      showToast('Please specify a valid number of occurrences (at least 1)', 'error');
+      return;
+    }
+  } else if (
+    editableRecurrence.value.endType === 'on_date' &&
+    !editableRecurrence.value.endDate
+  ) {
+    showToast('Please select an end date for the recurrence schedule', 'error');
+    return;
+  }
+
   const payloadRecurrence: RecurrenceSettings = {
     frequency: editableRecurrence.value.frequency || 'daily',
     interval: Math.max(1, Number(editableRecurrence.value.interval) || 1),
@@ -918,7 +957,7 @@ async function saveRecurrenceEdit() {
     endType: editableRecurrence.value.endType || 'never',
     occurrences:
       editableRecurrence.value.endType === 'after_occurrences'
-        ? Math.max(1, Number(editableRecurrence.value.occurrences) || 1)
+        ? Number(editableRecurrence.value.occurrences)
         : undefined,
     currentOccurrence: activeTask.value.recurrence?.currentOccurrence || 1,
     endDate:
@@ -927,6 +966,9 @@ async function saveRecurrenceEdit() {
         ? new Date(editableRecurrence.value.endDate).toISOString()
         : undefined,
   };
+
+  const previousIsRecurring = activeTask.value.isRecurring;
+  const previousRecurrence = activeTask.value.recurrence;
 
   // Optimistically set recurrence so UI updates immediately
   activeTask.value.isRecurring = true;
@@ -938,9 +980,8 @@ async function saveRecurrenceEdit() {
     recurrence: payloadRecurrence,
   });
   if (!success) {
-    // Revert if API failed
-    activeTask.value.isRecurring = false;
-    activeTask.value.recurrence = undefined;
+    activeTask.value.isRecurring = previousIsRecurring;
+    activeTask.value.recurrence = previousRecurrence;
   }
 }
 

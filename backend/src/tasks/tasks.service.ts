@@ -354,66 +354,22 @@ export class TasksService {
       task.description = updateTaskDto.description;
     }
 
-    if (updateTaskDto.status !== undefined) {
-      const targetList =
-        updateTaskDto.list !== undefined ? updateTaskDto.list : task.list;
-      const workflow = await this.getEffectiveWorkflowForList(targetList);
-      let targetStatus = updateTaskDto.status.trim();
-      if (workflow && workflow.statuses?.length) {
-        const match = workflow.statuses.find(
-          (s) => s.id.toLowerCase() === targetStatus.toLowerCase(),
-        );
-        if (!match) {
-          throw new BadRequestException(
-            `Status '${updateTaskDto.status}' is not valid for this task's workflow`,
-          );
-        }
-        targetStatus = match.id;
-      }
-
-      if (targetStatus !== task.status) {
-        const prevStatus = task.status;
-        const newStatus = targetStatus;
-        task.status = newStatus;
-
-        const wasDone = isStatusDone(prevStatus, workflow);
-        const isNowDone = isStatusDone(newStatus, workflow);
-
-        if (task.parentTaskId) {
-          let inc = 0;
-          if (!wasDone && isNowDone) {
-            inc = 1;
-          } else if (wasDone && !isNowDone) {
-            inc = -1;
-          }
-          if (inc !== 0) {
-            await this.taskModel
-              .updateOne(
-                { _id: this.extractId(task.parentTaskId) },
-                { $inc: { completedSubtasksCount: inc } },
-              )
-              .exec();
-          }
-        }
-
-        if (isNowDone && task.isRecurring && task.recurrence) {
-          await this.advanceRecurrence(task, workflow);
-        }
-      }
-    }
-
     if (updateTaskDto.isRecurring !== undefined) {
       task.isRecurring = updateTaskDto.isRecurring;
     }
 
     if (updateTaskDto.recurrence !== undefined) {
       task.recurrence = updateTaskDto.recurrence
-        ? ({
+        ? {
             ...updateTaskDto.recurrence,
+            currentOccurrence:
+              task.recurrence?.currentOccurrence ??
+              updateTaskDto.recurrence.currentOccurrence ??
+              1,
             endDate: updateTaskDto.recurrence.endDate
               ? new Date(updateTaskDto.recurrence.endDate)
               : undefined,
-          } as unknown as RecurrenceSettings)
+          }
         : undefined;
     }
 
@@ -453,6 +409,55 @@ export class TasksService {
         task.customFieldValues,
         updateTaskDto.customFieldValues,
       );
+    }
+
+    if (updateTaskDto.status !== undefined) {
+      const targetList =
+        updateTaskDto.list !== undefined ? updateTaskDto.list : task.list;
+      const workflow = await this.getEffectiveWorkflowForList(targetList);
+      let targetStatus = updateTaskDto.status.trim();
+      if (workflow && workflow.statuses?.length) {
+        const match = workflow.statuses.find(
+          (s) => s.id.toLowerCase() === targetStatus.toLowerCase(),
+        );
+        if (!match) {
+          throw new BadRequestException(
+            `Status '${updateTaskDto.status}' is not valid for this task's workflow`,
+          );
+        }
+        targetStatus = match.id;
+      }
+
+      if (targetStatus !== task.status) {
+        const prevStatus = task.status;
+        const newStatus = targetStatus;
+        task.status = newStatus;
+
+        const wasDone = isStatusDone(prevStatus, workflow);
+        let isNowDone = isStatusDone(newStatus, workflow);
+
+        if (isNowDone && task.isRecurring && task.recurrence) {
+          this.applyNextRecurrence(task, workflow);
+          isNowDone = isStatusDone(task.status, workflow);
+        }
+
+        if (task.parentTaskId) {
+          let inc = 0;
+          if (!wasDone && isNowDone) {
+            inc = 1;
+          } else if (wasDone && !isNowDone) {
+            inc = -1;
+          }
+          if (inc !== 0) {
+            await this.taskModel
+              .updateOne(
+                { _id: this.extractId(task.parentTaskId) },
+                { $inc: { completedSubtasksCount: inc } },
+              )
+              .exec();
+          }
+        }
+      }
     }
 
     const updated = await task.save();
@@ -498,7 +503,12 @@ export class TasksService {
     if (prevStatus !== newStatus) {
       task.status = newStatus;
       const wasDone = isStatusDone(prevStatus, workflow);
-      const isNowDone = isStatusDone(newStatus, workflow);
+      let isNowDone = isStatusDone(newStatus, workflow);
+
+      if (isNowDone && task.isRecurring && task.recurrence) {
+        this.applyNextRecurrence(task, workflow);
+        isNowDone = isStatusDone(task.status, workflow);
+      }
 
       if (task.parentTaskId) {
         let inc = 0;
@@ -516,10 +526,6 @@ export class TasksService {
             .exec();
         }
       }
-
-      if (isNowDone && task.isRecurring && task.recurrence) {
-        await this.advanceRecurrence(task, workflow);
-      }
     }
 
     const updated = await task.save();
@@ -529,10 +535,10 @@ export class TasksService {
     ]);
   }
 
-  async advanceRecurrence(
+  applyNextRecurrence(
     task: TaskDocument,
     workflow?: StatusWorkflow,
-  ): Promise<TaskDocument> {
+  ): TaskDocument {
     if (!task.isRecurring || !task.recurrence || !this.recurrenceService) {
       return task;
     }
@@ -555,6 +561,17 @@ export class TasksService {
       task.status = workflow?.defaultTodoStatusId || 'todo';
     }
 
+    return task;
+  }
+
+  async advanceRecurrence(
+    task: TaskDocument,
+    workflow?: StatusWorkflow,
+  ): Promise<TaskDocument> {
+    if (!task.isRecurring || !task.recurrence || !this.recurrenceService) {
+      return task;
+    }
+    this.applyNextRecurrence(task, workflow);
     return await task.save();
   }
 

@@ -1162,12 +1162,16 @@ export class HierarchyService implements OnModuleInit {
 
     if (dto.recurrence !== undefined) {
       task.recurrence = dto.recurrence
-        ? ({
+        ? {
             ...dto.recurrence,
+            currentOccurrence:
+              task.recurrence?.currentOccurrence ??
+              dto.recurrence.currentOccurrence ??
+              1,
             endDate: dto.recurrence.endDate
               ? new Date(dto.recurrence.endDate)
               : undefined,
-          } as unknown as RecurrenceSettings)
+          }
         : undefined;
     }
 
@@ -1189,7 +1193,12 @@ export class HierarchyService implements OnModuleInit {
         task.status = newStatus;
 
         const wasDone = isStatusDone(prevStatus, workflow);
-        const isNowDone = isStatusDone(newStatus, workflow);
+        let isNowDone = isStatusDone(newStatus, workflow);
+
+        if (isNowDone && task.isRecurring && task.recurrence) {
+          await this.advanceRecurrence(task, workflow);
+          isNowDone = isStatusDone(task.status, workflow);
+        }
 
         if (task.parentTaskId) {
           let inc = 0;
@@ -1204,10 +1213,6 @@ export class HierarchyService implements OnModuleInit {
               $inc: { completedSubtasksCount: inc },
             });
           }
-        }
-
-        if (isNowDone && task.isRecurring && task.recurrence) {
-          await this.advanceRecurrence(task, workflow);
         }
       }
     }

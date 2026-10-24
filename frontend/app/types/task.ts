@@ -38,7 +38,7 @@ export interface Task {
   subtasks?: Task[];
   customFieldValues?: Record<string, unknown>;
   isRecurring?: boolean;
-  recurrence?: RecurrenceSettings;
+  recurrence?: RecurrenceSettings | null;
   createdAt?: string;
   updatedAt?: string;
 }
