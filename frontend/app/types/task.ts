@@ -4,6 +4,19 @@ export type TaskStatus = 'todo' | 'in_progress' | 'in_review' | 'done' | (string
 
 export type TaskPriority = 'low' | 'medium' | 'high' | 'critical';
 
+export type RecurrenceFrequency = 'daily' | 'weekly' | 'monthly' | 'custom';
+export type RecurrenceEndType = 'never' | 'after_occurrences' | 'on_date';
+
+export interface RecurrenceSettings {
+  frequency: RecurrenceFrequency;
+  interval: number;
+  daysOfWeek?: number[];
+  endType: RecurrenceEndType;
+  occurrences?: number;
+  currentOccurrence?: number;
+  endDate?: string;
+}
+
 export interface Task {
   _id: string;
   title: string;
@@ -24,6 +37,8 @@ export interface Task {
   order?: number;
   subtasks?: Task[];
   customFieldValues?: Record<string, unknown>;
+  isRecurring?: boolean;
+  recurrence?: RecurrenceSettings | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -38,6 +53,8 @@ export interface CreateTaskPayload {
   dueDate?: string;
   list?: string;
   customFieldValues?: Record<string, unknown>;
+  isRecurring?: boolean;
+  recurrence?: RecurrenceSettings;
 }
 
 export interface UpdateTaskPayload {
@@ -50,6 +67,8 @@ export interface UpdateTaskPayload {
   dueDate?: string | null;
   list?: string | null;
   customFieldValues?: Record<string, unknown>;
+  isRecurring?: boolean;
+  recurrence?: RecurrenceSettings | null;
 }
 
 export interface CreateSubtaskPayload {

@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsDateString,
   IsEnum,
   IsMongoId,
@@ -7,9 +8,11 @@ import {
   MaxLength,
   MinLength,
   ValidateIf,
+  ValidateNested,
 } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { TaskPriority } from '../enums/task-priority.enum';
+import { RecurrenceSettingsDto } from './recurrence.dto';
 
 export class UpdateTaskDto {
   @ValidateIf((_, value) => value !== undefined)
@@ -64,4 +67,13 @@ export class UpdateTaskDto {
   @ValidateIf((_, value) => value !== undefined)
   @IsObject()
   customFieldValues?: Record<string, unknown>;
+
+  @ValidateIf((_, value) => value !== undefined)
+  @IsBoolean()
+  isRecurring?: boolean;
+
+  @ValidateIf((_, value) => value !== undefined && value !== null)
+  @ValidateNested()
+  @Type(() => RecurrenceSettingsDto)
+  recurrence?: RecurrenceSettingsDto | null;
 }

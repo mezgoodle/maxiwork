@@ -7,6 +7,7 @@ import { UpdateTaskStatusDto } from './update-task-status.dto';
 import { GetTasksQueryDto } from './get-tasks-query.dto';
 import { CreateSubtaskDto } from './create-subtask.dto';
 import { MoveSubtaskDto } from './move-subtask.dto';
+import { RecurrenceSettingsDto } from './recurrence.dto';
 import { TaskStatus } from '../enums/task-status.enum';
 import { TaskPriority } from '../enums/task-priority.enum';
 
@@ -211,6 +212,99 @@ describe('Tasks DTOs', () => {
       });
       const errors = await validate(dto);
       expect(errors.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('RecurrenceSettingsDto', () => {
+    it('should validate valid daily recurrence payload', async () => {
+      const dto = plainToInstance(RecurrenceSettingsDto, {
+        frequency: 'daily',
+        interval: 1,
+        endType: 'never',
+      });
+      const errors = await validate(dto);
+      expect(errors.length).toBe(0);
+    });
+
+    it('should validate weekly recurrence with daysOfWeek and occurrences limit', async () => {
+      const dto = plainToInstance(RecurrenceSettingsDto, {
+        frequency: 'weekly',
+        interval: 2,
+        daysOfWeek: [1, 3, 5],
+        endType: 'after_occurrences',
+        occurrences: 10,
+        currentOccurrence: 1,
+      });
+      const errors = await validate(dto);
+      expect(errors.length).toBe(0);
+    });
+
+    it('should validate recurrence with endDate', async () => {
+      const dto = plainToInstance(RecurrenceSettingsDto, {
+        frequency: 'monthly',
+        interval: 1,
+        endType: 'on_date',
+        endDate: '2026-12-31T23:59:59.000Z',
+      });
+      const errors = await validate(dto);
+      expect(errors.length).toBe(0);
+    });
+
+    it('should reject invalid frequency', async () => {
+      const dto = plainToInstance(RecurrenceSettingsDto, {
+        frequency: 'yearly',
+        interval: 1,
+        endType: 'never',
+      });
+      const errors = await validate(dto);
+      expect(errors.length).toBeGreaterThan(0);
+    });
+
+    it('should reject interval less than 1', async () => {
+      const dto = plainToInstance(RecurrenceSettingsDto, {
+        frequency: 'daily',
+        interval: 0,
+        endType: 'never',
+      });
+      const errors = await validate(dto);
+      expect(errors.length).toBeGreaterThan(0);
+    });
+
+    it('should reject invalid day numbers in daysOfWeek', async () => {
+      const dto = plainToInstance(RecurrenceSettingsDto, {
+        frequency: 'weekly',
+        interval: 1,
+        daysOfWeek: [7], // 0-6 only
+        endType: 'never',
+      });
+      const errors = await validate(dto);
+      expect(errors.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Task DTOs with recurrence', () => {
+    it('should validate CreateTaskDto with recurrence payload', async () => {
+      const dto = plainToInstance(CreateTaskDto, {
+        title: 'Weekly Standup',
+        isRecurring: true,
+        recurrence: {
+          frequency: 'weekly',
+          interval: 1,
+          daysOfWeek: [1],
+          endType: 'never',
+        },
+      });
+      const errors = await validate(dto);
+      expect(errors.length).toBe(0);
+    });
+
+    it('should validate UpdateTaskDto with recurrence payload', async () => {
+      const dto = plainToInstance(UpdateTaskDto, {
+        isRecurring: false,
+        recurrence: null,
+      });
+      const errors = await validate(dto);
+      expect(errors.length).toBe(0);
     });
   });
 });

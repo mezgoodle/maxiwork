@@ -158,6 +158,37 @@
               </div>
             </div>
 
+            <!-- Recurrence Section -->
+            <div class="pt-2 border-t border-slate-800 space-y-3">
+              <div class="flex items-center justify-between">
+                <label class="text-sm font-medium text-slate-300 flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    v-model="form.isRecurring"
+                    type="checkbox"
+                    class="w-4 h-4 rounded bg-slate-800 border-slate-700 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                  >
+                  <span>Repeat Task (Recurring)</span>
+                </label>
+                <span
+                  v-if="form.isRecurring"
+                  class="text-xs font-mono px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
+                >
+                  🔁 Recurring
+                </span>
+              </div>
+
+              <!-- Recurrence Settings Panel -->
+              <div
+                v-if="form.isRecurring"
+                class="p-3.5 bg-slate-800/40 rounded-xl border border-slate-700/60"
+              >
+                <RecurrenceConfigForm
+                  v-model="form.recurrence"
+                  :min-end-date="form.dueDate || form.startDate"
+                />
+              </div>
+            </div>
+
             <!-- Custom Fields Section -->
             <div
               v-if="availableCustomFields.length > 0"
@@ -236,6 +267,12 @@ import { extractApiErrorMessage } from '../../utils/error';
 import DatePickerMenu from '../ui/DatePickerMenu.vue';
 import CustomFieldInput from '../custom-fields/CustomFieldInput.vue';
 import MarkdownEditor from '../ui/MarkdownEditor.vue';
+import RecurrenceConfigForm from './RecurrenceConfigForm.vue';
+import {
+  getDefaultRecurrenceSettings,
+  validateRecurrenceSettings,
+  buildRecurrencePayload,
+} from '../../utils/recurrence';
 
 interface Props {
   isOpen: boolean;
@@ -305,6 +342,8 @@ const form = reactive({
   startDate: '',
   dueDate: '',
   customFieldValues: {} as Record<string, unknown>,
+  isRecurring: false,
+  recurrence: getDefaultRecurrenceSettings(),
 });
 
 function formatDateForInput(dateStr?: string): string {
@@ -345,6 +384,18 @@ watch(
         form.startDate = formatDateForInput(task.startDate);
         form.dueDate = formatDateForInput(task.dueDate);
         form.customFieldValues = { ...(task.customFieldValues || {}) };
+        form.isRecurring = !!task.isRecurring;
+        form.recurrence = task.recurrence
+          ? {
+              frequency: task.recurrence.frequency || 'daily',
+              interval: task.recurrence.interval || 1,
+              daysOfWeek: task.recurrence.daysOfWeek ? [...task.recurrence.daysOfWeek] : [],
+              endType: task.recurrence.endType || 'never',
+              occurrences: task.recurrence.occurrences,
+              currentOccurrence: task.recurrence.currentOccurrence || 1,
+              endDate: formatDateForInput(task.recurrence.endDate),
+            }
+          : getDefaultRecurrenceSettings();
       } else {
         form.title = '';
         form.description = '';
@@ -353,6 +404,8 @@ watch(
         form.assignee = '';
         form.startDate = '';
         form.dueDate = defaultDueDate ? formatDateForInput(defaultDueDate) : '';
+        form.isRecurring = false;
+        form.recurrence = getDefaultRecurrenceSettings();
         const initialCustomValues: Record<string, unknown> = {};
         for (const f of availableCustomFields.value) {
           if (f.defaultValue !== undefined && f.defaultValue !== null) {
@@ -447,6 +500,14 @@ async function handleSubmit() {
     }
   }
 
+  if (form.isRecurring) {
+    const recurrenceErr = validateRecurrenceSettings(form.recurrence);
+    if (recurrenceErr) {
+      errorMessage.value = recurrenceErr;
+      return;
+    }
+  }
+
   loading.value = true;
   try {
     const payload = {
@@ -461,6 +522,10 @@ async function handleSubmit() {
         Object.keys(form.customFieldValues).length > 0
           ? form.customFieldValues
           : undefined,
+      isRecurring: form.isRecurring,
+      recurrence: form.isRecurring
+        ? buildRecurrencePayload(form.recurrence)
+        : null,
     };
 
     let result: Task;
@@ -495,7 +560,16 @@ async function handleSubmit() {
       throw new Error('Either listId or projectId must be provided');
     }
 
-    emit('saved', result);
+    const mergedResult: Task = {
+      ...result,
+      isRecurring:
+        result.isRecurring !== undefined ? result.isRecurring : payload.isRecurring,
+      recurrence:
+        result.recurrence !== undefined
+          ? result.recurrence
+          : (payload.recurrence ?? undefined),
+    };
+    emit('saved', mergedResult);
     handleClose();
   } catch (err: unknown) {
     errorMessage.value = extractApiErrorMessage(err, 'Failed to save task');

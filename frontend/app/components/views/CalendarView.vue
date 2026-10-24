@@ -232,6 +232,15 @@
                   {{ seg.task.taskKey }}
                 </span>
 
+                <!-- Recurrence Indicator -->
+                <span
+                  v-if="seg.task.isRecurring"
+                  class="text-[9px] mr-1 shrink-0 select-none"
+                  title="Recurring task"
+                >
+                  🔁
+                </span>
+
                 <!-- Task Title (Rendered exactly once, truncated) -->
                 <span
                   class="truncate font-medium text-slate-100 group-hover/bar:text-indigo-200 min-w-0 flex-1"
@@ -337,6 +346,13 @@
                 />
                 <span class="font-mono text-[10px] text-slate-400 truncate">
                   {{ task.taskKey }}
+                </span>
+                <span
+                  v-if="task.isRecurring"
+                  class="text-[9px] shrink-0"
+                  title="Recurring task"
+                >
+                  🔁
                 </span>
               </div>
 
