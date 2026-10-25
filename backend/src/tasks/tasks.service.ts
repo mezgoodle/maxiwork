@@ -26,6 +26,7 @@ import {
   StatusWorkflow,
   isStatusDone,
 } from '../hierarchy/schemas/status-workflow.schema';
+import { RecurrenceService } from './services/recurrence.service';
 
 export interface PaginatedTasksResult {
   data: TaskDocument[];
@@ -50,6 +51,8 @@ export class TasksService {
     @Optional()
     @InjectModel(Space.name)
     private readonly spaceModel?: Model<SpaceDocument>,
+    @Optional()
+    private readonly recurrenceService?: RecurrenceService,
   ) {}
 
   private extractId(ref: unknown): string {
@@ -226,6 +229,16 @@ export class TasksService {
         ? new Date(createTaskDto.dueDate)
         : undefined,
       customFieldValues: createTaskDto.customFieldValues || {},
+      isRecurring: createTaskDto.isRecurring ?? false,
+      recurrence: createTaskDto.recurrence
+        ? {
+            ...createTaskDto.recurrence,
+            currentOccurrence: createTaskDto.recurrence.currentOccurrence ?? 1,
+            endDate: createTaskDto.recurrence.endDate
+              ? new Date(createTaskDto.recurrence.endDate)
+              : undefined,
+          }
+        : undefined,
     });
 
     const saved = await createdTask.save();
@@ -341,47 +354,23 @@ export class TasksService {
       task.description = updateTaskDto.description;
     }
 
-    if (updateTaskDto.status !== undefined) {
-      const targetList =
-        updateTaskDto.list !== undefined ? updateTaskDto.list : task.list;
-      const workflow = await this.getEffectiveWorkflowForList(targetList);
-      let targetStatus = updateTaskDto.status.trim();
-      if (workflow && workflow.statuses?.length) {
-        const match = workflow.statuses.find(
-          (s) => s.id.toLowerCase() === targetStatus.toLowerCase(),
-        );
-        if (!match) {
-          throw new BadRequestException(
-            `Status '${updateTaskDto.status}' is not valid for this task's workflow`,
-          );
-        }
-        targetStatus = match.id;
-      }
+    if (updateTaskDto.isRecurring !== undefined) {
+      task.isRecurring = updateTaskDto.isRecurring;
+    }
 
-      if (targetStatus !== task.status) {
-        const prevStatus = task.status;
-        const newStatus = targetStatus;
-        task.status = newStatus;
-
-        if (task.parentTaskId) {
-          const wasDone = isStatusDone(prevStatus, workflow);
-          const isNowDone = isStatusDone(newStatus, workflow);
-          let inc = 0;
-          if (!wasDone && isNowDone) {
-            inc = 1;
-          } else if (wasDone && !isNowDone) {
-            inc = -1;
+    if (updateTaskDto.recurrence !== undefined) {
+      task.recurrence = updateTaskDto.recurrence
+        ? {
+            ...updateTaskDto.recurrence,
+            currentOccurrence:
+              task.recurrence?.currentOccurrence ??
+              updateTaskDto.recurrence.currentOccurrence ??
+              1,
+            endDate: updateTaskDto.recurrence.endDate
+              ? new Date(updateTaskDto.recurrence.endDate)
+              : undefined,
           }
-          if (inc !== 0) {
-            await this.taskModel
-              .updateOne(
-                { _id: this.extractId(task.parentTaskId) },
-                { $inc: { completedSubtasksCount: inc } },
-              )
-              .exec();
-          }
-        }
-      }
+        : undefined;
     }
 
     if (updateTaskDto.priority !== undefined) {
@@ -420,6 +409,55 @@ export class TasksService {
         task.customFieldValues,
         updateTaskDto.customFieldValues,
       );
+    }
+
+    if (updateTaskDto.status !== undefined) {
+      const targetList =
+        updateTaskDto.list !== undefined ? updateTaskDto.list : task.list;
+      const workflow = await this.getEffectiveWorkflowForList(targetList);
+      let targetStatus = updateTaskDto.status.trim();
+      if (workflow && workflow.statuses?.length) {
+        const match = workflow.statuses.find(
+          (s) => s.id.toLowerCase() === targetStatus.toLowerCase(),
+        );
+        if (!match) {
+          throw new BadRequestException(
+            `Status '${updateTaskDto.status}' is not valid for this task's workflow`,
+          );
+        }
+        targetStatus = match.id;
+      }
+
+      if (targetStatus !== task.status) {
+        const prevStatus = task.status;
+        const newStatus = targetStatus;
+        task.status = newStatus;
+
+        const wasDone = isStatusDone(prevStatus, workflow);
+        let isNowDone = isStatusDone(newStatus, workflow);
+
+        if (isNowDone && task.isRecurring && task.recurrence) {
+          this.applyNextRecurrence(task, workflow);
+          isNowDone = isStatusDone(task.status, workflow);
+        }
+
+        if (task.parentTaskId) {
+          let inc = 0;
+          if (!wasDone && isNowDone) {
+            inc = 1;
+          } else if (wasDone && !isNowDone) {
+            inc = -1;
+          }
+          if (inc !== 0) {
+            await this.taskModel
+              .updateOne(
+                { _id: this.extractId(task.parentTaskId) },
+                { $inc: { completedSubtasksCount: inc } },
+              )
+              .exec();
+          }
+        }
+      }
     }
 
     const updated = await task.save();
@@ -464,9 +502,15 @@ export class TasksService {
 
     if (prevStatus !== newStatus) {
       task.status = newStatus;
+      const wasDone = isStatusDone(prevStatus, workflow);
+      let isNowDone = isStatusDone(newStatus, workflow);
+
+      if (isNowDone && task.isRecurring && task.recurrence) {
+        this.applyNextRecurrence(task, workflow);
+        isNowDone = isStatusDone(task.status, workflow);
+      }
+
       if (task.parentTaskId) {
-        const wasDone = isStatusDone(prevStatus, workflow);
-        const isNowDone = isStatusDone(newStatus, workflow);
         let inc = 0;
         if (!wasDone && isNowDone) {
           inc = 1;
@@ -489,6 +533,27 @@ export class TasksService {
       { path: 'reporter', select: 'firstName lastName email avatarUrl' },
       { path: 'assignee', select: 'firstName lastName email avatarUrl' },
     ]);
+  }
+
+  applyNextRecurrence(
+    task: TaskDocument,
+    workflow?: StatusWorkflow,
+  ): TaskDocument {
+    if (!task.isRecurring || !task.recurrence || !this.recurrenceService) {
+      return task;
+    }
+    return this.recurrenceService.applyNextRecurrenceToTask(task, workflow);
+  }
+
+  async advanceRecurrence(
+    task: TaskDocument,
+    workflow?: StatusWorkflow,
+  ): Promise<TaskDocument> {
+    if (!task.isRecurring || !task.recurrence || !this.recurrenceService) {
+      return task;
+    }
+    this.applyNextRecurrence(task, workflow);
+    return await task.save();
   }
 
   async remove(

@@ -242,6 +242,103 @@
         </div>
       </div>
 
+      <!-- Recurrence Section -->
+      <div class="bg-slate-800/40 border border-slate-800 rounded-xl p-4 space-y-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="text-base">🔁</span>
+            <span class="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+              Recurrence
+            </span>
+            <span
+              v-if="activeTask.isRecurring"
+              class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
+            >
+              Active
+            </span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button
+              v-if="activeTask.isRecurring && !isEditingRecurrence"
+              type="button"
+              class="text-xs font-medium px-2.5 py-1 rounded-lg text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 transition cursor-pointer"
+              @click="openRecurrenceEditor"
+            >
+              Edit schedule
+            </button>
+            <button
+              v-if="activeTask.isRecurring"
+              type="button"
+              class="text-xs font-medium px-2.5 py-1 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition cursor-pointer"
+              @click="disableRecurrence"
+            >
+              Disable recurrence
+            </button>
+            <button
+              v-else-if="!isEditingRecurrence"
+              type="button"
+              class="text-xs font-medium px-2.5 py-1 rounded-lg text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 transition cursor-pointer"
+              @click="openRecurrenceEditor"
+            >
+              + Enable recurrence
+            </button>
+          </div>
+        </div>
+
+        <!-- Recurrence View Mode -->
+        <div
+          v-if="activeTask.isRecurring && activeTask.recurrence && !isEditingRecurrence"
+          class="text-xs text-slate-300 flex items-center justify-between bg-slate-900/60 p-2.5 rounded-lg border border-slate-700/50"
+        >
+          <span class="font-medium text-slate-200">
+            {{ formatRecurrenceLabel(activeTask.recurrence) }}
+          </span>
+        </div>
+
+        <!-- Recurrence Edit Mode -->
+        <div
+          v-else-if="isEditingRecurrence"
+          class="p-3 bg-slate-900/80 rounded-xl border border-slate-700/70 space-y-3 text-xs"
+        >
+          <RecurrenceConfigForm
+            v-model="editableRecurrence"
+            :min-end-date="formatDateForInput(activeTask.dueDate || activeTask.startDate)"
+          />
+
+          <div class="flex items-center justify-end gap-2 pt-1 border-t border-slate-800">
+            <button
+              type="button"
+              class="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              @click="cancelRecurrenceEdit"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition shadow-xs cursor-pointer"
+              @click="saveRecurrenceEdit"
+            >
+              Save schedule
+            </button>
+          </div>
+        </div>
+
+        <div
+          v-else-if="!activeTask.isRecurring"
+          class="text-xs text-slate-400 flex items-center justify-between bg-slate-900/30 p-2.5 rounded-lg border border-slate-800/80"
+        >
+          <span class="italic text-slate-500">This task does not repeat.</span>
+          <button
+            type="button"
+            class="text-xs font-medium text-indigo-400 hover:text-indigo-300 hover:underline cursor-pointer"
+            @click="openRecurrenceEditor"
+          >
+            + Set up repeat schedule
+          </button>
+        </div>
+      </div>
+
       <!-- Custom Fields Section -->
       <div
         v-if="effectiveCustomFields.length > 0"
@@ -324,7 +421,13 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue';
-import type { Task, TaskPriority, TaskStatus, UpdateTaskPayload } from '../../types/task';
+import type {
+  Task,
+  TaskPriority,
+  TaskStatus,
+  UpdateTaskPayload,
+  RecurrenceSettings,
+} from '../../types/task';
 import { type StatusWorkflow, STATUS_CATEGORY_RANK } from '../../types/hierarchy';
 import type { EffectiveCustomField } from '../../types/custom-field';
 import { useApi } from '../../composables/useApi';
@@ -341,6 +444,13 @@ import SubtaskList from './SubtaskList.vue';
 import CustomFieldInput from '../custom-fields/CustomFieldInput.vue';
 import MarkdownViewer from '../ui/MarkdownViewer.vue';
 import MarkdownEditor from '../ui/MarkdownEditor.vue';
+import RecurrenceConfigForm from './RecurrenceConfigForm.vue';
+import {
+  formatRecurrenceLabel,
+  getDefaultRecurrenceSettings,
+  validateRecurrenceSettings,
+  buildRecurrencePayload,
+} from '../../utils/recurrence';
 
 interface Props {
   initialTask: Task;
@@ -588,11 +698,12 @@ async function navigateToParent() {
 }
 
 async function updateField(payload: UpdateTaskPayload): Promise<boolean> {
+  const taskId = activeTask.value._id;
   try {
     let updated: Task;
     if (props.listId) {
       updated = await apiFetch<Task>(
-        `/lists/${props.listId}/tasks/${activeTask.value._id}`,
+        `/lists/${props.listId}/tasks/${taskId}`,
         {
           method: 'PATCH',
           body: payload,
@@ -601,20 +712,108 @@ async function updateField(payload: UpdateTaskPayload): Promise<boolean> {
     } else if (props.projectId) {
       updated = await tasksStore.updateTask(
         props.projectId,
-        activeTask.value._id,
+        taskId,
         payload,
       );
     } else {
       return false;
     }
-    activeTask.value = updated;
-    syncInputs(updated);
-    emit('updated', updated);
+
+    const mergedTask: Task = {
+      ...(activeTask.value._id === taskId ? activeTask.value : updated),
+      ...updated,
+      isRecurring:
+        updated.isRecurring !== undefined
+          ? updated.isRecurring
+          : payload.isRecurring !== undefined
+            ? payload.isRecurring
+            : activeTask.value.isRecurring,
+      recurrence:
+        updated.recurrence !== undefined
+          ? updated.recurrence
+          : payload.recurrence !== undefined
+            ? payload.recurrence
+              ? { ...(activeTask.value.recurrence || {}), ...payload.recurrence }
+              : undefined
+            : activeTask.value.recurrence,
+    };
+
+    if (activeTask.value._id === taskId) {
+      activeTask.value = mergedTask;
+      syncInputs(activeTask.value);
+    }
+    emit('updated', mergedTask);
     showToast('Task updated', 'success');
     return true;
   } catch (err: unknown) {
     showToast(extractApiErrorMessage(err, 'Failed to update task'), 'error');
     return false;
+  }
+}
+
+const isEditingRecurrence = ref(false);
+const editableRecurrence = ref<RecurrenceSettings>(getDefaultRecurrenceSettings());
+
+watch(
+  () => activeTask.value._id,
+  () => {
+    isEditingRecurrence.value = false;
+    editableRecurrence.value = getDefaultRecurrenceSettings();
+  },
+);
+
+function openRecurrenceEditor() {
+  const source = activeTask.value.recurrence || getDefaultRecurrenceSettings();
+  editableRecurrence.value = {
+    ...source,
+    daysOfWeek: [...(source.daysOfWeek || [])],
+  };
+  isEditingRecurrence.value = true;
+}
+
+function cancelRecurrenceEdit() {
+  isEditingRecurrence.value = false;
+}
+
+async function disableRecurrence() {
+  const previousIsRecurring = activeTask.value.isRecurring;
+  const previousRecurrence = activeTask.value.recurrence;
+  isEditingRecurrence.value = false;
+  activeTask.value.isRecurring = false;
+  const success = await updateField({ isRecurring: false });
+  if (!success) {
+    activeTask.value.isRecurring = previousIsRecurring;
+    activeTask.value.recurrence = previousRecurrence;
+  }
+}
+
+async function saveRecurrenceEdit() {
+  const recurrenceErr = validateRecurrenceSettings(editableRecurrence.value);
+  if (recurrenceErr) {
+    showToast(recurrenceErr, 'error');
+    return;
+  }
+
+  const payloadRecurrence = buildRecurrencePayload(
+    editableRecurrence.value,
+    activeTask.value.recurrence?.currentOccurrence || 1,
+  );
+
+  const previousIsRecurring = activeTask.value.isRecurring;
+  const previousRecurrence = activeTask.value.recurrence;
+
+  // Optimistically set recurrence so UI updates immediately
+  activeTask.value.isRecurring = true;
+  activeTask.value.recurrence = payloadRecurrence;
+  isEditingRecurrence.value = false;
+
+  const success = await updateField({
+    isRecurring: true,
+    recurrence: payloadRecurrence,
+  });
+  if (!success) {
+    activeTask.value.isRecurring = previousIsRecurring;
+    activeTask.value.recurrence = previousRecurrence;
   }
 }
 

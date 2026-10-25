@@ -29,6 +29,14 @@
         >
           {{ task.taskKey }}
         </span>
+
+        <span
+          v-if="task.isRecurring"
+          class="text-xs px-1 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 flex items-center shrink-0"
+          title="Recurring task"
+        >
+          🔁
+        </span>
       </div>
 
       <span

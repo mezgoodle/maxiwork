@@ -3,6 +3,10 @@ import { HydratedDocument, Schema as MongooseSchema, Types } from 'mongoose';
 import { Project } from '../../projects/schemas/project.schema';
 import { User } from '../../users/schemas/user.schema';
 import { TaskPriority } from '../enums/task-priority.enum';
+import {
+  RecurrenceSettings,
+  RecurrenceSettingsSchema,
+} from './recurrence.schema';
 
 export type TaskDocument = HydratedDocument<Task>;
 
@@ -99,6 +103,12 @@ export class Task {
   })
   customFieldValues?: Record<string, unknown>;
 
+  @Prop({ type: Boolean, default: false, index: true })
+  isRecurring: boolean;
+
+  @Prop({ type: RecurrenceSettingsSchema, default: null })
+  recurrence?: RecurrenceSettings;
+
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -113,6 +123,7 @@ TaskSchema.index({ project: 1, parentTaskId: 1 });
 TaskSchema.index({ list: 1, status: 1 });
 TaskSchema.index({ list: 1, parentTaskId: 1 });
 TaskSchema.index({ parentTaskId: 1, order: 1 });
+TaskSchema.index({ isRecurring: 1, status: 1, dueDate: 1 });
 
 export function extractPlainCustomFieldValues(
   values?: unknown,

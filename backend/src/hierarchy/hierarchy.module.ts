@@ -9,6 +9,7 @@ import { Project, ProjectSchema } from '../projects/schemas/project.schema';
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { HierarchyService } from './hierarchy.service';
 import { HierarchyController } from './hierarchy.controller';
+import { RecurrenceService } from '../tasks/services/recurrence.service';
 
 @Module({
   imports: [
@@ -23,7 +24,7 @@ import { HierarchyController } from './hierarchy.controller';
     ]),
   ],
   controllers: [HierarchyController],
-  providers: [HierarchyService],
+  providers: [HierarchyService, RecurrenceService],
   exports: [HierarchyService, MongooseModule],
 })
 export class HierarchyModule {}

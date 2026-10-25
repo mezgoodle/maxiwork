@@ -15,6 +15,7 @@ import { Project } from '../projects/schemas/project.schema';
 import { User } from '../users/schemas/user.schema';
 import { WorkspaceRole } from './enums/workspace-role.enum';
 import { StatusCategory } from './enums/status-category.enum';
+import { RecurrenceService } from '../tasks/services/recurrence.service';
 
 interface MockModel {
   findOne: jest.Mock;
@@ -200,6 +201,7 @@ describe('HierarchyService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         HierarchyService,
+        RecurrenceService,
         {
           provide: getModelToken(Workspace.name),
           useValue: mockWorkspaceModel,
@@ -980,6 +982,211 @@ describe('HierarchyService', () => {
 
         expect(result).toBeDefined();
         expect(result.status).toBe('done');
+      });
+    });
+
+    describe('Recurring List Tasks', () => {
+      beforeEach(() => {
+        const mockWs = {
+          _id: mockWorkspaceId,
+          owner: mockUserId,
+          members: [{ user: mockUserId, role: WorkspaceRole.OWNER }],
+        };
+        const mockSpace = {
+          _id: mockSpaceId,
+          workspaceId: mockWorkspaceId,
+          name: 'General',
+          isPrivate: false,
+        };
+        const mockList = {
+          _id: mockListId,
+          spaceId: mockSpaceId,
+          name: 'Tasks',
+        };
+
+        mockListModel.findById.mockReturnValue({
+          exec: jest.fn().mockResolvedValue(mockList),
+        });
+        mockSpaceModel.findById.mockReturnValue({
+          exec: jest.fn().mockResolvedValue(mockSpace),
+        });
+        mockWorkspaceModel.findById.mockReturnValue({
+          exec: jest.fn().mockResolvedValue(mockWs),
+        });
+      });
+
+      it('should persist isRecurring and recurrence settings when creating a list task', async () => {
+        const mockCreated = {
+          _id: 'task_rec_1',
+          title: 'Daily Standup',
+          taskKey: 'GENE-1',
+          isRecurring: true,
+          recurrence: {
+            frequency: 'daily',
+            interval: 1,
+            daysOfWeek: [],
+            endType: 'never',
+            currentOccurrence: 1,
+          },
+          save: jest.fn().mockResolvedValue({
+            _id: 'task_rec_1',
+            title: 'Daily Standup',
+            isRecurring: true,
+          }),
+        };
+
+        (mockTaskModel as unknown as jest.Mock).mockImplementation(
+          () => mockCreated,
+        );
+        mockTaskModel.countDocuments.mockReturnValue({
+          exec: jest.fn().mockResolvedValue(0),
+        });
+        mockTaskModel.findById.mockReturnValue({
+          populate: jest.fn().mockReturnValue({
+            populate: jest.fn().mockReturnValue({
+              exec: jest.fn().mockResolvedValue(mockCreated),
+            }),
+          }),
+        });
+
+        const result = await service.createListTask(
+          mockListId,
+          {
+            title: 'Daily Standup',
+            isRecurring: true,
+            recurrence: {
+              frequency: 'daily',
+              interval: 1,
+              daysOfWeek: [],
+              endType: 'never',
+              currentOccurrence: 1,
+            },
+          },
+          mockUserId,
+        );
+
+        expect(result).toBeDefined();
+        expect(mockTaskModel).toHaveBeenCalledWith(
+          expect.objectContaining({
+            isRecurring: true,
+            recurrence: expect.objectContaining({
+              frequency: 'daily',
+              interval: 1,
+              endType: 'never',
+            }),
+          }),
+        );
+      });
+
+      it('should update isRecurring and recurrence settings in updateListTask', async () => {
+        const mockTaskId = '507f1f77bcf86cd799439092';
+        const saveSpy = jest.fn().mockResolvedValue(true);
+        const mockExistingTask = {
+          _id: mockTaskId,
+          title: 'Existing Task',
+          list: mockListId,
+          status: 'todo',
+          isRecurring: false,
+          recurrence: undefined,
+          save: saveSpy,
+        };
+
+        mockTaskModel.findOne.mockReturnValue({
+          exec: jest.fn().mockResolvedValue(mockExistingTask),
+        });
+
+        const mockUpdatedTask = {
+          ...mockExistingTask,
+          isRecurring: true,
+          recurrence: {
+            frequency: 'weekly',
+            interval: 2,
+            daysOfWeek: [1, 3],
+            endType: 'never',
+            currentOccurrence: 1,
+          },
+        };
+
+        mockTaskModel.findById.mockReturnValue({
+          populate: jest.fn().mockReturnValue({
+            populate: jest.fn().mockReturnValue({
+              populate: jest.fn().mockReturnValue({
+                exec: jest.fn().mockResolvedValue(mockUpdatedTask),
+              }),
+            }),
+          }),
+        });
+
+        const result = await service.updateListTask(
+          mockListId,
+          mockTaskId,
+          {
+            isRecurring: true,
+            recurrence: {
+              frequency: 'weekly',
+              interval: 2,
+              daysOfWeek: [1, 3],
+              endType: 'never',
+              currentOccurrence: 1,
+            },
+          },
+          mockUserId,
+        );
+
+        expect(result).toBeDefined();
+        expect(mockExistingTask.isRecurring).toBe(true);
+        expect(mockExistingTask.recurrence).toBeDefined();
+        expect(saveSpy).toHaveBeenCalled();
+      });
+
+      it('should advance recurrence when list task status transitions to done', async () => {
+        const mockTaskId = '507f1f77bcf86cd799439093';
+        const originalDueDate = new Date('2026-10-20T10:00:00.000Z');
+        const saveSpy = jest.fn().mockResolvedValue(true);
+        const mockExistingTask = {
+          _id: mockTaskId,
+          title: 'Weekly Report',
+          list: mockListId,
+          status: 'todo',
+          dueDate: originalDueDate,
+          isRecurring: true,
+          recurrence: {
+            frequency: 'daily',
+            interval: 1,
+            daysOfWeek: [],
+            endType: 'never',
+            currentOccurrence: 1,
+          },
+          save: saveSpy,
+        };
+
+        mockTaskModel.findOne.mockReturnValue({
+          exec: jest.fn().mockResolvedValue(mockExistingTask),
+        });
+
+        mockTaskModel.findById.mockReturnValue({
+          populate: jest.fn().mockReturnValue({
+            populate: jest.fn().mockReturnValue({
+              populate: jest.fn().mockReturnValue({
+                exec: jest.fn().mockResolvedValue(mockExistingTask),
+              }),
+            }),
+          }),
+        });
+
+        await service.updateListTask(
+          mockListId,
+          mockTaskId,
+          { status: 'done' },
+          mockUserId,
+        );
+
+        // Status should be reset to todo and dueDate advanced by 1 day
+        expect(mockExistingTask.status).toBe('todo');
+        expect(mockExistingTask.recurrence.currentOccurrence).toBe(2);
+        expect(mockExistingTask.dueDate.getTime()).toBe(
+          new Date('2026-10-21T10:00:00.000Z').getTime(),
+        );
       });
     });
   });
