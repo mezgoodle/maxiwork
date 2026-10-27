@@ -1,10 +1,25 @@
 import { Injectable } from '@nestjs/common';
 
+export interface McpToolPropertySchema {
+  type?: 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array';
+  description?: string;
+  enum?: unknown[];
+  [key: string]: unknown;
+}
+
 export interface McpToolInputSchema {
   type: 'object';
-  properties: Record<string, unknown>;
+  properties: Record<string, McpToolPropertySchema>;
   required?: string[];
   [key: string]: unknown;
+}
+
+export interface McpToolAnnotations {
+  title?: string;
+  readOnlyHint?: boolean;
+  destructiveHint?: boolean;
+  idempotentHint?: boolean;
+  openWorldHint?: boolean;
 }
 
 export interface McpToolContentBlock {
@@ -28,6 +43,7 @@ export interface McpToolDefinition {
   name: string;
   description: string;
   inputSchema: McpToolInputSchema;
+  annotations?: McpToolAnnotations;
   handler: McpToolHandler;
 }
 
@@ -51,12 +67,54 @@ export class McpToolsRegistryService {
     name: string;
     description: string;
     inputSchema: McpToolInputSchema;
+    annotations?: McpToolAnnotations;
   }> {
     return Array.from(this.tools.values()).map((tool) => ({
       name: tool.name,
       description: tool.description,
       inputSchema: tool.inputSchema,
+      ...(tool.annotations ? { annotations: tool.annotations } : {}),
     }));
+  }
+
+  private validatePropertyType(
+    field: string,
+    value: unknown,
+    propSchema: McpToolPropertySchema,
+  ): string | null {
+    if (value === undefined || value === null) return null;
+    const expectedType = propSchema.type;
+    if (!expectedType) return null;
+
+    if (expectedType === 'string' && typeof value !== 'string') {
+      return `Parameter '${field}' must be of type string`;
+    }
+    if (
+      (expectedType === 'number' || expectedType === 'integer') &&
+      (typeof value !== 'number' || Number.isNaN(value))
+    ) {
+      return `Parameter '${field}' must be of type ${expectedType}`;
+    }
+    if (expectedType === 'boolean' && typeof value !== 'boolean') {
+      return `Parameter '${field}' must be of type boolean`;
+    }
+    if (expectedType === 'array' && !Array.isArray(value)) {
+      return `Parameter '${field}' must be of type array`;
+    }
+    if (
+      expectedType === 'object' &&
+      (typeof value !== 'object' || Array.isArray(value))
+    ) {
+      return `Parameter '${field}' must be of type object`;
+    }
+    if (
+      Array.isArray(propSchema.enum) &&
+      propSchema.enum.length > 0 &&
+      !propSchema.enum.includes(value)
+    ) {
+      return `Parameter '${field}' must be one of: ${propSchema.enum.join(', ')}`;
+    }
+    return null;
   }
 
   async executeTool(
@@ -97,6 +155,34 @@ export class McpToolsRegistryService {
               },
             ],
           };
+        }
+      }
+    }
+
+    if (
+      tool.inputSchema.properties &&
+      typeof tool.inputSchema.properties === 'object'
+    ) {
+      for (const [field, propDef] of Object.entries(
+        tool.inputSchema.properties,
+      )) {
+        if (field in safeArgs && propDef && typeof propDef === 'object') {
+          const typeError = this.validatePropertyType(
+            field,
+            safeArgs[field],
+            propDef,
+          );
+          if (typeError) {
+            return {
+              isError: true,
+              content: [
+                {
+                  type: 'text',
+                  text: `Validation Error in '${name}': ${typeError}.`,
+                },
+              ],
+            };
+          }
         }
       }
     }

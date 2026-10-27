@@ -166,7 +166,7 @@ describe('ApiKeysService', () => {
   describe('validateRawKey', () => {
     const rawKey = `${API_KEY_PREFIX}${'a'.repeat(32)}`;
 
-    it('validates a valid active key and updates lastUsedAt', async () => {
+    it('validates a valid active key and updates lastUsedAt when missing or older than 60s', async () => {
       const expectedHash = service.hashKey(rawKey);
       mockFindOne.mockReturnValue({
         exec: jest.fn().mockResolvedValue({
@@ -175,6 +175,7 @@ describe('ApiKeysService', () => {
           keyHash: expectedHash,
           revoked: false,
           expiresAt: null,
+          lastUsedAt: null,
         }),
       });
       mockUpdateOne.mockReturnValue({
@@ -185,6 +186,24 @@ describe('ApiKeysService', () => {
       expect(principal).toEqual({ userId, apiKeyId: keyId });
       expect(mockFindOne).toHaveBeenCalledWith({ keyHash: expectedHash });
       expect(mockUpdateOne).toHaveBeenCalled();
+    });
+
+    it('throttles lastUsedAt DB writes when lastUsedAt was updated within 60 seconds', async () => {
+      const expectedHash = service.hashKey(rawKey);
+      mockFindOne.mockReturnValue({
+        exec: jest.fn().mockResolvedValue({
+          _id: new Types.ObjectId(keyId),
+          userId: new Types.ObjectId(userId),
+          keyHash: expectedHash,
+          revoked: false,
+          expiresAt: null,
+          lastUsedAt: new Date(Date.now() - 10_000),
+        }),
+      });
+
+      const principal = await service.validateRawKey(rawKey);
+      expect(principal).toEqual({ userId, apiKeyId: keyId });
+      expect(mockUpdateOne).not.toHaveBeenCalled();
     });
 
     it('throws UnauthorizedException for invalid prefix', async () => {

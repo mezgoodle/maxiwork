@@ -1,4 +1,5 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -11,12 +12,16 @@ import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import { McpToolsRegistryService } from './mcp-tools-registry.service';
 
+export const MAX_MCP_SESSIONS_PER_USER = 10;
+export const MCP_SESSION_IDLE_TTL_MS = 30 * 60 * 1000;
+
 export interface ActiveSseSession {
   sessionId: string;
   userId: string;
   transport: SSEServerTransport;
   server: Server;
   createdAt: Date;
+  lastActiveAt: Date;
 }
 
 export interface ActiveStreamableSession {
@@ -25,6 +30,7 @@ export interface ActiveStreamableSession {
   transport: StreamableHTTPServerTransport;
   server: Server;
   createdAt: Date;
+  lastActiveAt: Date;
 }
 
 @Injectable()
@@ -47,6 +53,56 @@ export class McpService implements OnModuleDestroy {
       await session.transport.close().catch(() => undefined);
     }
     this.streamableSessions.clear();
+  }
+
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  async cleanupExpiredSessions(
+    maxIdleMs: number = MCP_SESSION_IDLE_TTL_MS,
+  ): Promise<number> {
+    const now = Date.now();
+    let evicted = 0;
+
+    for (const [id, session] of this.sseSessions.entries()) {
+      if (now - session.lastActiveAt.getTime() > maxIdleMs) {
+        this.sseSessions.delete(id);
+        await session.transport.close().catch(() => undefined);
+        evicted++;
+      }
+    }
+
+    for (const [id, session] of this.streamableSessions.entries()) {
+      if (now - session.lastActiveAt.getTime() > maxIdleMs) {
+        this.streamableSessions.delete(id);
+        await session.transport.close().catch(() => undefined);
+        evicted++;
+      }
+    }
+
+    return evicted;
+  }
+
+  private async enforceUserSessionLimit<
+    T extends {
+      sessionId: string;
+      userId: string;
+      lastActiveAt: Date;
+      transport: { close: () => Promise<void> };
+    },
+  >(
+    sessionsMap: Map<string, T>,
+    userId: string,
+    maxPerUser: number = MAX_MCP_SESSIONS_PER_USER,
+  ): Promise<void> {
+    const userSessions = Array.from(sessionsMap.values())
+      .filter((s) => s.userId === userId)
+      .sort((a, b) => a.lastActiveAt.getTime() - b.lastActiveAt.getTime());
+
+    while (userSessions.length >= maxPerUser) {
+      const oldest = userSessions.shift();
+      if (!oldest) break;
+      sessionsMap.delete(oldest.sessionId);
+      await oldest.transport.close().catch(() => undefined);
+    }
   }
 
   createMcpServerForUser(userId: string): Server {
@@ -123,6 +179,7 @@ export class McpService implements OnModuleDestroy {
         return;
       }
 
+      streamableSession.lastActiveAt = new Date();
       if (!req.headers.accept?.includes('text/event-stream')) {
         req.headers.accept = 'text/event-stream';
       }
@@ -131,16 +188,20 @@ export class McpService implements OnModuleDestroy {
     }
 
     // Legacy HTTP+SSE handshake: GET /api/mcp -> sends `event: endpoint` with `/api/mcp?sessionId=<id>`
+    await this.enforceUserSessionLimit(this.sseSessions, userId);
+
     const transport = new SSEServerTransport('/api/mcp', res);
     const server = this.createMcpServerForUser(userId);
     const sseSessionId = transport.sessionId;
+    const now = new Date();
 
     this.sseSessions.set(sseSessionId, {
       sessionId: sseSessionId,
       userId,
       transport,
       server,
-      createdAt: new Date(),
+      createdAt: now,
+      lastActiveAt: now,
     });
 
     transport.onclose = () => {
@@ -180,6 +241,7 @@ export class McpService implements OnModuleDestroy {
         });
         return;
       }
+      sseSession.lastActiveAt = new Date();
       await sseSession.transport.handlePostMessage(req, res, body);
       return;
     }
@@ -217,22 +279,27 @@ export class McpService implements OnModuleDestroy {
         });
         return;
       }
+      existing.lastActiveAt = new Date();
       await existing.transport.handleRequest(req, res, body);
       return;
     }
 
     if (this.isInitMessage(body)) {
+      await this.enforceUserSessionLimit(this.streamableSessions, userId);
+
       const server = this.createMcpServerForUser(userId);
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),
         enableJsonResponse: true,
         onsessioninitialized: (sid: string) => {
+          const now = new Date();
           this.streamableSessions.set(sid, {
             sessionId: sid,
             userId,
             transport,
             server,
-            createdAt: new Date(),
+            createdAt: now,
+            lastActiveAt: now,
           });
         },
         onsessionclosed: (sid: string) => {

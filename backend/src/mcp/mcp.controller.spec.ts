@@ -5,6 +5,13 @@ import { ApiKeyAuthGuard } from '../api-keys/guards/api-key-auth.guard';
 import { McpController } from './mcp.controller';
 import { McpService } from './mcp.service';
 
+jest.mock('@nestjs/schedule', () => ({
+  Cron: () => () => undefined,
+  CronExpression: {
+    EVERY_5_MINUTES: '0 */5 * * * *',
+  },
+}));
+
 describe('McpController', () => {
   let controller: McpController;
   const mockMcpService = {

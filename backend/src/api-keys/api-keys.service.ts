@@ -11,6 +11,7 @@ import { CreateApiKeyDto } from './dto/create-api-key.dto';
 import { ApiKey, ApiKeyDocument } from './schemas/api-key.schema';
 
 export const API_KEY_PREFIX = 'mxw_live_';
+export const LAST_USED_THROTTLE_MS = 60_000;
 
 export interface SanitizedApiKey {
   id: string;
@@ -155,10 +156,15 @@ export class ApiKeysService {
     }
 
     const now = new Date();
-    keyDoc.lastUsedAt = now;
-    await this.apiKeyModel
-      .updateOne({ _id: keyDoc._id }, { $set: { lastUsedAt: now } })
-      .exec();
+    if (
+      !keyDoc.lastUsedAt ||
+      now.getTime() - new Date(keyDoc.lastUsedAt).getTime() >
+        LAST_USED_THROTTLE_MS
+    ) {
+      await this.apiKeyModel
+        .updateOne({ _id: keyDoc._id }, { $set: { lastUsedAt: now } })
+        .exec();
+    }
 
     return {
       userId: String(keyDoc.userId),

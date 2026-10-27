@@ -5,6 +5,13 @@ import type { Request, Response } from 'express';
 import { McpToolsRegistryService } from './mcp-tools-registry.service';
 import { McpService } from './mcp.service';
 
+jest.mock('@nestjs/schedule', () => ({
+  Cron: () => () => undefined,
+  CronExpression: {
+    EVERY_5_MINUTES: '0 */5 * * * *',
+  },
+}));
+
 describe('McpToolsRegistryService & McpService', () => {
   let registry: McpToolsRegistryService;
   let mcpService: McpService;
@@ -23,14 +30,18 @@ describe('McpToolsRegistryService & McpService', () => {
   });
 
   describe('McpToolsRegistryService', () => {
-    it('registers, lists, validates required fields, and executes tools with user context', async () => {
+    it('registers, lists with annotations, validates required fields and property types, and executes tools', async () => {
       registry.registerTool({
         name: 'echo_task',
         description: 'Echoes a task title for the user',
+        annotations: {
+          readOnlyHint: true,
+        },
         inputSchema: {
           type: 'object',
           properties: {
             title: { type: 'string' },
+            limit: { type: 'number' },
           },
           required: ['title'],
         },
@@ -50,10 +61,14 @@ describe('McpToolsRegistryService & McpService', () => {
         {
           name: 'echo_task',
           description: 'Echoes a task title for the user',
+          annotations: {
+            readOnlyHint: true,
+          },
           inputSchema: {
             type: 'object',
             properties: {
               title: { type: 'string' },
+              limit: { type: 'number' },
             },
             required: ['title'],
           },
@@ -66,9 +81,19 @@ describe('McpToolsRegistryService & McpService', () => {
         "Missing required parameter 'title'",
       );
 
+      const badTypeRes = await registry.executeTool(
+        'echo_task',
+        { title: 'Valid', limit: 'not-a-number' },
+        'u-1',
+      );
+      expect(badTypeRes.isError).toBe(true);
+      expect(badTypeRes.content[0].text).toContain(
+        "Parameter 'limit' must be of type number",
+      );
+
       const okRes = await registry.executeTool(
         'echo_task',
-        { title: 'Ship MCP' },
+        { title: 'Ship MCP', limit: 5 },
         'u-1',
       );
       expect(okRes.isError).toBeUndefined();
@@ -181,6 +206,29 @@ describe('McpToolsRegistryService & McpService', () => {
         res,
       );
       expect(statusMock).toHaveBeenCalledWith(404);
+    });
+
+    it('expires idle sessions via cleanupExpiredSessions', async () => {
+      const closeSpy = jest.fn().mockResolvedValue(undefined);
+      const internalStreamable = (
+        mcpService as unknown as {
+          streamableSessions: Map<string, Record<string, unknown>>;
+        }
+      ).streamableSessions;
+
+      internalStreamable.set('idle-1', {
+        sessionId: 'idle-1',
+        userId: 'u-1',
+        transport: { close: closeSpy },
+        server: {},
+        createdAt: new Date(Date.now() - 60_000),
+        lastActiveAt: new Date(Date.now() - 60_000),
+      });
+
+      const evicted = await mcpService.cleanupExpiredSessions(10_000);
+      expect(evicted).toBe(1);
+      expect(closeSpy).toHaveBeenCalled();
+      expect(mcpService.getActiveSessionCount().streamable).toBe(0);
     });
   });
 });
