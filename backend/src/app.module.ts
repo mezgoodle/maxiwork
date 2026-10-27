@@ -10,6 +10,8 @@ import { ProjectsModule } from './projects/projects.module';
 import { TasksModule } from './tasks/tasks.module';
 import { HierarchyModule } from './hierarchy/hierarchy.module';
 import { CustomFieldsModule } from './custom-fields/custom-fields.module';
+import { ApiKeysModule } from './api-keys/api-keys.module';
+import { McpModule } from './mcp/mcp.module';
 
 @Module({
   imports: [
@@ -31,6 +33,8 @@ import { CustomFieldsModule } from './custom-fields/custom-fields.module';
     TasksModule,
     HierarchyModule,
     CustomFieldsModule,
+    ApiKeysModule,
+    McpModule,
   ],
   controllers: [AppController],
   providers: [AppService],
