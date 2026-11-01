@@ -82,18 +82,28 @@ export class McpToolsRegistryService {
     value: unknown,
     propSchema: McpToolPropertySchema,
   ): string | null {
-    if (value === undefined || value === null) return null;
+    if (value === undefined) return null;
     const expectedType = propSchema.type;
     if (!expectedType) return null;
+
+    if (value === null) {
+      return `Parameter '${field}' must be of type ${expectedType}`;
+    }
 
     if (expectedType === 'string' && typeof value !== 'string') {
       return `Parameter '${field}' must be of type string`;
     }
     if (
-      (expectedType === 'number' || expectedType === 'integer') &&
+      expectedType === 'number' &&
       (typeof value !== 'number' || Number.isNaN(value))
     ) {
-      return `Parameter '${field}' must be of type ${expectedType}`;
+      return `Parameter '${field}' must be of type number`;
+    }
+    if (
+      expectedType === 'integer' &&
+      (typeof value !== 'number' || !Number.isInteger(value))
+    ) {
+      return `Parameter '${field}' must be of type integer`;
     }
     if (expectedType === 'boolean' && typeof value !== 'boolean') {
       return `Parameter '${field}' must be of type boolean`;

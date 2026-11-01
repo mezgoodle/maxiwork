@@ -81,6 +81,32 @@ export class McpService implements OnModuleDestroy {
     return evicted;
   }
 
+  private evictExcessUserSessions<
+    T extends {
+      sessionId: string;
+      userId: string;
+      lastActiveAt: Date;
+      transport: { close: () => Promise<void> };
+    },
+  >(
+    sessionsMap: Map<string, T>,
+    userId: string,
+    maxPerUser: number = MAX_MCP_SESSIONS_PER_USER,
+  ): Promise<void>[] {
+    const closePromises: Promise<void>[] = [];
+    const userSessions = Array.from(sessionsMap.values())
+      .filter((s) => s.userId === userId)
+      .sort((a, b) => a.lastActiveAt.getTime() - b.lastActiveAt.getTime());
+
+    while (userSessions.length >= maxPerUser) {
+      const oldest = userSessions.shift();
+      if (!oldest) break;
+      sessionsMap.delete(oldest.sessionId);
+      closePromises.push(oldest.transport.close().catch(() => undefined));
+    }
+    return closePromises;
+  }
+
   private async enforceUserSessionLimit<
     T extends {
       sessionId: string;
@@ -93,16 +119,12 @@ export class McpService implements OnModuleDestroy {
     userId: string,
     maxPerUser: number = MAX_MCP_SESSIONS_PER_USER,
   ): Promise<void> {
-    const userSessions = Array.from(sessionsMap.values())
-      .filter((s) => s.userId === userId)
-      .sort((a, b) => a.lastActiveAt.getTime() - b.lastActiveAt.getTime());
-
-    while (userSessions.length >= maxPerUser) {
-      const oldest = userSessions.shift();
-      if (!oldest) break;
-      sessionsMap.delete(oldest.sessionId);
-      await oldest.transport.close().catch(() => undefined);
-    }
+    const closePromises = this.evictExcessUserSessions(
+      sessionsMap,
+      userId,
+      maxPerUser,
+    );
+    await Promise.all(closePromises);
   }
 
   createMcpServerForUser(userId: string): Server {
@@ -188,13 +210,15 @@ export class McpService implements OnModuleDestroy {
     }
 
     // Legacy HTTP+SSE handshake: GET /api/mcp -> sends `event: endpoint` with `/api/mcp?sessionId=<id>`
-    await this.enforceUserSessionLimit(this.sseSessions, userId);
-
     const transport = new SSEServerTransport('/api/mcp', res);
     const server = this.createMcpServerForUser(userId);
     const sseSessionId = transport.sessionId;
     const now = new Date();
 
+    const closePromises = this.evictExcessUserSessions(
+      this.sseSessions,
+      userId,
+    );
     this.sseSessions.set(sseSessionId, {
       sessionId: sseSessionId,
       userId,
@@ -203,6 +227,7 @@ export class McpService implements OnModuleDestroy {
       createdAt: now,
       lastActiveAt: now,
     });
+    await Promise.all(closePromises);
 
     transport.onclose = () => {
       this.sseSessions.delete(sseSessionId);
@@ -293,6 +318,9 @@ export class McpService implements OnModuleDestroy {
         enableJsonResponse: true,
         onsessioninitialized: (sid: string) => {
           const now = new Date();
+          void Promise.all(
+            this.evictExcessUserSessions(this.streamableSessions, userId),
+          );
           this.streamableSessions.set(sid, {
             sessionId: sid,
             userId,

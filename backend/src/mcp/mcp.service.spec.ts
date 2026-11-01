@@ -41,7 +41,7 @@ describe('McpToolsRegistryService & McpService', () => {
           type: 'object',
           properties: {
             title: { type: 'string' },
-            limit: { type: 'number' },
+            limit: { type: 'integer' },
           },
           required: ['title'],
         },
@@ -68,7 +68,7 @@ describe('McpToolsRegistryService & McpService', () => {
             type: 'object',
             properties: {
               title: { type: 'string' },
-              limit: { type: 'number' },
+              limit: { type: 'integer' },
             },
             required: ['title'],
           },
@@ -88,7 +88,27 @@ describe('McpToolsRegistryService & McpService', () => {
       );
       expect(badTypeRes.isError).toBe(true);
       expect(badTypeRes.content[0].text).toContain(
-        "Parameter 'limit' must be of type number",
+        "Parameter 'limit' must be of type integer",
+      );
+
+      const floatTypeRes = await registry.executeTool(
+        'echo_task',
+        { title: 'Valid', limit: 3.5 },
+        'u-1',
+      );
+      expect(floatTypeRes.isError).toBe(true);
+      expect(floatTypeRes.content[0].text).toContain(
+        "Parameter 'limit' must be of type integer",
+      );
+
+      const nullTypeRes = await registry.executeTool(
+        'echo_task',
+        { title: 'Valid', limit: null },
+        'u-1',
+      );
+      expect(nullTypeRes.isError).toBe(true);
+      expect(nullTypeRes.content[0].text).toContain(
+        "Parameter 'limit' must be of type integer",
       );
 
       const okRes = await registry.executeTool(
