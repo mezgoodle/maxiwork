@@ -37,6 +37,8 @@ describe('ContextMcpToolsService (MAX-114)', () => {
     chain.populate = jest.fn().mockReturnValue(chain);
     chain.sort = jest.fn().mockReturnValue(chain);
     chain.limit = jest.fn().mockReturnValue(chain);
+    chain.select = jest.fn().mockReturnValue(chain);
+    chain.lean = jest.fn().mockReturnValue(chain);
     chain.exec = jest.fn().mockResolvedValue(result);
     return chain;
   }
@@ -46,7 +48,7 @@ describe('ContextMcpToolsService (MAX-114)', () => {
     taskKey: 'GEN-10',
     title: 'Fix overdue bug',
     status: 'in_progress',
-    priority: TaskPriority.URGENT,
+    priority: TaskPriority.CRITICAL,
     list: new Types.ObjectId(listId),
     assignee: new Types.ObjectId(userId),
     reporter: new Types.ObjectId(userId),
@@ -218,6 +220,7 @@ describe('ContextMcpToolsService (MAX-114)', () => {
         overdueTasksCount: number;
       };
       byStatusCategory: Record<string, number>;
+      byPriority: Record<string, number>;
       spacesBreakdown: Array<{ spaceName: string; overdueTasks: number }>;
     };
     expect(parsed.counts.totalTasks).toBe(2);
@@ -226,6 +229,11 @@ describe('ContextMcpToolsService (MAX-114)', () => {
     expect(parsed.counts.overdueTasksCount).toBe(1);
     expect(parsed.byStatusCategory.in_progress).toBe(1);
     expect(parsed.byStatusCategory.done).toBe(1);
+    expect(parsed.byPriority.critical).toBe(1);
+    expect(parsed.byPriority.medium).toBe(1);
+    expect(parsed.byPriority.low).toBe(0);
+    expect(parsed.byPriority.high).toBe(0);
+    expect(parsed.byPriority.urgent).toBeUndefined();
     expect(parsed.spacesBreakdown[0].overdueTasks).toBe(1);
   });
 

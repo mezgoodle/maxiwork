@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Task, TaskDocument } from '../../tasks/schemas/task.schema';
+import { TaskPriority } from '../../tasks/enums/task-priority.enum';
 import { StatusCategory } from '../../hierarchy/enums/status-category.enum';
 import { HierarchyService } from '../../hierarchy/hierarchy.service';
 import { McpToolsRegistryService } from '../mcp-tools-registry.service';
@@ -83,15 +84,20 @@ export class ContextMcpToolsService implements OnModuleInit {
           ? new Types.ObjectId(userId)
           : userId;
 
-        const assignedTasks = await this.taskModel
+        const assignedTasksQuery = this.taskModel
           .find({
             assignee: userObjId,
             $or: scopeClauses,
           })
           .sort({ dueDate: 1, updatedAt: -1 })
           .populate('reporter', 'firstName lastName email avatarUrl')
-          .populate('assignee', 'firstName lastName email avatarUrl')
-          .exec();
+          .populate('assignee', 'firstName lastName email avatarUrl');
+
+        if (!statusCategoryFilter) {
+          assignedTasksQuery.limit(limit);
+        }
+
+        const assignedTasks = await assignedTasksQuery.exec();
 
         const enriched = assignedTasks
           .map((task) => {
@@ -162,7 +168,11 @@ export class ContextMcpToolsService implements OnModuleInit {
 
         const tasks =
           scope.listIds.length > 0
-            ? await this.taskModel.find({ list: { $in: scope.listIds } }).exec()
+            ? await this.taskModel
+                .find({ list: { $in: scope.listIds } })
+                .select('list status priority dueDate assignee')
+                .lean()
+                .exec()
             : [];
 
         const now = new Date();
@@ -177,12 +187,9 @@ export class ContextMcpToolsService implements OnModuleInit {
           [StatusCategory.CLOSED]: 0,
         };
 
-        const byPriority: Record<string, number> = {
-          low: 0,
-          medium: 0,
-          high: 0,
-          urgent: 0,
-        };
+        const byPriority: Record<string, number> = Object.fromEntries(
+          Object.values(TaskPriority).map((p) => [p, 0]),
+        );
 
         let overdueTasksCount = 0;
         let dueSoonTasksCount = 0;
@@ -226,7 +233,7 @@ export class ContextMcpToolsService implements OnModuleInit {
           const category = this.helper.getStatusCategory(task.status, workflow);
           byStatusCategory[category] = (byStatusCategory[category] ?? 0) + 1;
 
-          const prio = task.priority || 'medium';
+          const prio = task.priority || TaskPriority.MEDIUM;
           byPriority[prio] = (byPriority[prio] ?? 0) + 1;
 
           const isCompleted =

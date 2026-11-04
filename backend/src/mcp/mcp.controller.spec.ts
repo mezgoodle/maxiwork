@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import type { Request, Response } from 'express';
 import { ApiKeysService } from '../api-keys/api-keys.service';
 import { ApiKeyAuthGuard } from '../api-keys/guards/api-key-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { McpAuthGuard } from './guards/mcp-auth.guard';
 import { McpController } from './mcp.controller';
 import { McpService } from './mcp.service';
 
@@ -30,7 +32,12 @@ describe('McpController', () => {
           provide: McpService,
           useValue: mockMcpService,
         },
+        McpAuthGuard,
         ApiKeyAuthGuard,
+        {
+          provide: JwtAuthGuard,
+          useValue: { canActivate: jest.fn().mockResolvedValue(true) },
+        },
         {
           provide: ApiKeysService,
           useValue: { validateRawKey: jest.fn() },

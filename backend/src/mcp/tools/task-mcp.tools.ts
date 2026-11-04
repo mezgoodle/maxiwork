@@ -1,8 +1,14 @@
-import { BadRequestException, Injectable, OnModuleInit } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  OnModuleInit,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Task, TaskDocument } from '../../tasks/schemas/task.schema';
 import { TaskPriority } from '../../tasks/enums/task-priority.enum';
+import { WorkspaceRole } from '../../hierarchy/enums/workspace-role.enum';
 import { TasksService } from '../../tasks/tasks.service';
 import { HierarchyService } from '../../hierarchy/hierarchy.service';
 import { isStatusDone } from '../../hierarchy/schemas/status-workflow.schema';
@@ -61,7 +67,7 @@ export class TaskMcpToolsService implements OnModuleInit {
           priority: {
             type: 'string',
             enum: Object.values(TaskPriority),
-            description: 'Task priority (low, medium, high, urgent)',
+            description: 'Task priority (low, medium, high, critical)',
           },
           status: {
             type: 'string',
@@ -210,7 +216,7 @@ export class TaskMcpToolsService implements OnModuleInit {
           priority: {
             type: 'string',
             enum: Object.values(TaskPriority),
-            description: 'Updated task priority (low, medium, high, urgent)',
+            description: 'Updated task priority (low, medium, high, critical)',
           },
           status: {
             type: 'string',
@@ -395,7 +401,8 @@ export class TaskMcpToolsService implements OnModuleInit {
           priority: {
             type: 'string',
             enum: Object.values(TaskPriority),
-            description: 'Optional priority filter (low, medium, high, urgent)',
+            description:
+              'Optional priority filter (low, medium, high, critical)',
           },
           assigneeId: {
             type: 'string',
@@ -568,6 +575,13 @@ export class TaskMcpToolsService implements OnModuleInit {
           taskIdInput,
           userId,
         );
+
+        if (resolved.role === WorkspaceRole.GUEST) {
+          throw new ForbiddenException(
+            'Guests are not permitted to delete tasks',
+          );
+        }
+
         const task = resolved.task;
         const actualId = this.helper.extractId(task._id);
 
@@ -591,6 +605,9 @@ export class TaskMcpToolsService implements OnModuleInit {
             .exec();
         }
 
+        const visited = new Set<string>();
+        visited.add(actualId);
+
         const deleteDescendants = async (
           parentIds: Types.ObjectId[],
         ): Promise<void> => {
@@ -601,9 +618,18 @@ export class TaskMcpToolsService implements OnModuleInit {
             .lean()
             .exec();
           if (children.length > 0) {
-            const childIds = children.map((c) => c._id);
-            await deleteDescendants(childIds);
-            await this.taskModel.deleteMany({ _id: { $in: childIds } }).exec();
+            const childIds = (children as Array<{ _id: Types.ObjectId }>)
+              .map((c) => c._id)
+              .filter((id) => !visited.has(this.helper.extractId(id)));
+            for (const id of childIds) {
+              visited.add(this.helper.extractId(id));
+            }
+            if (childIds.length > 0) {
+              await deleteDescendants(childIds);
+              await this.taskModel
+                .deleteMany({ _id: { $in: childIds } })
+                .exec();
+            }
           }
         };
 

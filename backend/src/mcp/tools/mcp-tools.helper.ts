@@ -40,6 +40,7 @@ export interface ResolvedAccessibleTask {
   list?: ListDocument;
   space?: SpaceDocument;
   workflow: StatusWorkflow;
+  role?: WorkspaceRole;
 }
 
 export interface AccessibleScope {
@@ -477,12 +478,12 @@ export class McpToolsHelper {
     const projectId = task.project ? this.extractId(task.project) : undefined;
 
     if (listId) {
-      const { list, space } = await this.hierarchyService.checkListAccess(
+      const { list, space, role } = await this.hierarchyService.checkListAccess(
         listId,
         userId,
       );
       const workflow = this.getEffectiveWorkflow(list, space);
-      return { task, listId, projectId, list, space, workflow };
+      return { task, listId, projectId, list, space, workflow, role };
     }
 
     if (projectId) {

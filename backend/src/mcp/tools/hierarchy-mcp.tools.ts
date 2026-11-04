@@ -23,10 +23,10 @@ export class HierarchyMcpToolsService implements OnModuleInit {
     this.registry.registerTool({
       name: 'list_workspaces',
       description:
-        'List all MaxiWork workspaces accessible to the authenticated user.',
+        'List all MaxiWork workspaces accessible to the authenticated user. Creates a default workspace if the user has none.',
       annotations: {
         title: 'List Workspaces',
-        readOnlyHint: true,
+        readOnlyHint: false,
         destructiveHint: false,
       },
       inputSchema: {

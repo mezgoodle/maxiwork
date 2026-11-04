@@ -122,6 +122,12 @@ describe('HierarchyMcpToolsService (MAX-113)', () => {
   });
 
   it('list_workspaces returns formatted workspaces for user', async () => {
+    const tool = registry.listTools().find((t) => t.name === 'list_workspaces');
+    expect(tool?.annotations?.readOnlyHint).toBe(false);
+    expect(tool?.description).toContain(
+      'Creates a default workspace if the user has none',
+    );
+
     const res = await registry.executeTool('list_workspaces', {}, userId);
     expect(res.isError).toBeUndefined();
     const parsed = JSON.parse(res.content[0].text) as {

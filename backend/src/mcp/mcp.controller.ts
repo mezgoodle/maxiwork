@@ -10,19 +10,18 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import type { ValidatedApiKeyPrincipal } from '../api-keys/api-keys.service';
-import { ApiKeyAuthGuard } from '../api-keys/guards/api-key-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { McpAuthGuard, type McpPrincipal } from './guards/mcp-auth.guard';
 import { McpService } from './mcp.service';
 
-@UseGuards(ApiKeyAuthGuard)
+@UseGuards(McpAuthGuard)
 @Controller('mcp')
 export class McpController {
   constructor(private readonly mcpService: McpService) {}
 
   @Get()
   async handleGet(
-    @CurrentUser() principal: ValidatedApiKeyPrincipal,
+    @CurrentUser() principal: McpPrincipal,
     @Req() req: Request,
     @Res() res: Response,
   ): Promise<void> {
@@ -31,7 +30,7 @@ export class McpController {
 
   @Post()
   async handlePost(
-    @CurrentUser() principal: ValidatedApiKeyPrincipal,
+    @CurrentUser() principal: McpPrincipal,
     @Req() req: Request,
     @Res() res: Response,
     @Body() body: unknown,
@@ -48,7 +47,7 @@ export class McpController {
 
   @Delete()
   async handleDelete(
-    @CurrentUser() principal: ValidatedApiKeyPrincipal,
+    @CurrentUser() principal: McpPrincipal,
     @Req() req: Request,
     @Res() res: Response,
     @Query('sessionId') sessionId?: string,

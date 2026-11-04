@@ -8,6 +8,7 @@ import { Folder } from '../../hierarchy/schemas/folder.schema';
 import { List } from '../../hierarchy/schemas/list.schema';
 import { Project } from '../../projects/schemas/project.schema';
 import { TaskPriority } from '../../tasks/enums/task-priority.enum';
+import { WorkspaceRole } from '../../hierarchy/enums/workspace-role.enum';
 import { createDefaultStatusWorkflow } from '../../hierarchy/schemas/status-workflow.schema';
 import { HierarchyService } from '../../hierarchy/hierarchy.service';
 import { TasksService } from '../../tasks/tasks.service';
@@ -385,5 +386,72 @@ describe('TaskMcpToolsService (MAX-112)', () => {
     };
     expect(parsed.deleted).toBe(true);
     expect(parsed.taskKey).toBe('GEN-1');
+  });
+
+  it('delete_task rejects guest users with ForbiddenException', async () => {
+    hierarchyService.checkListAccess.mockResolvedValueOnce({
+      list: {
+        _id: new Types.ObjectId(listId),
+        spaceId: new Types.ObjectId(spaceId),
+        name: 'Sprint Backlog',
+        statusWorkflow: defaultWorkflow,
+      },
+      space: {
+        _id: new Types.ObjectId(spaceId),
+        workspaceId: new Types.ObjectId(workspaceId),
+        name: 'Engineering',
+        statusWorkflow: defaultWorkflow,
+      },
+      workspace: {
+        _id: new Types.ObjectId(workspaceId),
+        owner: new Types.ObjectId(),
+        members: [],
+      },
+      role: WorkspaceRole.GUEST,
+    });
+
+    const res = await registry.executeTool(
+      'delete_task',
+      { taskId: 'GEN-1' },
+      userId,
+    );
+
+    expect(res.isError).toBe(true);
+    expect(res.content[0].text).toContain(
+      'Guests are not permitted to delete tasks',
+    );
+  });
+
+  it('exposes critical in tool priority descriptions', () => {
+    const tools = registry.listTools();
+    const createTask = tools.find((t) => t.name === 'create_task');
+    const updateTask = tools.find((t) => t.name === 'update_task');
+    const searchTasks = tools.find((t) => t.name === 'search_tasks');
+
+    const createPrio = (
+      createTask?.inputSchema?.properties as Record<
+        string,
+        { description?: string }
+      >
+    )?.priority;
+    const updatePrio = (
+      updateTask?.inputSchema?.properties as Record<
+        string,
+        { description?: string }
+      >
+    )?.priority;
+    const searchPrio = (
+      searchTasks?.inputSchema?.properties as Record<
+        string,
+        { description?: string }
+      >
+    )?.priority;
+
+    expect(createPrio?.description).toContain('critical');
+    expect(createPrio?.description).not.toContain('urgent');
+    expect(updatePrio?.description).toContain('critical');
+    expect(updatePrio?.description).not.toContain('urgent');
+    expect(searchPrio?.description).toContain('critical');
+    expect(searchPrio?.description).not.toContain('urgent');
   });
 });
