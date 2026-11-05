@@ -17,6 +17,13 @@
             >
               Dashboard
             </NuxtLink>
+            <NuxtLink
+              to="/settings/mcp"
+              class="px-3 py-1 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition flex items-center gap-1.5"
+            >
+              <span>🔌</span>
+              <span>MCP</span>
+            </NuxtLink>
             <span class="text-xs text-slate-400 hidden sm:inline ml-2">
               {{ authStore.user ? ([authStore.user.firstName, authStore.user.lastName].filter(Boolean).join(' ') || authStore.user.email) : '' }}
             </span>
