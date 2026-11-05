@@ -10,6 +10,26 @@ import {
 
 export type TaskDocument = HydratedDocument<Task>;
 
+@Schema({ _id: true, timestamps: false })
+export class TaskComment {
+  _id?: Types.ObjectId;
+
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: User.name,
+    required: true,
+  })
+  author: Types.ObjectId | User;
+
+  @Prop({ required: true, trim: true })
+  content: string;
+
+  @Prop({ type: Date, default: () => new Date() })
+  createdAt: Date;
+}
+
+export const TaskCommentSchema = SchemaFactory.createForClass(TaskComment);
+
 @Schema({
   timestamps: true,
 })
@@ -108,6 +128,9 @@ export class Task {
 
   @Prop({ type: RecurrenceSettingsSchema, default: null })
   recurrence?: RecurrenceSettings;
+
+  @Prop({ type: [TaskCommentSchema], default: [] })
+  comments?: TaskComment[];
 
   createdAt?: Date;
   updatedAt?: Date;
