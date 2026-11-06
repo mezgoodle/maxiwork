@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  MCP_TOKEN_PLACEHOLDER,
   MCP_TOOLS_CATALOG,
   buildMcpClientSnippet,
   computeExpirationIso,
@@ -19,7 +20,19 @@ describe('MCP Utilities (MAX-115, MAX-116)', () => {
       );
     });
 
-    it('handles empty or whitespace apiBase gracefully', () => {
+    it('resolves relative apiBase against appOrigin when provided', () => {
+      expect(resolveMcpEndpointUrl('/api', 'http://localhost:3001')).toBe(
+        'http://localhost:3001/api/mcp',
+      );
+      expect(resolveMcpEndpointUrl('/api/', 'http://localhost:3001/')).toBe(
+        'http://localhost:3001/api/mcp',
+      );
+      expect(resolveMcpEndpointUrl('', 'http://localhost:3001')).toBe(
+        'http://localhost:3001/mcp',
+      );
+    });
+
+    it('handles empty or whitespace apiBase gracefully without appOrigin', () => {
       expect(resolveMcpEndpointUrl('')).toBe('/mcp');
       expect(resolveMcpEndpointUrl('   ')).toBe('/mcp');
     });
@@ -68,11 +81,14 @@ describe('MCP Utilities (MAX-115, MAX-116)', () => {
   describe('buildMcpClientSnippet', () => {
     const endpoint = 'http://localhost:3000/api/mcp';
 
-    it('uses placeholder token by default when no secret is provided', () => {
+    it('uses placeholder token and local stdio bridge for Claude Desktop', () => {
       const claude = buildMcpClientSnippet('claude', endpoint);
       expect(claude.title).toBe('Claude Desktop');
       expect(claude.configPath).toBe('claude_desktop_config.json');
-      expect(claude.json).toContain('mxw_live_YOUR_TOKEN_HERE');
+      expect(claude.description).toContain('mcp-remote');
+      expect(claude.description).toContain(`Replace ${MCP_TOKEN_PLACEHOLDER}`);
+      expect(claude.json).toContain(MCP_TOKEN_PLACEHOLDER);
+      expect(claude.json).toContain('mcp-remote');
       expect(claude.json).toContain(endpoint);
     });
 
@@ -82,9 +98,10 @@ describe('MCP Utilities (MAX-115, MAX-116)', () => {
       expect(cursor.title).toBe('Cursor IDE');
       expect(cursor.configPath).toBe('.cursor/mcp.json');
       expect(cursor.json).toContain(rawSecret);
+      expect(cursor.description).not.toContain('Replace');
     });
 
-    it('masks token when revealSecret is false but token is provided', () => {
+    it('uses explicit placeholder instead of truncated secret when revealSecret is false', () => {
       const rawSecret = 'mxw_live_0123456789abcdef0123456789abcdef';
       const antigravity = buildMcpClientSnippet(
         'antigravity',
@@ -94,8 +111,10 @@ describe('MCP Utilities (MAX-115, MAX-116)', () => {
       );
       expect(antigravity.title).toBe('Google Antigravity');
       expect(antigravity.configPath).toBe('mcp_config.json');
-      expect(antigravity.json).toContain('mxw_live_0123456...');
+      expect(antigravity.json).toContain(MCP_TOKEN_PLACEHOLDER);
       expect(antigravity.json).not.toContain(rawSecret);
+      expect(antigravity.json).not.toContain('...');
+      expect(antigravity.description).toContain(`Replace ${MCP_TOKEN_PLACEHOLDER}`);
     });
   });
 

@@ -5,9 +5,23 @@ import type {
   McpToolCategoryGroup,
 } from '../types/mcp';
 
-export const resolveMcpEndpointUrl = (apiBase: string): string => {
-  const clean = (apiBase || '').trim().replace(/\/+$/, '');
-  return `${clean}/mcp`;
+export const MCP_TOKEN_PLACEHOLDER = 'YOUR_API_KEY_HERE';
+
+export const resolveMcpEndpointUrl = (
+  apiBase: string,
+  appOrigin?: string,
+): string => {
+  const cleanApi = (apiBase || '').trim().replace(/\/+$/, '');
+  const hasProtocol = /^https?:\/\//i.test(cleanApi);
+
+  if (!hasProtocol && appOrigin) {
+    const cleanOrigin = appOrigin.trim().replace(/\/+$/, '');
+    const cleanPath = cleanApi.replace(/^\/+/, '');
+    const joined = cleanPath ? `${cleanOrigin}/${cleanPath}` : cleanOrigin;
+    return `${joined}/mcp`;
+  }
+
+  return `${cleanApi}/mcp`;
 };
 
 export const computeExpirationIso = (
@@ -50,24 +64,31 @@ export const buildMcpClientSnippet = (
   rawSecret?: string | null,
   revealSecret = false,
 ): McpClientSnippetResult => {
-  const secretPlaceholder = 'mxw_live_YOUR_TOKEN_HERE';
   const effectiveSecret =
-    rawSecret && revealSecret ? rawSecret : rawSecret ? `${rawSecret.substring(0, 16)}...` : secretPlaceholder;
+    rawSecret && revealSecret ? rawSecret : MCP_TOKEN_PLACEHOLDER;
+  const isPlaceholder = effectiveSecret === MCP_TOKEN_PLACEHOLDER;
+  const placeholderInstruction = isPlaceholder
+    ? ` Replace ${MCP_TOKEN_PLACEHOLDER} with your generated MaxiWork API key.`
+    : '';
 
   switch (client) {
     case 'claude':
       return {
         title: 'Claude Desktop',
         configPath: 'claude_desktop_config.json',
-        description: 'Add to your Claude Desktop configuration file to interact with MaxiWork through Claude.',
+        description: `Claude Desktop connects to remote MCP servers via a local stdio bridge (mcp-remote). Add this to your Claude Desktop configuration file.${placeholderInstruction}`,
         json: JSON.stringify(
           {
             mcpServers: {
               maxiwork: {
-                url: endpointUrl,
-                headers: {
-                  Authorization: `Bearer ${effectiveSecret}`,
-                },
+                command: 'npx',
+                args: [
+                  '-y',
+                  'mcp-remote',
+                  endpointUrl,
+                  '--header',
+                  `Authorization: Bearer ${effectiveSecret}`,
+                ],
               },
             },
           },
@@ -79,7 +100,7 @@ export const buildMcpClientSnippet = (
       return {
         title: 'Cursor IDE',
         configPath: '.cursor/mcp.json',
-        description: 'Add to your project root or global Cursor MCP configuration to allow Cursor Composer to manage tasks.',
+        description: `Add to your project root or global Cursor MCP configuration to allow Cursor Composer to manage tasks.${placeholderInstruction}`,
         json: JSON.stringify(
           {
             mcpServers: {
@@ -99,7 +120,7 @@ export const buildMcpClientSnippet = (
       return {
         title: 'Google Antigravity',
         configPath: 'mcp_config.json',
-        description: 'Add to your Antigravity agent settings or workspace MCP manifest for pair-programming and tool access.',
+        description: `Add to your Antigravity agent settings or workspace MCP manifest for pair-programming and tool access.${placeholderInstruction}`,
         json: JSON.stringify(
           {
             mcpServers: {

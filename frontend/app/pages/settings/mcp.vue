@@ -317,7 +317,7 @@
             :class="snippetRevealToken ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-300' : 'border-slate-700 bg-slate-800 text-slate-400 hover:text-white'"
             @click="snippetRevealToken = !snippetRevealToken"
           >
-            {{ snippetRevealToken ? '✓ Active Token' : 'Masked Token' }}
+            {{ snippetRevealToken ? '✓ Active Token' : 'Placeholder' }}
           </button>
         </div>
       </div>
@@ -368,6 +368,16 @@
         <div class="relative">
           <pre class="bg-slate-950 border border-slate-800 rounded-xl p-4 text-xs font-mono text-emerald-300 overflow-x-auto leading-relaxed"><code>{{ currentSnippet.json }}</code></pre>
         </div>
+
+        <p
+          v-if="!createdSecret || !snippetRevealToken"
+          class="text-xs text-amber-400/90 flex items-center gap-1.5"
+        >
+          <span>💡</span>
+          <span>
+            Snippet contains placeholder <code>YOUR_API_KEY_HERE</code>. Replace it with your actual API key before connecting.
+          </span>
+        </p>
       </div>
     </div>
 
@@ -470,6 +480,7 @@ definePageMeta({
 });
 
 const config = useRuntimeConfig();
+const requestUrl = useRequestURL();
 const { apiFetch } = useApi();
 const toast = useToast();
 
@@ -500,7 +511,10 @@ const clientTabs: Array<{ id: McpClientTab; label: string }> = [
 const toolGroups = getMcpToolsByCategories();
 
 const mcpEndpointUrl = computed(() => {
-  return resolveMcpEndpointUrl(config.public?.apiBase || 'http://localhost:3000/api');
+  return resolveMcpEndpointUrl(
+    config.public?.apiBase || 'http://localhost:3000/api',
+    requestUrl.origin,
+  );
 });
 
 const currentSnippet = computed(() => {
