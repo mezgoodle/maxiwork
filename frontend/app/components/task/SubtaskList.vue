@@ -1,6 +1,6 @@
 <template>
   <div class="space-y-4">
-    <!-- Header with Counter and Progress -->
+    <!-- Header with Counter, Progress, and AI Suggest Button -->
     <div class="flex items-center justify-between gap-4">
       <div class="flex items-center gap-2.5">
         <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider">
@@ -13,13 +13,28 @@
         </span>
       </div>
 
-      <!-- Percentage Indicator -->
-      <span
-        v-if="totalCount > 0"
-        class="text-xs font-mono font-medium text-slate-400"
-      >
-        {{ progressPercent }}%
-      </span>
+      <div class="flex items-center gap-3">
+        <!-- Percentage Indicator -->
+        <span
+          v-if="totalCount > 0"
+          class="text-xs font-mono font-medium text-slate-400"
+        >
+          {{ progressPercent }}%
+        </span>
+
+        <!-- AI Suggest Subtasks Button -->
+        <button
+          type="button"
+          class="px-2.5 py-1 rounded-lg text-xs font-medium text-indigo-300 hover:text-white bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+          :disabled="isSuggesting"
+          title="Suggest subtasks using Gemini AI"
+          @click="handleSuggestSubtasks"
+        >
+          <span v-if="isSuggesting" class="animate-spin text-[10px]">⚙️</span>
+          <span v-else>✨</span>
+          <span>{{ isSuggesting ? 'Thinking...' : 'Suggest with AI' }}</span>
+        </button>
+      </div>
     </div>
 
     <!-- Progress Bar -->
@@ -32,6 +47,74 @@
         :class="progressPercent === 100 ? 'bg-emerald-500' : 'bg-indigo-500'"
         :style="{ width: `${progressPercent}%` }"
       />
+    </div>
+
+    <!-- AI Subtask Suggestions Preview Card -->
+    <div
+      v-if="suggestedSubtasks.length > 0"
+      class="p-3.5 bg-indigo-950/20 border border-indigo-500/30 rounded-2xl space-y-3"
+    >
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span>✨</span>
+          <span class="text-xs font-bold text-indigo-300">
+            AI Proposed Subtasks
+          </span>
+          <span class="text-[10px] text-slate-400">
+            ({{ selectedSubtaskIndexes.length }} of {{ suggestedSubtasks.length }} selected)
+          </span>
+        </div>
+        <button
+          type="button"
+          class="text-xs text-slate-400 hover:text-slate-200 cursor-pointer"
+          @click="dismissSuggestions"
+        >
+          Dismiss
+        </button>
+      </div>
+
+      <div class="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+        <label
+          v-for="(item, idx) in suggestedSubtasks"
+          :key="idx"
+          class="flex items-center justify-between gap-2.5 p-2 rounded-xl bg-slate-900/60 border border-indigo-500/20 hover:border-indigo-500/40 cursor-pointer transition text-xs"
+        >
+          <div class="flex items-center gap-2.5 min-w-0">
+            <input
+              type="checkbox"
+              :checked="selectedSubtaskIndexes.includes(idx)"
+              class="w-3.5 h-3.5 rounded border border-slate-600 bg-slate-800 text-indigo-500 focus:ring-0 cursor-pointer"
+              @change="toggleSelectSuggestion(idx)"
+            >
+            <span class="truncate text-slate-200 font-medium">{{ item.title }}</span>
+          </div>
+
+          <span
+            class="text-[10px] font-medium px-2 py-0.5 rounded-full border capitalize shrink-0"
+            :class="getPriorityBadgeClass(item.priority)"
+          >
+            {{ item.priority }}
+          </span>
+        </label>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-1 border-t border-indigo-500/20">
+        <button
+          type="button"
+          class="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white cursor-pointer"
+          @click="dismissSuggestions"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+          :disabled="selectedSubtaskIndexes.length === 0 || isCreatingBulk"
+          @click="createSelectedSubtasks"
+        >
+          <span>{{ isCreatingBulk ? 'Creating...' : `Create Selected (${selectedSubtaskIndexes.length})` }}</span>
+        </button>
+      </div>
     </div>
 
     <!-- Loading State -->
@@ -172,7 +255,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import type { Task, TaskStatus } from '../../types/task';
+import type { SuggestedSubtaskItem } from '../../types/ai';
 import { useTasksStore } from '../../stores/tasks';
+import { useAiStore } from '../../stores/ai';
 import { useApi } from '../../composables/useApi';
 import { useToast } from '../../composables/useToast';
 import { extractApiErrorMessage } from '../../utils/error';
@@ -194,6 +279,7 @@ const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 const tasksStore = useTasksStore();
+const aiStore = useAiStore();
 const { apiFetch } = useApi();
 const { showToast } = useToast();
 
@@ -201,6 +287,11 @@ const subtasks = ref<Task[]>([]);
 const loading = ref(false);
 const newTitle = ref('');
 const isCreating = ref(false);
+
+const isSuggesting = ref(false);
+const isCreatingBulk = ref(false);
+const suggestedSubtasks = ref<SuggestedSubtaskItem[]>([]);
+const selectedSubtaskIndexes = ref<number[]>([]);
 
 const totalCount = computed(() => {
   return subtasks.value.length;
@@ -235,6 +326,90 @@ async function loadSubtasks() {
     subtasks.value = [];
   } finally {
     loading.value = false;
+  }
+}
+
+async function handleSuggestSubtasks() {
+  if (!props.parentTask?.title || isSuggesting.value) return;
+
+  isSuggesting.value = true;
+  try {
+    const list = await aiStore.suggestSubtasks({
+      taskId: props.parentTask._id,
+      title: props.parentTask.title,
+      description: props.parentTask.description,
+      count: 4,
+    });
+    suggestedSubtasks.value = list;
+    selectedSubtaskIndexes.value = list.map((_, i) => i);
+    if (list.length === 0) {
+      showToast('No subtasks suggested', 'info');
+    }
+  } catch (err: unknown) {
+    showToast(extractApiErrorMessage(err, 'Failed to suggest subtasks'), 'error');
+  } finally {
+    isSuggesting.value = false;
+  }
+}
+
+function toggleSelectSuggestion(index: number) {
+  if (selectedSubtaskIndexes.value.includes(index)) {
+    selectedSubtaskIndexes.value = selectedSubtaskIndexes.value.filter((i) => i !== index);
+  } else {
+    selectedSubtaskIndexes.value.push(index);
+  }
+}
+
+function dismissSuggestions() {
+  suggestedSubtasks.value = [];
+  selectedSubtaskIndexes.value = [];
+}
+
+async function createSelectedSubtasks() {
+  if (selectedSubtaskIndexes.value.length === 0 || isCreatingBulk.value) return;
+
+  isCreatingBulk.value = true;
+  const itemsToCreate = selectedSubtaskIndexes.value.map((i) => suggestedSubtasks.value[i]);
+
+  let createdCount = 0;
+  for (const item of itemsToCreate) {
+    try {
+      if (props.listId) {
+        const created = await apiFetch<Task>(
+          `/lists/${props.listId}/tasks/${props.parentTask._id}/subtasks`,
+          {
+            method: 'POST',
+            body: {
+              title: item.title,
+              priority: item.priority,
+            },
+          },
+        );
+        subtasks.value.push(created);
+        createdCount++;
+      } else if (props.projectId) {
+        const created = await tasksStore.createSubtask(
+          props.projectId,
+          props.parentTask._id,
+          {
+            title: item.title,
+            priority: item.priority,
+          },
+        );
+        subtasks.value.push(created);
+        createdCount++;
+      }
+    } catch {
+      // Continue with remaining
+    }
+  }
+
+  isCreatingBulk.value = false;
+  dismissSuggestions();
+
+  if (createdCount > 0) {
+    showToast(`Created ${createdCount} subtasks with AI`, 'success');
+    emit('updated');
   }
 }
 
@@ -358,6 +533,7 @@ onMounted(() => {
 watch(
   () => props.parentTask._id,
   () => {
+    dismissSuggestions();
     loadSubtasks();
   },
 );

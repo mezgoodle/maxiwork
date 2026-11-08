@@ -134,11 +134,60 @@
         >
       </div>
 
-      <!-- Description -->
+      <!-- Description Section with AI Toolbar -->
       <div class="space-y-1.5">
-        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">
-          Description
-        </label>
+        <div class="flex items-center justify-between">
+          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">
+            Description
+          </label>
+
+          <!-- AI Improve Toolbar Dropdown -->
+          <div class="relative">
+            <button
+              type="button"
+              class="px-2 py-0.5 rounded-lg text-xs font-medium text-indigo-300 hover:text-white bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 transition flex items-center gap-1 cursor-pointer disabled:opacity-50"
+              :disabled="isImprovingDescription"
+              @click="isAiMenuOpen = !isAiMenuOpen"
+            >
+              <span v-if="isImprovingDescription" class="animate-spin text-[10px]">⚙️</span>
+              <span v-else>✨</span>
+              <span>{{ isImprovingDescription ? 'Improving...' : 'Improve with AI' }}</span>
+              <span class="text-[9px]">▾</span>
+            </button>
+
+            <!-- Dropdown Menu -->
+            <div
+              v-if="isAiMenuOpen"
+              class="absolute right-0 top-full mt-1 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-xl py-1 z-20 text-xs"
+            >
+              <button
+                type="button"
+                class="w-full px-3 py-1.5 text-left text-slate-200 hover:bg-slate-700/60 hover:text-white flex items-center gap-2 cursor-pointer"
+                @click="applyAiImprovement('polish')"
+              >
+                <span>✨</span>
+                <span>Polish & Clarify</span>
+              </button>
+              <button
+                type="button"
+                class="w-full px-3 py-1.5 text-left text-slate-200 hover:bg-slate-700/60 hover:text-white flex items-center gap-2 cursor-pointer"
+                @click="applyAiImprovement('expand')"
+              >
+                <span>📝</span>
+                <span>Expand Specification</span>
+              </button>
+              <button
+                type="button"
+                class="w-full px-3 py-1.5 text-left text-slate-200 hover:bg-slate-700/60 hover:text-white flex items-center gap-2 cursor-pointer"
+                @click="applyAiImprovement('acceptance_criteria')"
+              >
+                <span>☑️</span>
+                <span>Add Acceptance Criteria</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      
 
         <!-- View Mode -->
         <div
@@ -437,6 +486,8 @@ import { useHierarchyStore } from '../../stores/hierarchy';
 import { useProjectsStore } from '../../stores/projects';
 import { useTasksStore } from '../../stores/tasks';
 import { useCustomFieldsStore } from '../../stores/custom-fields';
+import { useAiStore } from '../../stores/ai';
+import type { ImproveDescriptionAction } from '../../types/ai';
 import { extractApiErrorMessage } from '../../utils/error';
 import DatePickerMenu from '../ui/DatePickerMenu.vue';
 import ConfirmDialog from '../ui/ConfirmDialog.vue';
@@ -481,6 +532,32 @@ const hierarchyStore = useHierarchyStore();
 const projectsStore = useProjectsStore();
 const tasksStore = useTasksStore();
 const customFieldsStore = useCustomFieldsStore();
+const aiStore = useAiStore();
+
+const isAiMenuOpen = ref(false);
+const isImprovingDescription = ref(false);
+
+async function applyAiImprovement(action: ImproveDescriptionAction) {
+  isAiMenuOpen.value = false;
+  if (!activeTask.value.title || isImprovingDescription.value) return;
+
+  isImprovingDescription.value = true;
+  try {
+    const current = editableDescription.value || activeTask.value.description || '';
+    const improved = await aiStore.improveDescription({
+      title: editableTitle.value || activeTask.value.title,
+      description: current,
+      action,
+    });
+    editableDescription.value = improved;
+    isEditingDescription.value = true;
+    showToast('Description generated with AI. Review and click Save.', 'info');
+  } catch (err: unknown) {
+    showToast(extractApiErrorMessage(err, 'Failed to improve description'), 'error');
+  } finally {
+    isImprovingDescription.value = false;
+  }
+}
 
 const activeTask = ref<Task>({ ...props.initialTask });
 const history = ref<Task[]>([]);
