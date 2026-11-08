@@ -24,6 +24,17 @@
               <span>🔌</span>
               <span>MCP</span>
             </NuxtLink>
+            <!-- AI Assistant Button -->
+            <button
+              type="button"
+              class="px-3 py-1 text-xs font-medium rounded-lg bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/30 border border-indigo-500/30 transition flex items-center gap-1.5 cursor-pointer"
+              title="Toggle AI Assistant (Ctrl+J)"
+              @click="aiStore.toggleDrawer()"
+            >
+              <span>✨</span>
+              <span>AI</span>
+              <kbd class="hidden sm:inline text-[10px] text-indigo-400/80">Ctrl+J</kbd>
+            </button>
             <span class="text-xs text-slate-400 hidden sm:inline ml-2">
               {{ authStore.user ? ([authStore.user.firstName, authStore.user.lastName].filter(Boolean).join(' ') || authStore.user.email) : '' }}
             </span>
@@ -68,6 +79,9 @@
       &copy; {{ new Date().getFullYear() }} MaxiWork. All rights reserved.
     </footer>
 
+    <!-- Global Floating AI Drawer -->
+    <AiDrawer v-if="authStore.isAuthenticated" />
+
     <!-- Global Toast Notifications -->
     <ToastContainer />
   </div>
@@ -75,10 +89,13 @@
 
 <script lang="ts" setup>
 import { useAuthStore } from '../stores/auth';
+import { useAiStore } from '../stores/ai';
 import SidebarTree from '../components/hierarchy/SidebarTree.vue';
 import ToastContainer from '../components/ui/ToastContainer.vue';
+import AiDrawer from '../components/ai/AiDrawer.vue';
 
 const authStore = useAuthStore();
+const aiStore = useAiStore();
 
 async function handleLogout() {
   await authStore.logout();
