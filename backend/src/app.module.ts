@@ -12,6 +12,7 @@ import { HierarchyModule } from './hierarchy/hierarchy.module';
 import { CustomFieldsModule } from './custom-fields/custom-fields.module';
 import { ApiKeysModule } from './api-keys/api-keys.module';
 import { McpModule } from './mcp/mcp.module';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { McpModule } from './mcp/mcp.module';
     CustomFieldsModule,
     ApiKeysModule,
     McpModule,
+    AiModule,
   ],
   controllers: [AppController],
   providers: [AppService],
