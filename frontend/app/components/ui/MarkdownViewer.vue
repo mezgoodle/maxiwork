@@ -22,10 +22,11 @@ interface Props {
   interactiveChecklists?: boolean;
   emptyPlaceholder?: string;
   compact?: boolean;
+  linkifyTasks?: boolean;
 }
 
 interface Emits {
-  (e: 'update:content', val: string): void;
+  (e: 'update:content' | 'task-click', val: string): void;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -33,6 +34,7 @@ const props = withDefaults(defineProps<Props>(), {
   interactiveChecklists: true,
   emptyPlaceholder: 'No description provided',
   compact: false,
+  linkifyTasks: false,
 });
 
 const emit = defineEmits<Emits>();
@@ -40,12 +42,28 @@ const emit = defineEmits<Emits>();
 const viewerRef = ref<HTMLElement | null>(null);
 
 const renderedHtml = computed(() => {
-  return renderMarkdown(props.content);
+  const baseHtml = renderMarkdown(props.content);
+  if (!props.linkifyTasks || !baseHtml) return baseHtml;
+  return baseHtml.replace(
+    /\b([A-Z]{2,10}-\d+)\b/g,
+    '<button type="button" class="task-key-pill font-mono font-bold text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 px-1.5 py-0.5 rounded border border-indigo-500/20 text-[11px] cursor-pointer transition inline-flex items-center" data-task-key="$1">$1</button>',
+  );
 });
 
 function handleClick(event: MouseEvent) {
   const target = event.target as HTMLElement | null;
   if (!target || !viewerRef.value) return;
+
+  const taskBtn = target.closest('[data-task-key]') as HTMLElement | null;
+  if (taskBtn) {
+    const key = taskBtn.getAttribute('data-task-key');
+    if (key) {
+      event.preventDefault();
+      event.stopPropagation();
+      emit('task-click', key);
+      return;
+    }
+  }
 
   // Prevent link clicks from bubbling up to parent click-to-edit handlers
   if (target.tagName === 'A' || target.closest('a')) {

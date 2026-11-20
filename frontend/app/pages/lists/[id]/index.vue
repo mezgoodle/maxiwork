@@ -294,6 +294,7 @@ import { useHierarchyStore } from '../../../stores/hierarchy';
 import { useCustomFieldsStore } from '../../../stores/custom-fields';
 import { useViewStore } from '../../../stores/view';
 import { useAuthStore } from '../../../stores/auth';
+import { useAiStore } from '../../../stores/ai';
 import { useApi } from '../../../composables/useApi';
 import { useToast } from '../../../composables/useToast';
 import { extractApiErrorMessage } from '../../../utils/error';
@@ -324,6 +325,7 @@ const hierarchyStore = useHierarchyStore();
 const customFieldsStore = useCustomFieldsStore();
 const viewStore = useViewStore();
 const authStore = useAuthStore();
+const aiStore = useAiStore();
 const { apiFetch } = useApi();
 const { showToast } = useToast();
 
@@ -797,19 +799,30 @@ async function confirmDeleteList() {
   }
 }
 
+watch(
+  () => aiStore.mutationVersion,
+  (v) => {
+    if (v > 0) void loadList();
+  },
+);
+
 async function handleDrop(taskId: string, newStatus: TaskStatus) {
   const targetTask = tasks.value.find((t) => t._id === taskId);
   if (!targetTask || targetTask.status === newStatus) return;
   await handleStatusChange(taskId, newStatus);
+
 }
 
 onMounted(() => {
   loadList();
+
 });
 
 watch(listId, () => {
   isConfirmDeleteListOpen.value = false;
   listToDelete.value = null;
+
   loadList();
+
 });
 </script>
