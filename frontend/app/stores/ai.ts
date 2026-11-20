@@ -239,6 +239,12 @@ export const useAiStore = defineStore('ai', () => {
                 if (data.mutated) {
                   mutationVersion.value++;
                 }
+              } else if (currentEvent === 'error') {
+                const errMsg =
+                  typeof data.message === 'string'
+                    ? data.message
+                    : 'AI streaming error';
+                assistantMessage.content += `\n\n*(Error: ${errMsg})*`;
               } else if (currentEvent === 'done') {
                 if (data.mutated) {
                   mutationVersion.value++;
