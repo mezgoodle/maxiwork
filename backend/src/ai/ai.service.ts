@@ -55,10 +55,10 @@ export class AiService {
   ) {
     const apiKey = this.configService.get<string>('GEMINI_API_KEY');
     this.defaultModel =
-      this.configService.get<string>('GEMINI_MODEL') || 'gemini-3.8-flash';
+      this.configService.get<string>('GEMINI_MODEL') || 'gemini-2.5-flash';
 
     if (apiKey && apiKey.trim() && apiKey !== 'your_gemini_api_key_here') {
-      this.genAiClient = new GoogleGenAI({ apiKey });
+      this.genAiClient = new GoogleGenAI({ apiKey, apiVersion: 'v1beta' });
       this.logger.log(
         `Gemini AI Client initialized with model ${this.defaultModel}`,
       );
